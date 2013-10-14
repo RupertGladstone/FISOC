@@ -1,3 +1,8 @@
 *.o
 *~
+*#
+*.Log
+*.mod
+*LogFile
 FISOC_caller
+a.out
