@@ -1,0 +1,5 @@
+&config
+     ts_ocn_sec = 300,   ts_ratio = 10, 
+     start_year = 2010,  start_month = 1,
+     end_year = 2010,    end_month = 2, 
+     tight_coupling = .TRUE./
