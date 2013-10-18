@@ -67,6 +67,10 @@ CONTAINS
  !*** can create the child grid components here, and register the relevant subroutines
 
  !*** create child grids and their decompositions
+!*** maybe elmer needs to set the grid... can write an elmer solver to create the grid 
+! in the proper ESMF way, using Elmer's own idea of how the grid should be...
+
+!***ROMS grid: need to see how Ufuk has done it...
 
  !*** create import and export states for all grid components, and call their initialize 
  ! routines (which have previously been registered)

@@ -16,10 +16,6 @@ PROGRAM FISOC_main
   INTEGER :: fileunit
   CHARACTER(len=ESMF_MAXSTR) :: msg
 
-!*** grids
-
-! ***where is clock actually advanced? or keep multiple clocks for checking?
-
   ! Timekeeping
   TYPE(ESMF_Clock)        :: FISOC_clock
   INTEGER                 :: ts_ocn_sec, ts_ice_sec, ts_ratio
@@ -29,10 +25,12 @@ PROGRAM FISOC_main
   TYPE(ESMF_Alarm)        :: alarm_ocn, alarm_ice
   LOGICAL                 :: tight_coupling
 
-!***explain...
+  ! A parent gridded component is used to support the hierarchical approach  
+  ! of ESMF, but the actual grid and state are dummy properties.  The parent 
+  ! merely coordinates the child components (ice, ocean and processing)
+!*** maybe we dont need even a dummy grid for parent... will soon see...
   TYPE(ESMF_GridComp)     :: FISOC_parent 
   TYPE(ESMF_State)        :: FISOC_dummy_state
-
 
   ! namelist of configuration parameters to be read from config file
   NAMELIST /config/  ts_ocn_sec, ts_ratio, start_year, start_month, &
@@ -41,14 +39,15 @@ PROGRAM FISOC_main
 !------------------------------------------------------------------------------
 
 
-! some things ESMF offers:
+! ***some things ESMF offers:
 ! logging (you don't need to create a log, ESMF will create a default log on initialize, 
 ! but you can create further logs using ESMF if you want) 
 ! regridding
 ! clocks and alarms
-
+! helping to manage effective parallelization
 !***does parent have access to child import/export states?
 !*** global params:
+! ***where is clock actually advanced? or keep multiple clocks for checking?
 
 !------------------------------------------------------------------------------
 !*** what calendar? 360 day?
@@ -190,12 +189,6 @@ PROGRAM FISOC_main
 
 
 !------------------------------------------------------------------------------
-!*** create grid 
-! ??? what grid is this?  used by child or parent grid components? 
-! is parent grid meaningless?  can we do without it?
-
-
-!------------------------------------------------------------------------------
 ! The main bit: initialize, run and finalize FISOC_parent (the parent calls 
 ! all child components).
   CALL ESMF_GridCompInitialize(FISOC_parent, &
@@ -212,7 +205,10 @@ PROGRAM FISOC_main
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
- 
+  msg = "FISOC_caller: FISOC run complete, tidying up..."  
+  CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
+
   CALL ESMF_GridCompFinalize(FISOC_parent, &
        importState=FISOC_dummy_state, exportState=FISOC_dummy_state, &
        clock=FISOC_clock, userRc=urc, rc=rc)
@@ -221,9 +217,26 @@ PROGRAM FISOC_main
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   
 !------------------------------------------------------------------------------
-!***destroy clock and both alarms and grid component(s)
 
+  CALL ESMF_AlarmDestroy(alarm_ice, rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+  
+  CALL ESMF_AlarmDestroy(alarm_ocn, rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+  CALL ESMF_ClockDestroy(FISOC_clock, rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+  
   CALL ESMF_Finalize()
+
+  msg = "FISOC_caller: completed finalize and destruction routines"  
+  CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
 
 END PROGRAM FISOC_main
