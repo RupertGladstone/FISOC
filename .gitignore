@@ -4,5 +4,11 @@
 *.Log
 *.mod
 *LogFile
+*.grd
+*.log
+*.ep
 FISOC_caller
 a.out
+FISOC_mesh1a_2D/
+FISOC_mesh1a_3D/
+FISOC_mesh1a_DEM/
