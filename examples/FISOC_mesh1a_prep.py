@@ -4,23 +4,36 @@ import os, sys, numpy
 # create DEM
 print "\ncreating DEM..."
 # first some parameters used in the DEM and the grid creation
-ny   = 4
-nz   = 6
+ny   = 6
+nz   = 8
 ylim =  20000. # in metres
 
-nx   = 20
+nx   = 50
 xlim = 500000. # in metres
 bedShape = "linear" 
+
+# defines slope and sea level for linear bed
+z0    = 500.
+zlast = -500.
+
+# initial thickness
+H = 200.
 
 #nx   = 40
 #xlim = 1700000. # in metres
 #bedShape = "MM_overdeepened" 
 
-DEM_dir   = "FISOC_mesh1a_DEM"
-surfFile  = DEM_dir+"/surf.xyz"
-bedFile   = DEM_dir+"/bed.xyz"
+# used in determining floatation
+rho_i = 910.0   # ice density in kg/m^3
+rho_w = 1025.0  # ocean water density in kg/m^3
+
+DEM_dir    = "FISOC_mesh1a_DEM"
+surfFile   = DEM_dir+"/surf.xyz"
+bedFile    = DEM_dir+"/bed.xyz" # called bed because extrudemesh requires it, but actualy lower surface
+bedrockFile= DEM_dir+"/bedrock.dat" # this really is the bedrock!
 gridName2D = "FISOC_mesh1a_2D"
 gridName3D = "FISOC_mesh1a_3D"
+sif_bed    = "PYELA_readBedrock.sif"
 
 # valid bedshapes:
 # linear - downsloping towards ocean
@@ -37,21 +50,50 @@ yAxis = numpy.linspace(0,ylim,ny+1)
 bedrock  = numpy.zeros([nx+1, ny+1])
 surface  = numpy.zeros([nx+1, ny+1])
 if bedShape == "linear":
-    bedrock[:,0] = numpy.linspace(500.,-500*1000.,nx+1)
+    bedrock[:,0] = numpy.linspace(z0,zlast,nx+1)
 elif bedShape == "MM_overdeepened":
     bedrock[:,0] =  -  729. - 2184.8*(xAxis[:]/750000.)**2 + 1031.72*(xAxis[:]/750000.)**4 - 151.72*(xAxis[:]/750000.)**6 
 else:
     sys.exit("ERROR: bedShape not recognised")
 bedrock[:,:] = numpy.transpose(numpy.tile(bedrock[:,0],[ny+1,1]))
-surface[:,:] = bedrock[:,:]+1000.
-surf_out = open(surfFile,'w')
-bed_out  = open(bedFile,'w')
-for x in range(nx+1):
-    for y in range(ny+1):
+lowerSurf = numpy.maximum(-H*rho_i/rho_w,bedrock[:,:])
+surface[:,:] = lowerSurf[:,:]+H
+bedrock[:,:] = lowerSurf[:,:]
+surf_out   = open(surfFile,'w')
+lsurf_out  = open(bedFile,'w')
+bed_out    = open(bedrockFile,'w')
+for y in range(ny+1):
+    for x in range(nx+1):
         surf_out.write(str(xAxis[x])+" "+str(yAxis[y])+" "+str(surface[x,y])+"\n")
+        lsurf_out.write(str(xAxis[x])+" "+str(yAxis[y])+" "+str(lowerSurf[x,y])+"\n")
         bed_out.write(str(xAxis[x])+" "+str(yAxis[y])+" "+str(bedrock[x,y])+"\n")
 surf_out.close()
+lsurf_out.close()
 bed_out.close()
+
+
+# create sif section for reading the bedrock
+print "\ncreating sif section for bedrock reading..."
+sif = open(sif_bed,'w')
+sif.write('\nSolver 1')
+sif.write('\n  Exec Solver = Before Simulation')
+sif.write('\n  Equation = \"Read Bedrock\"')
+sif.write('\n  Procedure = \"ElmerIceSolvers\" \"Grid2DInterpolator\"')
+sif.write('\n  Variable 1 = String "bedrock"')
+sif.write('\n  Variable 1 data file = File \"'+bedrockFile+'\"')
+sif.write('\n  Variable 1 x0 = Real 0.0')
+sif.write('\n  Variable 1 y0 = Real 0.0')
+sif.write('\n  Variable 1 lx = Real '+str(xlim))
+sif.write('\n  Variable 1 ly = Real '+str(ylim))
+sif.write('\n  Variable 1 Nx = Integer '+str(nx+1))
+sif.write('\n  Variable 1 Ny = Integer '+str(ny+1))
+sif.write('\nEnd\n')
+sif.write('\n!Solver 2')
+sif.write('\n!  Equation = \"Navier-Stokes\"')
+sif.write('\n!  Exported Variable 1 = -dofs 1 bedrock')
+sif.write('\n!End\n')
+sif.close()
+
 
 # create 2D mesh
 print "\ncreating 2D mesh..."
@@ -95,3 +137,14 @@ if ret == 0.:
 else:
     sys.exit("ElmerGrid appeared to fail, see ElmerGrid.log\n")
 
+
+# note on resulting boundary labels:
+# 1 - lower boundary (bedrock)
+# 2 - upper surface
+# 3 - y = 0 side wall
+# 4 - x = 500km calving front
+# 5 - y = 20km side wall
+# 6 - x = 0 inland boundary
+
+# elmerf90 DummySolver.f90 -o DummySolver.so
+# http://elmerice.elmerfem.org/wiki/doku.php?id=userfunctions:buoyancy
