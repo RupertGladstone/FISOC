@@ -4,20 +4,23 @@ import os, sys, numpy
 # create DEM
 print "\ncreating DEM..."
 # first some parameters used in the DEM and the grid creation
-ny   = 6
-nz   = 8
+# Note nx,ny,nz indicate number of cells or elements.  Number of nodes is +1.
+
+ny   = 10
 ylim =  20000. # in metres
 
-nx   = 50
+nx   = 200
 xlim = 500000. # in metres
+
 bedShape = "linear" 
 
 # defines slope and sea level for linear bed
-z0    = 500.
-zlast = -500.
+nz    = 8
+z0    = 100.
+zlast = -900.
 
 # initial thickness
-H = 200.
+H = 300.
 
 #nx   = 40
 #xlim = 1700000. # in metres
@@ -27,13 +30,13 @@ H = 200.
 rho_i = 910.0   # ice density in kg/m^3
 rho_w = 1025.0  # ocean water density in kg/m^3
 
-DEM_dir    = "FISOC_mesh1a_DEM"
+DEM_dir    = "/home/elmeruser/Source/FISOC/examples/meshGen/FISOC_mesh1a_DEM"
 surfFile   = DEM_dir+"/surf.xyz"
 bedFile    = DEM_dir+"/bed.xyz" # called bed because extrudemesh requires it, but actualy lower surface
 bedrockFile= DEM_dir+"/bedrock.dat" # this really is the bedrock!
 gridName2D = "FISOC_mesh1a_2D"
 gridName3D = "FISOC_mesh1a_3D"
-sif_bed    = "PYELA_readBedrock.sif"
+sif_bed    = "/home/elmeruser/Source/PYELA/sifLib/PYELA_sp_readBedrock.sif"
 
 # valid bedshapes:
 # linear - downsloping towards ocean
@@ -41,7 +44,8 @@ sif_bed    = "PYELA_readBedrock.sif"
 # b(x) = - [ 729 - 2184.8(x/750km)^2 + 1031.72(x/750km)^4 - 151.72(x/750km)^6 ]m
 
 
-if DEM_dir not in os.listdir('.'):
+#if DEM_dir not in os.listdir('.'):
+if not os.path.isdir(DEM_dir):
     ret = os.mkdir(DEM_dir)
 # the +1 is because nx and ny refer to the number of elements, 
 # but here we are writing values at nodes
@@ -58,7 +62,7 @@ else:
 bedrock[:,:] = numpy.transpose(numpy.tile(bedrock[:,0],[ny+1,1]))
 lowerSurf = numpy.maximum(-H*rho_i/rho_w,bedrock[:,:])
 surface[:,:] = lowerSurf[:,:]+H
-bedrock[:,:] = lowerSurf[:,:]
+#bedrock[:,:] = lowerSurf[:,:]
 surf_out   = open(surfFile,'w')
 lsurf_out  = open(bedFile,'w')
 bed_out    = open(bedrockFile,'w')
@@ -88,10 +92,10 @@ sif.write('\n  Variable 1 ly = Real '+str(ylim))
 sif.write('\n  Variable 1 Nx = Integer '+str(nx+1))
 sif.write('\n  Variable 1 Ny = Integer '+str(ny+1))
 sif.write('\nEnd\n')
-sif.write('\n!Solver 2')
-sif.write('\n!  Equation = \"Navier-Stokes\"')
-sif.write('\n!  Exported Variable 1 = -dofs 1 bedrock')
-sif.write('\n!End\n')
+sif.write('\nSolver 2')
+sif.write('\n  Equation = \"GroundedMaskInit\"')
+sif.write('\n  Exported Variable 1 = -dofs 1 bedrock')
+sif.write('\nEnd\n')
 sif.close()
 
 

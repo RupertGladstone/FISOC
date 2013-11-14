@@ -1,36 +1,37 @@
-FISOC/examples contains sample code used while developing FISOC.
+# FISOC/examples contains sample code used while developing FISOC.
+# 
+# Hopefully this README can be run as a script...
+# 
+# To create the longThinMIS (MIS means Marine Ice Sheet) example:
+#
+elmerf90 DummySolver.f90 -o DummySolver.so 
+cd meshGen
+python FISOC_mesh1a_prep.py
 
-mesh1a.sif is an elmer sif file (solver input file) for simple standalone simulations.  
-This is for comparison against Elmer/Ice-only simulations run through the FISOC/ESMF 
-interface. 
+PYELA_merge.py PYELA_sp_template.sif PYELA_sp_constants.sif PYELA_sp_simulation.sif PYELA_sp_readBedrock.sif PYELA_sp_depthAndHeight.sif PYELA_sp_groundedMask.sif  PYELA_sp_marineFlowBCs.sif PYELA_sp_basicDynamics.sif PYELA_sp_2freeSurfaces.sif  PYELA_sp_Paraview.sif
+mv PYELA_merged.sif  ../longThinMIS/mesh1a.sif 
+cp -r FISOC_mesh1a_3D ../longThinMIS
+cp ../DummySolver.so ../longThinMIS
 
-FISOC_mesh1a_prep.py is a python script for generating simple meshes.  It uses numpy 
-to generate arrays for bedrock and surface ehight data, ElmerGrid for generation of 
-a simple rectangular 2d mesh, and ExtrudeMesh to extrude to a 3d mesh. 
+#
+# To then create the longThinMIS_periodic (i.e. with periodic boundary conditions for the sidewalls) example:
+#
+PYELA_merge.py PYELA_sp_template.sif PYELA_sp_constants.sif PYELA_sp_simulation.sif PYELA_sp_readBedrock.sif PYELA_sp_depthAndHeight.sif PYELA_sp_groundedMask.sif  PYELA_sp_marineFlowBCs_periodic.sif PYELA_sp_basicDynamics.sif PYELA_sp_2freeSurfaces.sif  PYELA_sp_Paraview.sif
+mv PYELA_merged.sif ../longThinMIS_periodic/mesh1a_periodic.sif 
+cp -r FISOC_mesh1a_3D ../longThinMIS_periodic
+cp ../DummySolver.so ../longThinMIS_periodic
 
-ElmerGrid and ExtrudeMesh both come with a recent (2013 or later) Elmer/Ice checkout. 
-Extrudemesh can be found under the Elmer/Ice section of the Elmer repository.
-
-
-modify meshing and also cavity.sif to work with my grid...
-
-***mesh: need seperate labels for:
-1. back wall (flux in? of no flux and stick some accumulation on the surface?)
-2. sides walls
-3. ice front
-
-***then edit sif file:
-1. flux or no flux, no slip condition at back wall 
-2. periodic free-slip b.c. for side walls
-3. water pressure at ice front (maybe fix it first before we have agrounding line)
-4. add grounding line stuff from wiki
-
-sif filenames: mesh1ap2 is phase 2 of mesh1a.  Intention is to use difference between them to 
-construct sif inputs to PYELA (reverse engineering...).  Also need to break up mesh1a into 
-smaller components at some point for creation of PYELA inputs.
-
-2013-03-07: GetHydrostaticloads has an issue for periodic boundary conditions: the force is half what it should be on the periodic boundary whereas the residual account for the fact that the domain is periodic. TODO: fix this! 
-
-
-https://subversion.assembla.com/svn/papers_asf1.papers/
-https://subversion.assembla.com/svn/papers_asf1/trunk
+#
+# These examples are for comparison against Elmer/Ice-only simulations run through the FISOC/ESMF 
+# interface, to verify the interface. 
+#
+# FISOC_mesh1a_prep.py is a python script for generating simple meshes.  It uses numpy 
+# to generate arrays for bedrock and surface ehight data, ElmerGrid for generation of 
+# a simple rectangular 2d mesh, and ExtrudeMesh to extrude to a 3d mesh. 
+#
+# ElmerGrid and ExtrudeMesh both come with a recent (2013 or later) Elmer/Ice checkout. 
+# Extrudemesh can be found under the Elmer/Ice section of the Elmer repository.
+#
+# Note from elmerice wiki (should we avoid periodic BCs?):
+# 2013-03-07: GetHydrostaticloads has an issue for periodic boundary conditions: the force is half what it should be on the periodic boundary whereas the residual account for the fact that the domain is periodic. TODO: fix this! 
+#
