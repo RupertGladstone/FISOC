@@ -12,6 +12,7 @@ PYELA_merge.py PYELA_sp_template.sif PYELA_sp_constants.sif PYELA_sp_simulation.
 mv PYELA_merged.sif  ../longThinMIS/mesh1a.sif 
 cp -r FISOC_mesh1a_3D ../longThinMIS
 cp ../DummySolver.so ../longThinMIS
+cp -r FISOC_mesh1a_DEM  ../longThinMIS
 
 #
 # To then create the longThinMIS_periodic (i.e. with periodic boundary conditions for the sidewalls) example:
@@ -20,6 +21,7 @@ PYELA_merge.py PYELA_sp_template.sif PYELA_sp_constants.sif PYELA_sp_simulation.
 mv PYELA_merged.sif ../longThinMIS_periodic/mesh1a_periodic.sif 
 cp -r FISOC_mesh1a_3D ../longThinMIS_periodic
 cp ../DummySolver.so ../longThinMIS_periodic
+cp -r FISOC_mesh1a_DEM  ../longThinMIS_periodic
 
 #
 # These examples are for comparison against Elmer/Ice-only simulations run through the FISOC/ESMF 
