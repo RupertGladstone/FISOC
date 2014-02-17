@@ -20,7 +20,7 @@ ny   = 11
 #ylim =  20000. # in metres
 ylim = 1.0 # for creating unit height mesh for use with structured mesh mapper
 
-nx   = 200
+nx   = 2000
 
 squish = 1.
 
