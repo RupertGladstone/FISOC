@@ -1,0 +1,133 @@
+
+# Summary of steps for creating input files for some idealised Elmer/Ice 
+# simulations of marine ice sheets.
+
+To create the mesh:
+
+# create 2d grid
+ElmerGrid 1 2 longThinMIS.grd
+
+# convert to elmer post format to check grid
+ElmerGrid 2 3 longThinMIS
+
+# partition 2D grid into 16 or 32 partitions
+ElmerGrid 2 2 longThinMIS -metis 16 4
+ElmerGrid 2 2 longThinMIS -metis 32 4
+
+# These steps have created a 2d mesh but with no information about 
+# upper and lower ice surfaces or about bedrock elevations.
+
+
+# Create DEMs to be "included" in the sif files.  This script creates ascii 
+# DEM files for upper and lower surfaces and bedrock elevations.  These 
+# files will be read by Elmer/Ice at the start of a simulation.
+./makeSimpleDEM.py
+
+# If using real world data you probably will need to process your data 
+# (from netcdf for example) into this same ascii format as the above script.
+
+# Once mesh and DEM files are ready, you need a solver input file.  The 
+# example file here (longThinMIS.sif) has had a couple of changes made 
+# corresponding to the DEM (made by the above makeSimpleDEM.py script from 
+# the longThinMIS.sif.template file).
+#
+# Note that the  longThinMIS_meshOnly.sif file should also have been created. 
+# Running Elmer/Ice with this input file should result in the mesh being processed 
+# (extruded from 2d and mapped according to the upper and lower surfaces defined 
+# in the DEM files) but no further calculations.  It is basically a copy of the standard 
+# sif but with only one timestep and the more costly solvers (especially the Stokes 
+# solver) turned off.
+#
+# The meshOnly simulation is useful because it should help to verify that 
+# 1. the DEM information has been corectly prescribed
+# 2. the boundary condition labelling is correct
+#
+# An example batch submit script is also provided here, as used on the Autralian 
+# NCI HPC resource Raijin.
+#
+# When you are ready to run, tar up all the files you need to run Elmer/Ice 
+# and copy them to the machine of your choice...
+tar -cf meshFiles.tar batchSubmit.sh ELMERSOLVER_STARTINFO longThinMIS_meshOnly.sif longThinMIS.sif longThinMIS_DEM longThinMIS
+scp  meshFiles.tar rmg581@raijin.nci.org.au:/short/m68/rmg581/elmerIce/longThinMIS
+
+***change templates: remove toloerinit to just toler in grounded init, and see also diff on raijin between sifs.
+
+# TODO: at a later date: extend this example setup to cover real world domains
+# (should include script for converting upper and lower surfaces from netcdf files)
+
+
+can I add 10 to the values of an included file at run time? specifically to set min upper fs to berock plus 10...
+
+grounded mask init before all or before timestep?
+
+internal extrusion!!!
+
+
+notes on inclusions follow... to be deleted when confirmed working
+
+
+from Thomas:
+
+Hi,
+don't know whether I answered to this.
+So, do I understand correctly? You have a bunch of 2-D points defining your bedrock and free surface, right?
+
+if you can order them in
+
+x1, y1
+x2, y2
+.
+.
+.
+xN, yN
+
+you could just use the piecewise linear interpolation table for the boundary settings of top and bottom surface. Something like:
+
+Bottom Surface = Variable Coordinate 1
+Real
+x1 y1
+x2 y2
+.
+.
+.
+xN, yN
+End
+
+If you are lazy to copy that longish lines into your sif - just include them as external files.
+
+Naturally, you will have to run your StructuredMashMapper before you do any flow simulation (so either "before simulation" or "before timestep")
+
+Cheers,
+
+Thomas (stranded on Stockholm Arlanda, as snow storm)
+
+
+
+from Elmer forum:
+
+
+Re: External file for array declarations
+
+Postby raback » 24 Sep 2010, 11:16
+Hi
+
+The following way of using include statement works also, for example
+
+Code: Select all
+    Temperature = Variable Coordinate 1
+      Real
+        include temp_prof.dat
+      End
+
+
+Where the included file gives the linear dependence, temp_prof.dat could be
+
+Code: Select all
+    0.0 300.0
+    1.0 310.0
+    2.0 330.0
+
+
+This way the included file is a pure numerical table which may be desirable in automated workflows.
+
+-Peter
