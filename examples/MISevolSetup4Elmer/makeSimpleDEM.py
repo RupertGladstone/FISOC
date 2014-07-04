@@ -43,6 +43,12 @@ if (nx!=noData & xLen!=noData):
 if (ny!=noData & yLen!=noData):
     dy = yLen / ny
 
+# extend one block in the y direction because the grid interpolator (an elmerice solver) isnt really 
+# set up well for grids that match exactly the domain size...
+ny   = ny + 1
+yLen = yLen + dy
+print ny, yLen
+
 #print nx,ny,xLen,yLen,dx,dy
 #sys.exit(0)
 
@@ -86,32 +92,55 @@ bed_out.close()
 sifName = 'longThinMIS'
 
 replacements = {
-    'XXX_xLen'      : str(xLen),
-    'XXX_yLen'      : str(yLen),
-    'XXX_Nx'        : str(nx+1),
-    'XXX_Ny'        : str(ny+1),
-    'XXX_execNever' : '',
-    'XXX_dt'        : '5000',
+    'XXX_xLen'           : str(xLen),
+    'XXX_yLen'           : str(yLen),
+    'XXX_Nx'             : str(nx+1),
+    'XXX_Ny'             : str(ny+1),
+    'XXX_execNever'      : '',
+    'XXX_execReadInputs' : 'Exec Solver = Before Simulation',
+    'XXX_nt'             : '5000',
+    'XXX_outFreq'        : '10',
+    'XXX_restartFile'    :  '',
+    'XXX_restartPosition':  '',
+    'XXX_restartB4Init'  :  '',
+    }
+
+restartReplacements = {
+    'XXX_restartFile'    : '  Restart File = $restartName',
+    'XXX_restartPosition': '  Restart position = 0',
+    'XXX_restartB4Init'  : '  Restart Before Initial Conditions = Logical False',
+    'XXX_execReadInputs' : 'Exec Solver = Never',
     }
 
 meshOnlyReplacements = {
-    'XXX_execNever' : 'exec solver = never',
-    'XXX_dt'        : '1',
+    'XXX_execNever'      : 'exec solver = never',
+    'XXX_nt'             : '1',
+    'XXX_outFreq'        : '1',
 }
 
+restartReplacements = dict(replacements.items() + restartReplacements.items())
+meshOnlyReplacements = dict(replacements.items() + meshOnlyReplacements.items())
+
+# read sif template then make replacements to create specific
+# sifs for use
 f = open(sifName+'.sif.template','r')
 lines = f.readlines()
 f.close()
 f    = open(sifName+'.sif','w')
 f_mo = open(sifName+'_meshOnly.sif','w')
+f_re = open(sifName+'_restart.sif','w')
 for line in lines:
     lineMO = line
+    lineRE = line
+    for key in replacements.keys():
+        line   = line.replace(key,replacements[key])
+    for key in restartReplacements.keys():
+        lineRE = lineRE.replace(key,restartReplacements[key])
     for key in meshOnlyReplacements.keys():
         lineMO = lineMO.replace(key,meshOnlyReplacements[key])
-    for key in replacements.keys():
-        lineMO = lineMO.replace(key,replacements[key])
-        line   = line.replace(key,replacements[key])
     f.write(line)
+    f_re.write(lineMO)
     f_mo.write(lineMO)
 f.close()
 f_mo.close()
+f_re.close()

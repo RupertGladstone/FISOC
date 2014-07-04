@@ -9,6 +9,7 @@ $A2 = 2.42736e-02*yearinsec*1.0e18
 $gravity = -9.81*yearinsec^2
 $GLTolerance = 1.0e-4
 $name = "longThinMIS"
+$restartName = "restartFileName"
 $m = 1.0/3.0
 
 !--------------------------------------------------------
@@ -30,16 +31,19 @@ Simulation
   Simulation Type ="Transient"
   Timestepping Method = "BDF"
   BDF Order = 1
-  Timestep Intervals = 1
+  Timestep Intervals = XXX_nt
   Timestep Sizes = 1.0
   Steady State Min Iterations = 1
   Steady State Max Iterations = 10
-  Output Intervals = 1
+  Output Intervals = XXX_outFreq
   Initialize Dirichlet Conditions = Logical False
   Output File = $name".result"
 !  Post File = $name".vtu"
   max output level = 9
-  Extruded Mesh Levels = Integer 4
+  Extruded Mesh Levels = Integer 6
+XXX_restartFile
+XXX_restartPosition
+XXX_restartB4Init
 End
 
 !--------------------------------------------------------
@@ -67,7 +71,6 @@ Body 3
   Initial Condition = 3
 End
 
-
 !--------------------------------------------------------
 Initial Condition 1
   Depth = Real 0.0
@@ -76,38 +79,19 @@ Initial Condition 1
   Velocity 1 = Real 0.0
   Velocity 2 = Real 0.0
   Velocity 3 = Real 0.0
+  Normal Vector 1 = Real 0.0
+  Normal Vector 2 = Real 0.0
+  Normal Vector 3 = Real 0.0
 End
 
 Initial Condition 2
-!  FS lower = real -100.
-  ReferenceFS lower = real -100.
-  FS lower = Variable Coordinate 1
-      Real
-1000.0 100. 
-10000.0 0.0 
-100000.0 -450.0  
-!1000.0 1000.0 100.0
-!1000.0 10000.0 150.0
-!10000.0 10000.0 130.0
-!10000.0 10000.0 180.0 
-      End
-!  ReferenceFS lower = Variable Coordinate 1
-!      Real
-!        include lsurf.dat
-!      End
+  FS lower = real 0.0
+  ReferenceFS lower = real 0.0
 End
 
 Initial Condition 3
-  ReferenceFS upper = real 2000.0
-  FS upper = real 2000.0
-!  FS upper = Variable Coordinate 1
-!      Real
-!        include longThinMIS_DEM/usurf.dat
-!      End
-!  ReferenceFS upper = Variable Coordinate 1
-!      Real
-!        include longThinMIS_DEM/usurf.dat
-!      End
+  FS upper = real 0.0
+  ReferenceFS upper = real 0.0
 End
 
 !--------------------------------------------------------
@@ -127,7 +111,7 @@ Body Force 3
   FS upper Accumulation Flux 1 = Real 0.0e0
   FS upper Accumulation Flux 2 = Real 0.0e0
   FS upper Accumulation Flux 3 = Variable Coordinate 1
-    Real MATC "(0.1 + (tx/1800000.0 * 0.9)) * rhow/rhoi"
+    Real MATC "(0.1 + (tx/XXX_xLen * 0.9)) * rhow/rhoi"
 End
 
 
@@ -167,91 +151,99 @@ End
 
 !--------------------------------------------------------
 Solver 1
-  Exec Solver = Before Simulation
-!Exec Solver = Never
+  XXX_execReadInputs
   Equation = "Read ReferenceFS lower"
   Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
   Variable 1 = String "ReferenceFS lower"
   Variable 1 data file = File "longThinMIS_DEM/lsurf.dat"
   Variable 1 x0 = Real 0.0
   Variable 1 y0 = Real 0.0
-  Variable 1 lx = Real 1800000.0
-  Variable 1 ly = Real 50000.0
-  Variable 1 Nx = Integer 201
-  Variable 1 Ny = Integer 21
+  Variable 1 lx = Real XXX_xLen.0
+  Variable 1 ly = Real XXX_yLen.0
+  Variable 1 Nx = Integer XXX_Nx
+  Variable 1 Ny = Integer XXX_Ny
   Variable 1 no data = real -12345678.0
   Variable 1 no data tol = real 0.123
 End
 
 Solver 2
-!  Exec Solver = Before Simulation
-Exec Solver = Never
+  XXX_execReadInputs
   Equation = "Read FS lower"
   Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
   Variable 1 = String "FS lower"
   Variable 1 data file = File "longThinMIS_DEM/lsurf.dat"
   Variable 1 x0 = Real 0.0
   Variable 1 y0 = Real 0.0
-  Variable 1 lx = Real 1800000.0
-  Variable 1 ly = Real 50000.0
-  Variable 1 Nx = Integer 201
-  Variable 1 Ny = Integer 21
+  Variable 1 lx = Real XXX_xLen.0
+  Variable 1 ly = Real XXX_yLen.0
+  Variable 1 Nx = Integer XXX_Nx
+  Variable 1 Ny = Integer XXX_Ny
   Variable 1 no data = real -12345678.0
   Variable 1 no data tol = real 0.123
 End
 
 Solver 3
-!  Exec Solver = Before Simulation
-Exec Solver = Never
+  XXX_execReadInputs
   Equation = "Read ReferenceFS upper"
   Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
   Variable 1 = String "ReferenceFS upper"
   Variable 1 data file = File "longThinMIS_DEM/usurf.dat"
   Variable 1 x0 = Real 0.0
   Variable 1 y0 = Real 0.0
-  Variable 1 lx = Real 1800000.0
-  Variable 1 ly = Real 50000.0
-  Variable 1 Nx = Integer 201
-  Variable 1 Ny = Integer 21
+  Variable 1 lx = Real XXX_xLen.0
+  Variable 1 ly = Real XXX_yLen.0
+  Variable 1 Nx = Integer XXX_Nx
+  Variable 1 Ny = Integer XXX_Ny
   Variable 1 no data = real -12345678.0
   Variable 1 no data tol = real 0.123
 End
 
 Solver 4
-!  Exec Solver = Before Simulation
-Exec Solver = Never
+  XXX_execReadInputs
   Equation = "Read FS upper"
   Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
   Variable 1 = String "FS upper"
   Variable 1 data file = File "longThinMIS_DEM/usurf.dat"
   Variable 1 x0 = Real 0.0
   Variable 1 y0 = Real 0.0
-  Variable 1 lx = Real 1800000.0
-  Variable 1 ly = Real 50000.0
-  Variable 1 Nx = Integer 201
-  Variable 1 Ny = Integer 21
+  Variable 1 lx = Real XXX_xLen.0
+  Variable 1 ly = Real XXX_yLen.0
+  Variable 1 Nx = Integer XXX_Nx
+  Variable 1 Ny = Integer XXX_Ny
   Variable 1 no data = real -12345678.0
   Variable 1 no data tol = real 0.123
 End
 
 Solver 5
-  Exec Solver = Before Simulation
-!Exec Solver = Never
+  XXX_execReadInputs
   Equation = "Read Bedrock"
   Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
   Variable 1 = String "bedrock"
   Variable 1 data file = File "longThinMIS_DEM/bedrock.dat"
   Variable 1 x0 = Real 0.0
   Variable 1 y0 = Real 0.0
-  Variable 1 lx = Real 1800000.0
-  Variable 1 ly = Real 50000.0
-  Variable 1 Nx = Integer 201
-  Variable 1 Ny = Integer 21
+  Variable 1 lx = Real XXX_xLen.0
+  Variable 1 ly = Real XXX_yLen.0
+  Variable 1 Nx = Integer XXX_Nx
+  Variable 1 Ny = Integer XXX_Ny
   Variable 1 no data = real -12345678.0
   Variable 1 no data tol = real 0.123
 End
 
 Solver 6
+!exec solver = never
+  Exec Solver = "Before All"
+  Equation = "MapCoordinateInit"
+  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
+  Active Coordinate = Integer 3
+  Dot Product Tolerance = Real 0.001
+  Minimum Mesh Height = Real 100.0
+  Top Surface Variable Name = String FS upper
+  Bottom Surface Variable Name = String FS lower
+!  Mesh Velocity First Zero = Logical True
+End
+
+Solver 7
   Exec Solver = Before all
 !Exec Solver = Never
   Equation = "GroundedMaskInit"
@@ -262,7 +254,7 @@ Solver 6
   Exported Variable 1 = -dofs 3 "Mesh Velocity"
 End
 
-Solver 7
+Solver 8
 !Exec Solver = Never
   Equation = "Flowdepth"
   Procedure = File "ElmerIceSolvers" "FlowDepthSolver"
@@ -282,7 +274,7 @@ Solver 7
   Exported Variable 1 = -dofs 1 bedrock
 End
 
-Solver 8
+Solver 9
 !Exec Solver = Never
   Equation = "Flowheight"
   Procedure = File "ElmerIceSolvers" "FlowDepthSolver"
@@ -300,7 +292,7 @@ Solver 8
   Calc Free Surface = Logical False
 End
 
-Solver 9
+Solver 10
 !Exec Solver = Never
   Exec Solver = "After TimeStep"
   Equation = GroundedMask
@@ -313,7 +305,7 @@ Solver 9
   Save File Name = String "GL".dat"
 End
 
-Solver 10
+Solver 11
 !exec solver = never
   Equation = "Normal Vector"
   Procedure = "ElmerIceSolvers" "ComputeNormalSolver"
@@ -321,12 +313,12 @@ Solver 10
   Variable DOFs = 3
 !  Exported Variable 1 = BodyMask
 !  Exported Variable 1 DOFs = 1
-  ComputeAll = Logical False
+  ComputeAll = Logical True
   Optimize Bandwidth = Logical False
 End
 
-Solver 11
-exec solver = never
+Solver 12
+XXX_execNever
   Equation = "Navier-Stokes"
   Exported Variable 1 = Flow Solution Loads[Stress Vector:3 CEQ Residual:1]
   Calculate Loads = Logical True
@@ -343,115 +335,16 @@ exec solver = never
   Steady State Convergence Tolerance = Real 1.0e-3
 End
 
-Solver 12
-exec solver = never
+Solver 13
+XXX_execNever
   Equation = Fw
   Procedure = "ElmerIceSolvers" "GetHydrostaticLoads"
   Variable = Fw[Fwater:3]
   Variable DOFs = 3
 End
 
-Solver 13
-Exec Solver = Never
-!  Exec Solver = "After TimeStep"
-  Equation =  String "Lower Free Surface"
-  Variable = "FS lower"
-  Variable DOFs = 1
-  Procedure = "FreeSurfaceSolver" "FreeSurfaceSolver"
-  Apply Dirichlet = Logical True
-  Linear System Solver = Iterative
-  Linear System Iterative Method = BiCGStab
-  Linear System Max Iterations  = 1000
-  Linear System Preconditioning = ILU1
-  Linear System Convergence Tolerance = 1.0e-08
-  Nonlinear System Max Iterations = 100
-  Nonlinear System Min Iterations = 2
-  Nonlinear System Convergence Tolerance = 1.0e-06
-  Steady State Convergence Tolerance = 1.0e-4
-  Stabilization Method = Bubbles
-  Flow Solution Name = String "Flow Solution"
-  Use Accumulation = Logical True
-!  Normal Flux = Logical False
-  Exported Variable 1 = FS lower Residual
-  Exported Variable 1 DOFS = 1
-  Exported Variable 2 = ReferenceFS lower
-  Exported Variable 2 DOFS = 1
-End
-
 Solver 14
-Exec Solver = Never
-!  Exec Solver = "After TimeStep"
-  Equation =  String "Upper Free Surface"
-  Variable = "FS upper"
-  Variable DOFs = 1
-  Procedure = "FreeSurfaceSolver" "FreeSurfaceSolver"
-  Apply Dirichlet = Logical True
-  Linear System Solver = Iterative
-  Linear System Iterative Method = BiCGStab
-  Linear System Max Iterations  = 1000
-  Linear System Preconditioning = ILU1
-  Linear System Convergence Tolerance = 1.0e-08
-  Nonlinear System Max Iterations = 100
-  Nonlinear System Min Iterations = 2
-  Nonlinear System Convergence Tolerance = 1.0e-06
-  Steady State Convergence Tolerance = 1.0e-4
-  Stabilization Method = Bubbles
-  Flow Solution Name = String "Flow Solution"
-  Use Accumulation = Logical True
-  Normal Flux = Logical False
-  Exported Variable 1 =  FS upper Residual
-  Exported Variable 1 DOFS = 1
-  Exported Variable 2 = ReferenceFS upper
-  Exported Variable 2 DOFS = 1
-End
-
-
-Solver 15
-exec solver = never
-!  Exec Solver = "Before All"
-  Equation = "MapCoordinateInit"
-  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
-  Active Coordinate = Integer 3
-  Dot Product Tolerance = Real 0.001
-  Minimum Mesh Height = Real 100.0
-  Top Surface Variable Name = String FS upper
-  Bottom Surface Variable Name = String FS lower
-!  Mesh Velocity First Zero = Logical True
-End
-
-Solver 16
-exec solver = never
-!  Exec Solver = "After Timestep"
-  Equation = "MapCoordinate"
-  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
-  Active Coordinate = Integer 3
-  Dot Product Tolerance = Real 0.001
-  Minimum Mesh Height = Real 100.0
-  Top Surface Variable Name = String FS upper
-  Bottom Surface Variable Name = String FS lower
-!  Mesh Velocity First Zero = Logical True
-End
-
-Solver 17
-Exec Solver = Never
-  Equation = "Save Materials"
-  Procedure = File "SaveData" "SaveMaterials"
-End
-
-Solver 18
-Exec Solver = Never
-  Equation = "Save Boundaries"
-  Procedure = File "SaveData" "SaveBoundaryValues"
-  Variable = String -nooutput dummyvar
-  Variable DOFs = Integer 1
-  Parameter 1 = String Slip Coefficient 1
-  Parameter 2 = String Slip Coefficient 2
-  Parameter 3 = String Slip Coefficient 3
-  Parameter 4 = String External Pressure
-End
-
-Solver 19
-exec solver = never
+XXX_execNever
   Equation = String "StressSolver"
   Procedure =  File "ElmerIceSolvers" "ComputeDevStress"
   ! this is just a dummy, hence no output is needed
@@ -476,6 +369,91 @@ exec solver = never
   Linear System Residual Output = 1
 End
 
+Solver 15
+!Exec Solver = Never
+  Exec Solver = "After TimeStep"
+  Equation =  String "Lower Free Surface"
+  Variable = "FS lower"
+  Variable DOFs = 1
+  Procedure = "FreeSurfaceSolver" "FreeSurfaceSolver"
+  Apply Dirichlet = Logical True
+  Linear System Solver = Iterative
+  Linear System Iterative Method = BiCGStab
+  Linear System Max Iterations  = 1000
+  Linear System Preconditioning = ILU1
+  Linear System Convergence Tolerance = 1.0e-08
+  Nonlinear System Max Iterations = 100
+  Nonlinear System Min Iterations = 2
+  Nonlinear System Convergence Tolerance = 1.0e-06
+  Steady State Convergence Tolerance = 1.0e-4
+  Stabilization Method = Bubbles
+  Flow Solution Name = String "Flow Solution"
+  Use Accumulation = Logical True
+!  Normal Flux = Logical False
+  Exported Variable 1 = FS lower Residual
+  Exported Variable 1 DOFS = 1
+  Exported Variable 2 = ReferenceFS lower
+  Exported Variable 2 DOFS = 1
+End
+
+Solver 16
+!Exec Solver = Never
+  Exec Solver = "After TimeStep"
+  Equation =  String "Upper Free Surface"
+  Variable = "FS upper"
+  Variable DOFs = 1
+  Procedure = "FreeSurfaceSolver" "FreeSurfaceSolver"
+  Apply Dirichlet = Logical True
+  Linear System Solver = Iterative
+  Linear System Iterative Method = BiCGStab
+  Linear System Max Iterations  = 1000
+  Linear System Preconditioning = ILU1
+  Linear System Convergence Tolerance = 1.0e-08
+  Nonlinear System Max Iterations = 100
+  Nonlinear System Min Iterations = 2
+  Nonlinear System Convergence Tolerance = 1.0e-06
+  Steady State Convergence Tolerance = 1.0e-4
+  Stabilization Method = Bubbles
+  Flow Solution Name = String "Flow Solution"
+  Use Accumulation = Logical True
+  Normal Flux = Logical False
+  Exported Variable 1 =  FS upper Residual
+  Exported Variable 1 DOFS = 1
+  Exported Variable 2 = ReferenceFS upper
+  Exported Variable 2 DOFS = 1
+End
+
+Solver 17
+!exec solver = never
+  Exec Solver = "After Timestep"
+  Equation = "MapCoordinate"
+  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
+  Active Coordinate = Integer 3
+  Dot Product Tolerance = Real 0.001
+  Minimum Mesh Height = Real 100.0
+  Top Surface Variable Name = String FS upper
+  Bottom Surface Variable Name = String FS lower
+!  Mesh Velocity First Zero = Logical True
+End
+
+Solver 18
+Exec Solver = Never
+  Equation = "Save Materials"
+  Procedure = File "SaveData" "SaveMaterials"
+End
+
+Solver 19
+Exec Solver = Never
+  Equation = "Save Boundaries"
+  Procedure = File "SaveData" "SaveBoundaryValues"
+  Variable = String -nooutput dummyvar
+  Variable DOFs = Integer 1
+  Parameter 1 = String Slip Coefficient 1
+  Parameter 2 = String Slip Coefficient 2
+  Parameter 3 = String Slip Coefficient 3
+  Parameter 4 = String External Pressure
+End
+
 Solver 20
 Exec Solver = Never
   Equation = "DistanceSolver"
@@ -495,20 +473,17 @@ End
 
 !--------------------------------------------------------
 Equation 1
-  Active Solvers(14) = 1 2 3 4 5 7 8 10 11 15 16 17 19 21
-!  Active Solvers(10) =        1 3 4 6  7  11 12 13 15 17
+  Active Solvers(14) = 1 2 3 4 5 6 8 9 11 12 14 17 18 21
 End
 
 Equation 2
   Flow Solution Name = String "Flow Solution"
   Convection = Computed
-  Active Solvers(6) = 6 9 12 13 18 20
-!  Active Solvers(6) = 2 5 8 9 14 16
+  Active Solvers(6) = 7 10 13 15 19 20
 End
 
 Equation 3
-  Active Solvers(1) = 14
-!  Active Solvers(1) = 10
+  Active Solvers(1) = 16
   Flow Solution Name = String "Flow Solution"
   Convection = Computed
 End
@@ -519,10 +494,11 @@ End
 Boundary Condition 1
   Name = "sidewall y=yMin"
   Target Boundaries(1)  = 1
-  Normal-Tangential Velocity = Logical True
-  Velocity 1 = Real 0.0
-  Slip Coefficient 2 = Real 0.0
-  Slip Coefficient 3 = Real 0.0
+  Velocity 2 = Real 0.0
+!  Normal-Tangential Velocity = Logical True
+!  Velocity 1 = Real 0.0
+!  Slip Coefficient 2 = Real 0.0
+!  Slip Coefficient 3 = Real 0.0
 
   External Pressure = Variable depth
     Real MATC "1.0 * rhoi * gravity * tx"
@@ -531,10 +507,11 @@ End
 Boundary Condition 2
   Name = "sidewall y=yMax"
   Target Boundaries(1)  = 3
-  Normal-Tangential Velocity = Logical True
-  Velocity 1 = Real 0.0
-  Slip Coefficient 2 = Real 0.0
-  Slip Coefficient 3 = Real 0.0
+  Velocity 2 = Real 0.0
+!  Normal-Tangential Velocity = Logical True
+!  Velocity 1 = Real 0.0
+!  Slip Coefficient 2 = Real 0.0
+!  Slip Coefficient 3 = Real 0.0
 
   External Pressure = Variable depth
     Real MATC "1.0 * rhoi * gravity * tx"
