@@ -9,6 +9,7 @@ $A2 = 2.42736e-02*yearinsec*1.0e18
 $gravity = -9.81*yearinsec^2
 $GLTolerance = 1.0e-4
 $name = "longThinMIS"
+$restartName = "restartFileName"
 $m = 1.0/3.0
 
 !--------------------------------------------------------
@@ -30,16 +31,19 @@ Simulation
   Simulation Type ="Transient"
   Timestepping Method = "BDF"
   BDF Order = 1
-  Timestep Intervals = XXX_dt
+  Timestep Intervals = XXX_nt
   Timestep Sizes = 1.0
   Steady State Min Iterations = 1
   Steady State Max Iterations = 10
-  Output Intervals = 1
+  Output Intervals = XXX_outFreq
   Initialize Dirichlet Conditions = Logical False
   Output File = $name".result"
 !  Post File = $name".vtu"
   max output level = 9
-  Extruded Mesh Levels = Integer 4
+  Extruded Mesh Levels = Integer 6
+XXX_restartFile
+XXX_restartPosition
+XXX_restartB4Init
 End
 
 !--------------------------------------------------------
@@ -67,7 +71,6 @@ Body 3
   Initial Condition = 3
 End
 
-
 !--------------------------------------------------------
 Initial Condition 1
   Depth = Real 0.0
@@ -76,6 +79,9 @@ Initial Condition 1
   Velocity 1 = Real 0.0
   Velocity 2 = Real 0.0
   Velocity 3 = Real 0.0
+  Normal Vector 1 = Real 0.0
+  Normal Vector 2 = Real 0.0
+  Normal Vector 3 = Real 0.0
 End
 
 Initial Condition 2
@@ -145,8 +151,7 @@ End
 
 !--------------------------------------------------------
 Solver 1
-  Exec Solver = Before Simulation
-!Exec Solver = Never
+  XXX_execReadInputs
   Equation = "Read ReferenceFS lower"
   Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
   Variable 1 = String "ReferenceFS lower"
@@ -162,8 +167,7 @@ Solver 1
 End
 
 Solver 2
-  Exec Solver = Before Simulation
-!Exec Solver = Never
+  XXX_execReadInputs
   Equation = "Read FS lower"
   Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
   Variable 1 = String "FS lower"
@@ -179,8 +183,7 @@ Solver 2
 End
 
 Solver 3
-  Exec Solver = Before Simulation
-!Exec Solver = Never
+  XXX_execReadInputs
   Equation = "Read ReferenceFS upper"
   Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
   Variable 1 = String "ReferenceFS upper"
@@ -196,8 +199,7 @@ Solver 3
 End
 
 Solver 4
-  Exec Solver = Before Simulation
-!Exec Solver = Never
+  XXX_execReadInputs
   Equation = "Read FS upper"
   Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
   Variable 1 = String "FS upper"
@@ -213,8 +215,7 @@ Solver 4
 End
 
 Solver 5
-  Exec Solver = Before Simulation
-!Exec Solver = Never
+  XXX_execReadInputs
   Equation = "Read Bedrock"
   Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
   Variable 1 = String "bedrock"
@@ -312,7 +313,7 @@ Solver 11
   Variable DOFs = 3
 !  Exported Variable 1 = BodyMask
 !  Exported Variable 1 DOFs = 1
-  ComputeAll = Logical False
+  ComputeAll = Logical True
   Optimize Bandwidth = Logical False
 End
 
@@ -493,10 +494,11 @@ End
 Boundary Condition 1
   Name = "sidewall y=yMin"
   Target Boundaries(1)  = 1
-  Normal-Tangential Velocity = Logical True
-  Velocity 1 = Real 0.0
-  Slip Coefficient 2 = Real 0.0
-  Slip Coefficient 3 = Real 0.0
+  Velocity 2 = Real 0.0
+!  Normal-Tangential Velocity = Logical True
+!  Velocity 1 = Real 0.0
+!  Slip Coefficient 2 = Real 0.0
+!  Slip Coefficient 3 = Real 0.0
 
   External Pressure = Variable depth
     Real MATC "1.0 * rhoi * gravity * tx"
@@ -505,10 +507,11 @@ End
 Boundary Condition 2
   Name = "sidewall y=yMax"
   Target Boundaries(1)  = 3
-  Normal-Tangential Velocity = Logical True
-  Velocity 1 = Real 0.0
-  Slip Coefficient 2 = Real 0.0
-  Slip Coefficient 3 = Real 0.0
+  Velocity 2 = Real 0.0
+!  Normal-Tangential Velocity = Logical True
+!  Velocity 1 = Real 0.0
+!  Slip Coefficient 2 = Real 0.0
+!  Slip Coefficient 3 = Real 0.0
 
   External Pressure = Variable depth
     Real MATC "1.0 * rhoi * gravity * tx"

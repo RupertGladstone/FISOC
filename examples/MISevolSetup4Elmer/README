@@ -42,92 +42,18 @@ ElmerGrid 2 2 longThinMIS -metis 32 4
 # 1. the DEM information has been corectly prescribed
 # 2. the boundary condition labelling is correct
 #
-# An example batch submit script is also provided here, as used on the Autralian 
+# An example batch submit script is also provided here, as used on the Australian 
 # NCI HPC resource Raijin.
 #
 # When you are ready to run, tar up all the files you need to run Elmer/Ice 
 # and copy them to the machine of your choice...
-tar -cf meshFiles.tar batchSubmit.sh ELMERSOLVER_STARTINFO longThinMIS_meshOnly.sif longThinMIS.sif longThinMIS_DEM longThinMIS
-scp  meshFiles.tar rmg581@raijin.nci.org.au:/short/m68/rmg581/elmerIce/longThinMIS
-
-***change templates: remove toloerinit to just toler in grounded init, and see also diff on raijin between sifs.
+tar -cf meshFiles.tar batchSubmit.sh ELMERSOLVER_STARTINFO longThinMIS_meshOnly.sif longThinMIS.sif longThinMIS_restart.sif longThinMIS_DEM longThinMIS
+#scp  meshFiles.tar rmg581@raijin.nci.org.au:/short/m68/rmg581/elmerIce/longThinMIS
 
 # TODO: at a later date: extend this example setup to cover real world domains
 # (should include script for converting upper and lower surfaces from netcdf files)
 
-
-can I add 10 to the values of an included file at run time? specifically to set min upper fs to berock plus 10...
-
-grounded mask init before all or before timestep?
-
-internal extrusion!!!
-
-
-notes on inclusions follow... to be deleted when confirmed working
-
-
-from Thomas:
-
-Hi,
-don't know whether I answered to this.
-So, do I understand correctly? You have a bunch of 2-D points defining your bedrock and free surface, right?
-
-if you can order them in
-
-x1, y1
-x2, y2
-.
-.
-.
-xN, yN
-
-you could just use the piecewise linear interpolation table for the boundary settings of top and bottom surface. Something like:
-
-Bottom Surface = Variable Coordinate 1
-Real
-x1 y1
-x2 y2
-.
-.
-.
-xN, yN
-End
-
-If you are lazy to copy that longish lines into your sif - just include them as external files.
-
-Naturally, you will have to run your StructuredMashMapper before you do any flow simulation (so either "before simulation" or "before timestep")
-
-Cheers,
-
-Thomas (stranded on Stockholm Arlanda, as snow storm)
-
-
-
-from Elmer forum:
-
-
-Re: External file for array declarations
-
-Postby raback » 24 Sep 2010, 11:16
-Hi
-
-The following way of using include statement works also, for example
-
-Code: Select all
-    Temperature = Variable Coordinate 1
-      Real
-        include temp_prof.dat
-      End
-
-
-Where the included file gives the linear dependence, temp_prof.dat could be
-
-Code: Select all
-    0.0 300.0
-    1.0 310.0
-    2.0 330.0
-
-
-This way the included file is a pure numerical table which may be desirable in automated workflows.
-
--Peter
+# TODO: add auto creation of a restart sif to python script...
+# solvers to read in bedrock should be removed, restart file should be named at top of sif.
+# care with initialisation: which vars to be read in from restart, any to be initialised in sif? 
+# in particular check structured mesh mapper and free surface solvers
