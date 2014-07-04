@@ -3,7 +3,7 @@ import os, sys, numpy
 
 # this is where the digital elevation maps for the upper and lower ice surfaces and 
 # the bedrock (which differs from lower surface under ice shelves) will be stored.
-DEM_dir     = "/home/elmeruser/Source/FISOC/examples/MISevolSetup4Elmer/longThinMIS_DEM"
+DEM_dir     = "./longThinMIS_DEM"
 uSurfFile   = DEM_dir+"/usurf.dat"
 lSurfFile   = DEM_dir+"/lsurf.dat"
 bedrockFile = DEM_dir+"/bedrock.dat"

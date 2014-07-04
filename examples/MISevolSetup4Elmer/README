@@ -2,7 +2,7 @@
 # Summary of steps for creating input files for some idealised Elmer/Ice 
 # simulations of marine ice sheets.
 
-To create the mesh:
+#To create the mesh:
 
 # create 2d grid
 ElmerGrid 1 2 longThinMIS.grd
