@@ -1,10 +1,8 @@
 #!/usr/bin/python
 
 import sys, numpy
-
-write from python to netcdf
-
-learn esmf file format requirements
+from netCDF4 import Dataset
+import time
 
 elementTypes = {
     101 : (1,"nodal element"),
@@ -31,9 +29,11 @@ elementTypes = {
 
 validElementTypes = (303,404)
 
-# we may need to write out the mapping for node:partition in case we cant store this info in ESMF format
+# we may need to write out the mapping for node:partition in case we cant store this info in ESMF format.
+# in any case this code needs to be extended at some point to cope with partitioned meshes.
 
-#elementMapping = {}
+# Check element connectivity (node ordering) in elmer is consistent with esmf, i.e. counter clockwise.
+# Node ordering looks fine, see ElmerSolver manual, appendix D
 
 #--------------------------------------------------------------------------------------------
 def readElmerMesh(meshFileName): 
@@ -54,6 +54,7 @@ def readElmerMesh(meshFileName):
     nodes    = readElmerNodes(nodesFileName)        # get node coords
 #    print nodes[2]
 
+    return (header, elements, nodes)
 
 #--------------------------------------------------------------------------------------------
 
