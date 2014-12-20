@@ -59,7 +59,7 @@ PROGRAM FISOC_main
        line=__LINE__, file=__FILE__)) THEN
      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   END IF
-  msg = "FISOC_caller: read FISOC configuration file"  
+  msg = "FISOC_caller: Initialised ESMF framework"  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -112,7 +112,7 @@ PROGRAM FISOC_main
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
+print*,"plop"
   msg = "FISOC_caller: completed FISOC_parent creation and registration"  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
@@ -204,7 +204,6 @@ PROGRAM FISOC_main
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
   msg = "FISOC_caller: FISOC run complete, tidying up..."  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
@@ -235,8 +234,9 @@ PROGRAM FISOC_main
   
   CALL ESMF_Finalize()
 
-  msg = "FISOC_caller: completed finalize and destruction routines"  
-  CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-       line=__LINE__, file=__FILE__, rc=rc)
+! this log write removed because log destroyed by esmf finalize!
+!  msg = "FISOC_caller: completed finalize and destruction routines"  
+!  CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+!       line=__LINE__, file=__FILE__, rc=rc)
 
 END PROGRAM FISOC_main

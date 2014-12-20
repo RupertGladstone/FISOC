@@ -152,8 +152,8 @@ def readElmerHeader(headerFileName):
 #--------------------------------------------------------------------------------------------
 
 
-def writeESMFmesh(elmerMesh,ESMFmeshFileName):
-
+def convertMesh(elmerMesh):
+#--------------------------------------------------------------------------------------------
     (eHeader, eElements, eNodes, eElementTypes) = elmerMesh # "e" for elmer
 
     eElementTypes = list(eElementTypes)
@@ -170,59 +170,60 @@ def writeESMFmesh(elmerMesh,ESMFmeshFileName):
 
     # create the data using proper arrays.  Now the node and element Ids from the lists become array indices.
 
-#    print ESMF_nodeCount, ESMF_elementCount, ESMF_maxNodePElement
     ESMF_nodeCoords = numpy.zeros([len(eNodes), 2])
     for nodeId in eNodes.keys():
         ESMF_nodeCoords[nodeId-1,:] = eNodes[nodeId][0:2] # num dimensions hard coded to 2.  thus nodes will have 2 coords each
 
     ESMF_elementConn    = numpy.zeros([len(eElements), ESMF_maxNodePElement])
     ESMF_elementConn[:] = -1.0
-    ESMF_NumElementConn = numpy.zeros([len(eElements)])
+    ESMF_numElementConn = numpy.zeros([len(eElements)])
     for elementId in eElements.keys():
-        ESMF_NumElementConn[elementId-1] = len(eElements[elementId])
+        ESMF_numElementConn[elementId-1] = len(eElements[elementId])
         ESMF_elementConn[elementId-1,:]  = numpy.array(eElements[elementId])
 
-#netcdf mesh-esmf {
-#dimensions:
-#        nodeCount = 9 ;
-#        elementCount = 5 ;
-#        maxNodePElement = 4 ;
-#        coordDim = 2 ;
-#variables:
-#        double  nodeCoords(nodeCount, coordDim);
-#                nodeCoords:units = "degrees" ;
-#        int elementConn(elementCount, maxNodePElement) ;
-#                elementConn:long_name = "Node Indices that define the element /
-#                                         connectivity";
-#                elementConn:_FillValue = -1 ;
-#        byte numElementConn(elementCount) ;
-#                numElementConn:long_name = "Number of nodes per element" ;
-#// global attributes:
-#                :gridType="unstructured";
-#                :version = "0.9" ;
-#data:
-#    nodeCoords=
-#        0.0, 0.0,
-#        1.0, 0.0,
-#        2.0, 0.0,
-#        0.0, 1.0,
-#        1.0, 1.0,
-#        2.0, 1.0,
-#        0.0, 2.0,
-#        1.0, 2.0,
-#        2.0, 2.0 ;
-#
-#    elementConn=
-#        1, 2, 5,  4,
-#        2, 3, 5, -1,
-#        3, 6, 5, -1,
-#        4, 5, 8,  7,
-#        5, 6, 9,  8 ;#
-#
-#    numElementConn= 4, 3, 3, 4, 4 ;
-#}
+    return ESMF_maxNodePElement, ESMF_nodeCount, ESMF_elementCount, ESMF_coordDim, ESMF_nodeCoords, ESMF_elementConn, ESMF_numElementConn
 
-    rc = 1
+
+#--------------------------------------------------------------------------------------------
+
+
+def writeESMFmesh(ESMFmesh,ESMFmeshFileName):
+#--------------------------------------------------------------------------------------------
+
+    (ESMF_maxNodePElement, ESMF_nodeCount, ESMF_elementCount, ESMF_coordDim, ESMF_nodeCoords, ESMF_elementConn, ESMF_numElementConn) = ESMFmesh
+
+    rootgrp = Dataset(ESMFmeshFileName, 'w', format='NETCDF4')
+
+    nodeCount       = rootgrp.createDimension('nodeCount', ESMF_nodeCount)
+    elementCount    = rootgrp.createDimension('elementCount', ESMF_elementCount)
+    maxNodePElement = rootgrp.createDimension('maxNodePElement', ESMF_maxNodePElement)
+    coordDim        = rootgrp.createDimension('coordDim',ESMF_coordDim)
+
+    rootgrp.history = 'Created ' + time.ctime(time.time())
+    rootgrp.gridType= 'unstructured'
+#    rootgrp.version = '0.9'
+
+    nodeCoords     = rootgrp.createVariable('nodeCoords','f8',('nodeCount','coordDim'))
+    elementConn    = rootgrp.createVariable('elementConn','i4',('elementCount','maxNodePElement'),fill_value=-1)
+    numElementConn = rootgrp.createVariable('numElementConn','i4',('elementCount'))
+#    centerCoords   = rootgrp.createVariable('centerCoords','f8',('elementCount','coordDim')) # optional!
+#    elementArea    = rootgrp.createVariable('elementArea','f8',('elementCount')) # optional!
+#    elementMask    = rootgrp.createVariable('elementMask','i4',('elementCount'),fill_value=-9999) # optional!
+
+    nodeCoords.units         = 'degrees' 
+    elementConn.long_name    = 'Node Indices that define the element connectivity'
+    numElementConn.long_name = 'Number of nodes per element' 
+#    centerCoords.units       = 'degrees' 
+#    elementArea.units        = 'radians^2' 
+#    elementArea.long_name    = 'area weights' 
+ 
+    nodeCoords[:] =  ESMF_nodeCoords   
+    numElementConn[:] = ESMF_numElementConn
+    elementConn[:] = ESMF_elementConn
+
+    rootgrp.close()
+
+    rc = -1
     return rc
 
 #--------------------------------------------------------------------------------------------
@@ -245,5 +246,7 @@ if __name__ == "__main__":
     print 'I\'ll try to write converted ESMF mesh to ', ESMFmeshFileName
 
     elmerMesh = readElmerMesh(ElmerMeshDir)
+    ESMFmesh = convertMesh(elmerMesh)
+    rc = writeESMFmesh(ESMFmesh,ESMFmeshFileName)
 
-    rc = writeESMFmesh(elmerMesh,ESMFmeshFileName)
+    print "conversion complete"

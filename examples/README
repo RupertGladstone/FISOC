@@ -1,3 +1,20 @@
+
+Latest example (June 10th 2014) is in MISevolSetup4Elmer.  This contains 
+setup for 3D simulations, hopefully fairly generic.
+
+meshGen contains a python script used for various earlier mesh generation. 
+
+Note that the flowline meshes created that way are still in use for the 
+Budd (and Weertman) sliding stuff.
+
+TODO:
+Distil the essentials for the Budd flowline sliding stuff: mesh gen, 
+sif template, grd file and merge into the newer MISevolSetup4Elmer 
+directory... maybe need to read in geometry from file... merge with 
+MISevolSetup4Elmer should help with that...
+
+# stuff below is mostly out of date...
+
 # FISOC/examples contains sample code used while developing FISOC.
 # 
 # Hopefully this README can be run as a script...
