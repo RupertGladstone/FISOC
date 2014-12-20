@@ -4,7 +4,7 @@ import sys, numpy
 from netCDF4 import Dataset
 import time
 
-elementTypes = {
+allElementTypes = {
     101 : (1,"nodal element"),
     202 : (2,"line segment"),
     203 : (2,"line segment quadratic"),
@@ -45,33 +45,44 @@ def readElmerMesh(meshFileName):
     elementsFileName = meshFileName+'/mesh.elements'
     nodesFileName    = meshFileName+'/mesh.nodes'
 
-    header   = readElmerHeader(headerFileName)
+    (header, elementTypes) = readElmerHeader(headerFileName)
 
-    print len(header), len(header["numElements"])
 #    boundary = readElmerBoundary(boundaryFileName)
-    elements = readElmerElements(elementsFileName)  # get element -  node mapping
-#    print elements[1]
-    nodes    = readElmerNodes(nodesFileName)        # get node coords
-#    print nodes[2]
+    elements = readElmerElements(elementsFileName)        # get element -  node mapping
+    validNodeIds = elmerGetValidNodeIds(elements)         # we only want the nodes corresponding to the elements we have kept
+    nodes    = readElmerNodes(nodesFileName,validNodeIds) # get node coords
 
-    return (header, elements, nodes)
+    return (header, elements, nodes, elementTypes)
 
 #--------------------------------------------------------------------------------------------
 
 
-def readElmerNodes(nodesFileName):
+def elmerGetValidNodeIds(elements):
+#--------------------------------------------------------------------------------------------
+    uniqueNodeIds = set()
+    for elementId in elements.keys():
+        uniqueNodeIds.update(elements[elementId])
+
+    return uniqueNodeIds
+
+#--------------------------------------------------------------------------------------------
+
+
+
+def readElmerNodes(nodesFileName,validNodeIds):
 #--------------------------------------------------------------------------------------------
     nodes = {}
 
     fMeshNodes = open(nodesFileName,'r')
-    lines         = fMeshNodes.readlines()
+    lines      = fMeshNodes.readlines()
     fMeshNodes.close()
 
     for line in lines:
         lineList    = line.split()
         nodeId      = int(lineList[0])
         partitionId = int(lineList[1])
-        nodes[nodeId] = map(float,lineList[2:5]) # 3 coords (z will be zero for 3d meshes) for this node id
+        if nodeId in validNodeIds:
+            nodes[nodeId] = map(float,lineList[2:5]) # 3 coords (z will be zero for 3d meshes) for this node id
 
     return nodes
 #--------------------------------------------------------------------------------------------
@@ -91,7 +102,7 @@ def readElmerElements(elementsFileName):
         bodyId      = int(lineList[1])
         elementType = int(lineList[2])
         if (elementType in validElementTypes): 
-            nodesPerElement = elementTypes[elementType][0]
+            nodesPerElement = allElementTypes[elementType][0]
             elements[elementId] = map(int,lineList[3:3+nodesPerElement]) # list of node ids for this element id
 
     return elements
@@ -101,6 +112,7 @@ def readElmerElements(elementsFileName):
 def readElmerHeader(headerFileName):
 #--------------------------------------------------------------------------------------------
 
+    elementTypes = set()
     header = {}
     header["numElements"] = {}
 
@@ -115,10 +127,11 @@ def readElmerHeader(headerFileName):
         elif (len(lineList)==2):
             elementType         = int(lineList[0])
             numElements         = int(lineList[1])
-            if (elementType not in elementTypes.keys()):
+            if (elementType not in allElementTypes.keys()):
                 msg = "I don't recognise this element type: "+elementType
                 raise ValueError(msg)
             if elementType in validElementTypes:
+                elementTypes.update([elementType])
                 header["numElements"][elementType] = numElements
         elif (len(lineList)==3):
             numNodes            = int(lineList[0])
@@ -135,7 +148,83 @@ def readElmerHeader(headerFileName):
 #    boundaryElementType = int(lines[2].split()[0])
 #    bodyElementType     = int(lines[3].split()[0])
 
-    return header
+    return header, elementTypes
+#--------------------------------------------------------------------------------------------
+
+
+def writeESMFmesh(elmerMesh,ESMFmeshFileName):
+
+    (eHeader, eElements, eNodes, eElementTypes) = elmerMesh # "e" for elmer
+
+    eElementTypes = list(eElementTypes)
+
+    maxNumNodes = 0
+    for elementType in eElementTypes:
+        maxNumNodes = max(maxNumNodes,allElementTypes[elementType][0])
+    ESMF_maxNodePElement = maxNumNodes
+
+    ESMF_nodeCount = len(eNodes)
+    ESMF_elementCount = len(eElements)
+
+    ESMF_coordDim = 2 # should this perhaps not be hard coded?  But I think we only need to used the bottom ice surface for exchange of variables in ESMF, at least to start with.
+
+    # create the data using proper arrays.  Now the node and element Ids from the lists become array indices.
+
+#    print ESMF_nodeCount, ESMF_elementCount, ESMF_maxNodePElement
+    ESMF_nodeCoords = numpy.zeros([len(eNodes), 2])
+    for nodeId in eNodes.keys():
+        ESMF_nodeCoords[nodeId-1,:] = eNodes[nodeId][0:2] # num dimensions hard coded to 2.  thus nodes will have 2 coords each
+
+    ESMF_elementConn    = numpy.zeros([len(eElements), ESMF_maxNodePElement])
+    ESMF_elementConn[:] = -1.0
+    ESMF_NumElementConn = numpy.zeros([len(eElements)])
+    for elementId in eElements.keys():
+        ESMF_NumElementConn[elementId-1] = len(eElements[elementId])
+        ESMF_elementConn[elementId-1,:]  = numpy.array(eElements[elementId])
+
+#netcdf mesh-esmf {
+#dimensions:
+#        nodeCount = 9 ;
+#        elementCount = 5 ;
+#        maxNodePElement = 4 ;
+#        coordDim = 2 ;
+#variables:
+#        double  nodeCoords(nodeCount, coordDim);
+#                nodeCoords:units = "degrees" ;
+#        int elementConn(elementCount, maxNodePElement) ;
+#                elementConn:long_name = "Node Indices that define the element /
+#                                         connectivity";
+#                elementConn:_FillValue = -1 ;
+#        byte numElementConn(elementCount) ;
+#                numElementConn:long_name = "Number of nodes per element" ;
+#// global attributes:
+#                :gridType="unstructured";
+#                :version = "0.9" ;
+#data:
+#    nodeCoords=
+#        0.0, 0.0,
+#        1.0, 0.0,
+#        2.0, 0.0,
+#        0.0, 1.0,
+#        1.0, 1.0,
+#        2.0, 1.0,
+#        0.0, 2.0,
+#        1.0, 2.0,
+#        2.0, 2.0 ;
+#
+#    elementConn=
+#        1, 2, 5,  4,
+#        2, 3, 5, -1,
+#        3, 6, 5, -1,
+#        4, 5, 8,  7,
+#        5, 6, 9,  8 ;#
+#
+#    numElementConn= 4, 3, 3, 4, 4 ;
+#}
+
+    rc = 1
+    return rc
+
 #--------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -144,6 +233,7 @@ if __name__ == "__main__":
         raise ValueError("Missing command line arguments.  Please specify at least the Elmer mesh directory.")
     elif (len(sys.argv) == 2):
         ESMFmeshFileName = sys.argv[1]+'.nc'
+        ESMFmeshFileName = ESMFmeshFileName.replace('/','')
     elif (len(sys.argv) == 3):
         ESMFmeshFileName = sys.argv[2]
     elif (len(sys.argv) > 3):
@@ -151,6 +241,9 @@ if __name__ == "__main__":
 
     ElmerMeshDir = sys.argv[1]
 
-    print ElmerMeshDir, ESMFmeshFileName
+    print 'I\'ll try to read Elmer mesh from ', ElmerMeshDir
+    print 'I\'ll try to write converted ESMF mesh to ', ESMFmeshFileName
 
-    mesh = readElmerMesh(ElmerMeshDir)
+    elmerMesh = readElmerMesh(ElmerMeshDir)
+
+    rc = writeESMFmesh(elmerMesh,ESMFmeshFileName)
