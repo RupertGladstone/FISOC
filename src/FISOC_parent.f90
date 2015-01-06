@@ -7,6 +7,8 @@ MODULE  FISOC_parent_mod
   !  use   InjectorMod, only : Injector_register
   !  use FlowSolverMod, only : FlowSolver_register
   !  use    CouplerMod, only : Coupler_register
+
+  USE FISOC_ISM, ONLY : FISOC_ISM_register
   
   IMPLICIT NONE
   
@@ -14,15 +16,15 @@ MODULE  FISOC_parent_mod
   
   PUBLIC FISOC_parent_register
   
-  TYPE(ESMF_GridComp), SAVE :: FISOC_ice, FISOC_ocean, FISOC_proc
+  TYPE(ESMF_GridComp), SAVE :: FISOC_ISM, FISOC_OM, FISOC_proc
   TYPE(ESMF_CplComp),  SAVE :: FISOC_coupler
   TYPE(ESMF_State),    SAVE :: FISOC_ice_import, FISOC_ice_export, &
        FISOC_ocean_import, FISOC_ocean_export, FISOC_proc_import,  &
-       FISOC_proc_export
+       FISOC_proc_export ! might remove the proc ones? (time processing can be done within Elmer maybe?)
   
 CONTAINS
   
-!------------------------------------------------------------------------------
+  !------------------------------------------------------------------------------
   ! register subroutines to be called for init, run, finalize for this 
   ! parent component
   SUBROUTINE FISOC_parent_register(FISOC_parent, rc)
@@ -57,9 +59,47 @@ CONTAINS
     TYPE(ESMF_GridComp)  :: FISOC_parent
     TYPE(ESMF_State)     :: importState, exportState
     TYPE(ESMF_Clock)     :: FISOC_clock
+    INTEGER              :: petCount, localrc, urc
     INTEGER, INTENT(OUT) :: rc
     
     rc = ESMF_SUCCESS
+
+    ! Get petCount from the component (pet is persistent execution thread)
+    call ESMF_GridCompGet(FISOC_parent, petCount=petCount, rc=localrc)
+    if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, &
+         file=__FILE__, &
+         rcToReturn=rc)) return ! bail out
+
+    print *,"petCount ",petCount
+
+    ! Create and register child components and routines
+    FISOC_ISM = ESMF_GridCompCreate(name="Ice Sheet Model", rc=localrc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_GridCompSetServices(FISOC_ISM, FISOC_ISM_register, &
+         userRc=urc, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+
+! importState=INimp, exportState=INexp, &
+    CALL ESMF_GridCompInitialize(FISOC_ISM, &
+         clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+    IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
+    IF (urc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=urc)
+    
+    PRINT *, "Injection Model Initialize finished, rc = ", rc,"  and urc = ", urc
+    
+
+!*** how to set up a mesh
+
+!*** import and export states
+
+!***more child comps
 
  !*** can access and check stuff to do with parallelization here... PET count...
  !*** can set up stuff to do with connectivity - how grids are distributed over pets
