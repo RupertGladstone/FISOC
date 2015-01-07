@@ -13,8 +13,17 @@ ifneq ($(origin ESMFMKFILE), environment)
 $(error Environment variable ESMFMKFILE was not set.)
 endif
 
+ifneq ($(origin FISOC_ISM), environment)
+$(error Environment variable FISOC_ISM was not set.)
+endif
+
+ifneq ($(origin FISOC_OM), environment)
+$(error Environment variable FISOC_OM was not set.)
+endif
+
 include $(ESMFMKFILE)
 
+#cp  $(SRCDIR)/FISOC_ISM_dummy.f90  $(SRCDIR)/FISOC_ISM.f90
 
 ################################################################################
 
@@ -24,20 +33,16 @@ include $(ESMFMKFILE)
 
 ################################################################################
 
-# dependencies 
-#FISOC_caller: FISOC_caller.o FISOC_parent.o FISOC_coupler.o FISOC_proc.o FISOC_Elmer_dummy.o FISOC_ROMS_dummy.o  
-#FISOC_caller: FISOC_caller.o FISOC_parent.o FISOC_coupler.o FISOC_proc.o FISOC_Elmer.o FISOC_ROMS.o  
-#	$(ESMF_F90LINKER) $(ESMF_F90LINKOPTS) $(ESMF_F90LINKPATHS) $(ESMF_F90LINKRPATHS) -o $@ $^ $(ESMF_F90ESMFLINKLIBS)
-#FISOC_caller.o: FISOC_parent.o  
-#FISOC_parent.o: FISOC_coupler.o FISOC_proc.o FISOC_Elmer_dummy.o FISOC_ROMS_dummy.o  
-#FISOC_parent.o: FISOC_coupler.o FISOC_proc.o FISOC_ROMS.o FISOC_Elmer.o  
-
 FISOC_caller: $(SRCDIR)/FISOC_caller.o $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_ISM.o  
 	$(ESMF_F90LINKER) $(ESMF_F90LINKOPTS) $(ESMF_F90LINKPATHS) $(ESMF_F90LINKRPATHS) -o $@ $^ $(ESMF_F90ESMFLINKLIBS)
-#FISOC_caller.o: FISOC_parent.o  
 $(SRCDIR)/FISOC_caller.o: $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_caller.f90
 $(SRCDIR)/FISOC_parent.o: $(SRCDIR)/FISOC_parent.f90 $(SRCDIR)/FISOC_ISM.o
 $(SRCDIR)/FISOC_ISM.o:  $(SRCDIR)/FISOC_ISM.f90
+$(SRCDIR)/FISOC_ISM.f90: $(SRCDIR)/FISOC_ISM_$(FISOC_ISM).f90
+	cp  $(SRCDIR)/FISOC_ISM_$(FISOC_ISM).f90  $(SRCDIR)/FISOC_ISM.f90
+##$(SRCDIR)/FISOC_OM.o:  $(SRCDIR)/FISOC_OM.f90
+##$(SRCDIR)/FISOC_OM.f90: $(SRCDIR)/FISOC_OM_$(FISOC_OM).f90
+##	cp  $(SRCDIR)/FISOC_OM_$(FISOC_OM).f90  $(SRCDIR)/FISOC_OM.f90
 
 ################################################################################
 
@@ -45,5 +50,6 @@ $(SRCDIR)/FISOC_ISM.o:  $(SRCDIR)/FISOC_ISM.f90
 
 clean:
 	rm -f FISOC_caller *.o *.mod $(SRCDIR)/*.o $(SRCDIR)/*.mod
+	rm -f $(SRCDIR)/FISOC_ISM.f90  $(SRCDIR)/FISOC_OM.f90
 
 

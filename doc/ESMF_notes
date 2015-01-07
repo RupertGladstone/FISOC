@@ -1,0 +1,133 @@
+
+# netcdf instructions
+# http://www.unidata.ucar.edu/software/netcdf/docs/netcdf-install.html
+
+cd /home/elmeruser/Source
+
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4/zlib-1.2.8.tar.gz
+tar -xzf zlib-1.2.8.tar.gz 
+cd zlib-1.2.8
+ ./configure --prefix=/home/ed/local
+ make
+ make check
+ sudo make install
+cd ..
+
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4/hdf5-1.8.11.tar.gz	
+tar -xzf hdf5-1.8.11.tar.gz 
+cd hdf5-1.8.11
+ cd config
+  #emacs -nw gnu-flags
+  # then change these lines:
+  #      gcc-4.*)
+  #        PROD_CFLAGS="-O3"
+  # to this:
+  #      gcc-4.*)
+  #        PROD_CFLAGS="-O0"
+  # (just changed the 3)
+  #
+ cd ..
+ ./configure --with-zlib=/home/ed/local --prefix=/home/ed/local --enable-fortran 
+ make
+ make check
+ sudo make install
+cd ..
+
+#wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4/old/hdf5-1.8.6.tar.gz	
+#tar -xzf hdf5-1.8.6.tar.gz 
+#cd hdf5-1.8.6 
+# ./configure --with-zlib=/home/ed/local --prefix=/home/ed/local --enable-fortran 
+# make
+# make check
+# sudo make install
+#cd ..
+
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf.tar.gz
+tar -xzf netcdf.tar.gz 
+cd netcdf-4.3.0/
+ make clean
+ CPPFLAGS=-I/home/ed/local/include LDFLAGS=-L/home/ed/local/lib ./configure --prefix=/home/ed/local
+ make check
+ sudo make install
+
+ make clean
+ LD_LIBRARY_PATH=/home/ed/local/lib/ CPPFLAGS="-I/home/ed/local/include -DUSE_NETCDF4" LDFLAGS=-L/home/ed/local/lib ./configure --enable-netcdf-4  --prefix=/home/ed/local
+ make check
+ sudo make install
+cd ..
+
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-fortran-4.2.tar.gz
+tar -xzf netcdf-fortran-4.2.tar.gz
+cd netcdf-fortran-4.2
+ make clean
+ LD_LIBRARY_PATH=/home/ed/local/lib/ CPPFLAGS="-I/home/ed/local/include -DUSE_NETCDF4" LDFLAGS=-L/home/ed/local/lib ./configure --prefix=/home/ed/local
+ make				     
+ make check
+ sudo make install
+cd ..
+
+# the official c++ code provides libnetcdf_c++4.a
+wget https://github.com/Unidata/netcdf-cxx4/archive/v4.2.1.tar.gz
+tar -xzf v4.2.1.tar.gz 
+cd netcdf-cxx4-4.2.1
+ make clean
+ LD_LIBRARY_PATH=/home/ed/local/lib/ CPPFLAGS="-I/home/ed/local/include -DUSE_NETCDF4" LDFLAGS=-L/home/ed/local/lib ./configure  --prefix=/home/ed/local
+ make
+ make check
+ sudo make install
+cd ..
+
+# need c++ legacy code for ESMF, this provides libnetcdf_c++.a
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-cxx-4.2.tar.gz
+tar -xzf netcdf-cxx-4.2.tar.gz
+cd netcdf-cxx-4.2
+ make clean
+ LD_LIBRARY_PATH=/home/ed/local/lib/ CPPFLAGS="-I/home/ed/local/include -DUSE_NETCDF4" LDFLAGS=-L/home/ed/local/lib ./configure  --prefix=/home/ed/local
+ make
+ make check
+ sudo make install
+cd ..
+
+sudo apt-get install ncview
+
+
+# environment variables set in .bashrc:
+# there are env vars for debug options, compiler choices, mpi library, lapack location
+
+# downloaded esmf v6.2 tarball from sourceforge, put it in 6.2.0
+# build ESMF
+
+cd /home/elmeruser/Source
+wget http://sourceforge.net/projects/esmf/files/ESMF_6_2_0/esmf_6_2_0_src.tar.gz
+tar -xzf esmf_6_2_0_src.tar.gz 
+cd esmf 
+ make clean
+ make
+ make check
+# make all_tests
+ sudo -E make install
+cd ..
+
+# cd /home/elmeruser/Source/Esmf/esmf_v6.2/
+
+# get esmf demos from git:
+git clone git://git.code.sf.net/p/esmf/external_demos esmf-external_demos
+# build esmf examples
+# environment variables set in .bashrc (points to my esmf installation):
+# export ESMFMKFILE="/home/elmeruser/Source/Esmf/esmf_v6.2/lib/libO/Linux.gfortran.64.mpiuni.default/esmf.mk"
+
+Questions:
+If I have changed the ESMF_ environment variables (for example I previously compiled without netcdf and now I want to use netcdf) do I need to run "make clean" before I run "make"?
+
+One of my components (Elmer, which I use as an ice sheet model) requires run time dynamic loading of code.  Would this cause any problems for ESMF?
+
+It is unlikely that I will be able to fit either of my components into a single F90 module.  Elmer currently uses a number of different modules.  Would this cause any problems for ESMF?
+
+I first compiled ESMF in serial.  I ran "make check" and I think it ran ok.  Later I compiled with openmpi.  I ran "make check" and it was still running after three days, so I killed it.  It was running something on 6 cores.  This was on my i5 laptop.  Is this expected behaviour?  Should it take several days to run the tests?  It would be good to have an easy-to-run subset of the tests that completes in minutes to hours rather than days. 
+
+Outputting issues with the coupled flow example.
+
+
+ warning, the mode argument is currently ignored for binary file operations
+ write_mpiio_real: after call to file_write_all:MPI_ERR_READ_ONLY: file is read only
+ pio_support::pio_die:: myrank=          -1 : ERROR: iompi_mod.F90:         227 : (no message)
