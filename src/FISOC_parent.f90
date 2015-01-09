@@ -2,11 +2,6 @@
 MODULE  FISOC_parent_mod
   
   USE ESMF
-  
-  !*** register the components? register all four child components here...
-  !  use   InjectorMod, only : Injector_register
-  !  use FlowSolverMod, only : FlowSolver_register
-  !  use    CouplerMod, only : Coupler_register
 
   USE FISOC_ISM, ONLY : FISOC_ISM_register
   USE FISOC_coupler, ONLY : FISOC_coupler_register
@@ -56,16 +51,21 @@ CONTAINS
   SUBROUTINE FISOC_init(FISOC_parent, importState, exportState, FISOC_clock, rc)
     TYPE(ESMF_GridComp)  :: FISOC_parent
     TYPE(ESMF_State)     :: importState, exportState
-    TYPE(ESMF_State)     :: ISM_ImpSt, ISM_ExpSt, OM_ImpSt, OM_ExpSt
     TYPE(ESMF_Clock)     :: FISOC_clock
-    TYPE(ESMF_config)    :: config
-    INTEGER              :: petCount, localrc, urc
     INTEGER, INTENT(OUT) :: rc
 
-    
-    rc = ESMF_SUCCESS
+    TYPE(ESMF_State)     :: ISM_ImpSt, ISM_ExpSt, OM_ImpSt, OM_ExpSt
+    TYPE(ESMF_config)    :: config
+    INTEGER              :: petCount, localrc, urc
+    CHARACTER(len=ESMF_MAXSTR) :: msg
 
-    ! Get config and petCount from the component (pet is persistent execution thread)
+    rc = ESMF_FAILURE
+
+    msg = "Starting FISOC parent initialisation"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
+
+    ! Get config and petCount from the component object (pet is persistent execution thread)
     CALL ESMF_GridCompGet(FISOC_parent, config=config, petCount=petCount, rc=localrc)
     IF (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, &
@@ -115,6 +115,10 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    msg = "FISOC child routines created and registered"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
+
     ISM_ImpSt = ESMF_StateCreate(name='ISM import state', stateintent=ESMF_STATEINTENT_IMPORT, rc=rc) 
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -125,7 +129,19 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-print*,'need some log write calls'
+    OM_ImpSt = ESMF_StateCreate(name='OM import state', stateintent=ESMF_STATEINTENT_IMPORT, rc=rc) 
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    OM_ExpSt = ESMF_StateCreate(name='OM export state', stateintent=ESMF_STATEINTENT_EXPORT, rc=rc) 
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    msg = "Empty import and export states created"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
 
     CALL ESMF_GridCompInitialize(FISOC_ISM, &
          importState=ISM_ImpSt, exportState=ISM_ExpSt, &
@@ -137,24 +153,28 @@ print*,'need some log write calls'
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!***more child comps
+    !***more child comps: OM and coupler
+    
+    !*** can access and check stuff to do with parallelization here... PET count...
+    !*** can set up stuff to do with connectivity - how grids are distributed over pets
+    ! (PET = persistent execution thread)
+    
+    !*** create child grids and their decompositions
+    !*** maybe elmer needs to set the grid... can write an elmer solver to create the grid 
+    ! in the proper ESMF way, using Elmer's own idea of how the grid should be...
+    
+    !***ROMS grid: need to see how Ufuk has done it...
+    
+    !*** create empty import and export states for all grid components, and call their initialize 
+    ! routines (which have previously been registered)
+    ! note components can have multiple initialisation phases (i.e. multiple initialisation routines 
+    ! to be called in order determined by the programmer)
 
- !*** can access and check stuff to do with parallelization here... PET count...
- !*** can set up stuff to do with connectivity - how grids are distributed over pets
- ! (PET = persistent execution thread)
- !*** can create the child grid components here, and register the relevant subroutines
+    msg = "FISOC initialise completed"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
 
- !*** create child grids and their decompositions
-!*** maybe elmer needs to set the grid... can write an elmer solver to create the grid 
-! in the proper ESMF way, using Elmer's own idea of how the grid should be...
-
-!***ROMS grid: need to see how Ufuk has done it...
-
- !*** create import and export states for all grid components, and call their initialize 
- ! routines (which have previously been registered)
- ! note coupler gets initialised multiple times... seems like one of the child 
- ! components get initialised multiple times???  ah, grid components have multiple 
- ! initialisation stages ... is this set in their register routines?  or somewhere else?
+    rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_init
 
@@ -174,29 +194,28 @@ print*,'need some log write calls'
     DO WHILE (.NOT. ESMF_ClockIsStopTime(FISOC_clock, rc=rc))
 
        !*** run:
-       !*** do clock stuff (but not advancing the main clock??? where does that happen???)
        !*** run the child components
        !*** coupler gets called multiple times with different import and export states.  
 !       CALL ESMF_TimeIntervalPrint(ts_ice, rc=rc)
 !       CALL ESMF_ClockPrint(FISOC_clock, options="advanceCount string isofrac", rc=rc)
 !       CALL ESMF_ClockPrint(FISOC_clock, options="currTime string", rc=rc)
        
-       PRINT*,""
-       PRINT*,"New timestep. We need to call FISOC_proc"
+!       PRINT*,""
+!       PRINT*,"New timestep. We need to call FISOC_proc"
        ! ***the FISOC_proc component accesses and can activate or deactivate alarms.
        ! after alarm adjustments FISOC_proc does accumulation of fluxes.
        ! FISOC_proc must operate on the ocean grid and degeneration.
 
-       IF (ESMF_AlarmIsRinging(alarm_ocn, rc=rc)) THEN
-          PRINT*, "Ocean alarm, we must call the ocean component"
-          PRINT*, "After the ocean component we must call the coupler"
-       END IF
+!       IF (ESMF_AlarmIsRinging(alarm_ocn, rc=rc)) THEN
+!          PRINT*, "Ocean alarm, we must call the ocean component"
+!          PRINT*, "After the ocean component we must call the coupler"
+!       END IF
 
-       IF (ESMF_AlarmIsRinging(alarm_ice, rc=rc)) THEN
-          PRINT*, "Ice alarm, we must call the ice component"
-          PRINT*, "After the ice component we must call the coupler"
-          CALL ESMF_AlarmRingerOff(alarm_ice, rc=rc)
-       END IF
+!       IF (ESMF_AlarmIsRinging(alarm_ice, rc=rc)) THEN
+!          PRINT*, "Ice alarm, we must call the ice component"
+!          PRINT*, "After the ice component we must call the coupler, phase 2?"
+!          CALL ESMF_AlarmRingerOff(alarm_ice, rc=rc)
+!       END IF
        
        CALL ESMF_ClockAdvance(FISOC_clock, rc=rc)   
     END DO

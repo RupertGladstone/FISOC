@@ -10,6 +10,7 @@ MODULE FISOC_ISM
   
 CONTAINS
   
+  !------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_register(FISOC_ISM, rc)
     
     TYPE(ESMF_GridComp)  :: FISOC_ISM
@@ -41,13 +42,34 @@ CONTAINS
     TYPE(ESMF_GridComp)  :: FISOC_ISM
     TYPE(ESMF_State)     :: ISM_ImpSt, ISM_ExpSt
     TYPE(ESMF_Clock)     :: FISOC_clock
+    INTEGER, INTENT(OUT) :: rc
+
     TYPE(ESMF_config)    :: config
     TYPE(ESMF_mesh)      :: ISM_mesh
+    TYPE(ESMF_field)     :: ISM_temperature_l0, ISM_temperature_l1
+    TYPE(ESMF_field)     :: ISM_z_l0, ISM_z_l1
     INTEGER              :: localrc
-    INTEGER, INTENT(OUT) :: rc
-    CHARACTER(len=ESMF_MAXSTR) :: ISM_meshFile 
-   
+    CHARACTER(len=ESMF_MAXSTR) :: ISM_meshFile, msg
+    REAL(ESMF_KIND_R8),POINTER :: ISM_temperature_l0_ptr(:),ISM_temperature_l1_ptr(:) 
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:),ISM_z_l1_ptr(:) 
+
+!    real(ESMF_KIND_R8)        :: ownedNodeCoords(:)
+    integer                   :: numOwnedElements
+    logical                   :: isMemFreed
+    type(ESMF_CoordSys_Flag)  :: coordSys
+    integer                   :: parametricDim
+    integer                   :: spatialDim
+    type(ESMF_DistGrid)       :: nodalDistgrid
+    type(ESMF_DistGrid)       :: elementDistgrid
+    integer                   :: numOwnedNodes
+    
     rc = ESMF_SUCCESS
+
+    NULLIFY(ISM_temperature_l0_ptr)
+
+    msg = "ISM initialise started"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
 
     ! Get mesh file name from the config file
     CALL ESMF_GridCompGet(FISOC_ISM, config=config, rc=localrc)
@@ -66,9 +88,60 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-print *,'!create mesh here and use it to create fields#'
-print *,'!put the fields in the state objects, set to zero for now probably'
-print *,'need some log file writes here and in parent'
+! Note weakness: currently regridding in 2d instead of a 2d manifold in 3d space.
+
+!    CALL ESMF_MeshGet(ISM_mesh, parametricDim=parametricDim, spatialDim=spatialDim, &
+!                    nodalDistgrid=nodalDistgrid, numOwnedNodes=numOwnedNodes, &
+!                    numOwnedElements=numOwnedElements, rc=rc)
+!    print *,"check this with elmer mesh header file"
+!    print *,"mesh stuff", parametricDim, spatialDim, numOwnedNodes, numOwnedElements !, ownedNodeCoords
+    
+    ISM_temperature_l0 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_temperature_l0, localDe=0, farrayPtr=ISM_temperature_l0_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ISM_temperature_l0_ptr(:) = -1.0
+
+    ISM_temperature_l1 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_temperature_l1, localDe=0, farrayPtr=ISM_temperature_l1_ptr, rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ISM_temperature_l1_ptr(:) = -1.1
+    
+    ISM_z_l0 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ISM_z_l0_ptr(:) = -100.0
+    
+    ISM_z_l1 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_z_l1, localDe=0, farrayPtr=ISM_z_l1_ptr, rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ISM_z_l1_ptr(:) = -75.0
+    
+    msg = "ISM created mesh and fields"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
+
+print*,"make field bundle"
+print*,"add bundle to export state"
+
+!    if (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+!get some mesh info, check it looks sensible
+!create a zeroed array on it as a new field
+!fields for export:
+!level0 temperature
+!level0 z coord
+!level1 temperature
+!level1 z coord
+!fields for import:
+!level0 melt rate
 
   END SUBROUTINE FISOC_ISM_init
   !------------------------------------------------------------------------------

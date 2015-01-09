@@ -29,7 +29,6 @@ PROGRAM FISOC_main
   ! of ESMF, but the actual grid and state are dummy properties.  The parent 
   ! merely coordinates the child components (ice, ocean and processing)
   TYPE(ESMF_GridComp)     :: FISOC_parent 
-  TYPE(ESMF_State)        :: FISOC_parent_state
   TYPE(ESMF_config)       :: FISOC_config
 
 !------------------------------------------------------------------------------
@@ -41,9 +40,6 @@ PROGRAM FISOC_main
 ! regridding
 ! clocks and alarms
 ! helping to manage effective parallelization
-!***does parent have access to child import/export states?
-!*** global params:
-! ***where is clock actually advanced? or keep multiple clocks for checking?
 
 !------------------------------------------------------------------------------
 !*** what calendar? 360 day?
@@ -61,10 +57,9 @@ PROGRAM FISOC_main
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-  ! Note: only checking log writing for success on first call to ESMF_LogWrite
+  ! Note: we are only checking log writing for success on first call to ESMF_LogWrite
   ! possibly this is naively optimistic...
 
-  !------------------------------------------------------------------------------
 
   ! Load configuration file
   FISOC_config = ESMF_ConfigCreate(rc=rc)
@@ -79,12 +74,6 @@ PROGRAM FISOC_main
   msg = "Loaded FISOC configuration file"  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
-!  IF (rc .NE. 0) THEN
-!     CALL ESMF_LogSetError(rcToCheck=ESMF_RC_FILE_OPEN, &
-!          msg="Failed to open FISOC namelist config file", &
-!          line=__LINE__, file=__FILE__)
-!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!  END IF
   
 
   !------------------------------------------------------------------------------
@@ -103,11 +92,6 @@ PROGRAM FISOC_main
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   
-!  ! Create and initialize a dummy State to use for both import and export.
-!  FISOC_parent_state = ESMF_StateCreate(Name="FISOC_parent_state", rc=rc)
-!  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!       line=__LINE__, file=__FILE__)) &
-!       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   msg = "Completed FISOC_parent creation and registration"  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
