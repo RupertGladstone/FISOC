@@ -8,10 +8,6 @@ MODULE FISOC_ISM
   
   PUBLIC FISOC_ISM_register
   
-!  TYPE(ESMF_GridComp), SAVE :: FISOC_ice, FISOC_ocean, FISOC_proc
-!  TYPE(ESMF_CplComp),  SAVE :: FISOC_coupler
-!  TYPE(ESMF_State),    SAVE :: FISOC_ice_import, FISOC_ice_export
-  
 CONTAINS
   
   SUBROUTINE FISOC_ISM_register(FISOC_ISM, rc)
@@ -41,19 +37,38 @@ CONTAINS
   END SUBROUTINE FISOC_ISM_register
 
   !------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_init(FISOC_ISM, importState, exportState, FISOC_clock, rc)
+  SUBROUTINE FISOC_ISM_init(FISOC_ISM, ISM_ImpSt, ISM_ExpSt, FISOC_clock, rc)
     TYPE(ESMF_GridComp)  :: FISOC_ISM
-    TYPE(ESMF_State)     :: importState, exportState
+    TYPE(ESMF_State)     :: ISM_ImpSt, ISM_ExpSt
     TYPE(ESMF_Clock)     :: FISOC_clock
-    INTEGER              :: petCount, localrc
+    TYPE(ESMF_config)    :: config
+    TYPE(ESMF_mesh)      :: ISM_mesh
+    INTEGER              :: localrc
     INTEGER, INTENT(OUT) :: rc
-    
+    CHARACTER(len=ESMF_MAXSTR) :: ISM_meshFile 
+   
     rc = ESMF_SUCCESS
 
-create mesh
-create state
+    ! Get mesh file name from the config file
+    CALL ESMF_GridCompGet(FISOC_ISM, config=config, rc=localrc)
+    IF (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
-    print *," FISOC_ISM_init needs writing"
+    CALL ESMF_ConfigGetAttribute(config, ISM_meshFile, label='ISM_meshFile:', rc=localrc)
+    IF (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+
+    ! create ISM mesh and use it to create zeroed fields for the ISM import and export states
+    ISM_mesh = ESMF_MeshCreate(filename=ISM_meshFile, &
+            filetypeflag=ESMF_FILEFORMAT_ESMFMESH, &
+            rc=localrc)
+    IF (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+print *,'!create mesh here and use it to create fields#'
+print *,'!put the fields in the state objects, set to zero for now probably'
+print *,'need some log file writes here and in parent'
 
   END SUBROUTINE FISOC_ISM_init
   !------------------------------------------------------------------------------

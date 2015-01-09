@@ -18,9 +18,9 @@ PROGRAM FISOC_main
 
   ! Timekeeping
   TYPE(ESMF_Clock)        :: FISOC_clock
-  INTEGER                 :: ts_ocn_sec, ts_ice_sec, ts_ratio
+  INTEGER                 :: ISM_dt_sec, OM_dt_sec, dt_ratio
   INTEGER                 :: start_year, end_year, start_month, end_month
-  TYPE(ESMF_TimeInterval) :: ts_ocn, ts_ice
+  TYPE(ESMF_TimeInterval) :: ISM_dt, OM_dt
   TYPE(ESMF_Time)         :: startTime, endTime
   TYPE(ESMF_Alarm)        :: alarm_ocn, alarm_ice
   LOGICAL                 :: tight_coupling
@@ -28,14 +28,10 @@ PROGRAM FISOC_main
   ! A parent gridded component is used to support the hierarchical approach  
   ! of ESMF, but the actual grid and state are dummy properties.  The parent 
   ! merely coordinates the child components (ice, ocean and processing)
-!*** maybe we dont need even a dummy grid for parent... will soon see...
   TYPE(ESMF_GridComp)     :: FISOC_parent 
-  TYPE(ESMF_State)        :: FISOC_dummy_state
+  TYPE(ESMF_State)        :: FISOC_parent_state
+  TYPE(ESMF_config)       :: FISOC_config
 
-  ! namelist of configuration parameters to be read from config file
-  NAMELIST /config/  ts_ocn_sec, ts_ratio, start_year, start_month, &
-       end_year, end_month, tight_coupling
-  
 !------------------------------------------------------------------------------
 
 
@@ -59,7 +55,7 @@ PROGRAM FISOC_main
        line=__LINE__, file=__FILE__)) THEN
      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   END IF
-  msg = "FISOC_caller: Initialised ESMF framework"  
+  msg = "Initialised ESMF framework"  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -68,34 +64,34 @@ PROGRAM FISOC_main
   ! Note: only checking log writing for success on first call to ESMF_LogWrite
   ! possibly this is naively optimistic...
 
-!------------------------------------------------------------------------------
+  !------------------------------------------------------------------------------
 
-  ! Read configuration parameters
-  CALL ESMF_UtilIOUnitGet(unit=fileunit, rc=rc)
+  ! Load configuration file
+  FISOC_config = ESMF_ConfigCreate(rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-  OPEN(fileunit, status="old", file="./FISOC_config", &
-       action="read", iostat=rc)
-  IF (rc .NE. 0) THEN
-     CALL ESMF_LogSetError(rcToCheck=ESMF_RC_FILE_OPEN, &
-          msg="Failed to open FISOC namelist config file", &
-          line=__LINE__, file=__FILE__)
-     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-  END IF
-  READ(fileunit, config, end=20)
-20 CONTINUE
-  CLOSE(fileunit)
-  msg = "FISOC_caller: read FISOC configuration file"  
+  call ESMF_ConfigLoadFile(FISOC_config, "FISOC_config.rc", rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  msg = "Loaded FISOC configuration file"  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
+!  IF (rc .NE. 0) THEN
+!     CALL ESMF_LogSetError(rcToCheck=ESMF_RC_FILE_OPEN, &
+!          msg="Failed to open FISOC namelist config file", &
+!          line=__LINE__, file=__FILE__)
+!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!  END IF
   
 
-!------------------------------------------------------------------------------
+  !------------------------------------------------------------------------------
 
   ! Create the parent Gridded Component (though we don't use its grid, we just 
   ! use it for coordinating child components...)
-  FISOC_parent = ESMF_GridCompCreate(name="FISOC parent gridded component", rc=rc)
+  FISOC_parent = ESMF_GridCompCreate(name="FISOC parent gridded component", config=FISOC_config, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -107,58 +103,89 @@ PROGRAM FISOC_main
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   
-  ! Create and initialize a dummy State to use for both import and export.
-  FISOC_dummy_state = ESMF_StateCreate(Name="FISOC_dummy_state", rc=rc)
-  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-       line=__LINE__, file=__FILE__)) &
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-  msg = "FISOC_caller: completed FISOC_parent creation and registration"  
+!  ! Create and initialize a dummy State to use for both import and export.
+!  FISOC_parent_state = ESMF_StateCreate(Name="FISOC_parent_state", rc=rc)
+!  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!       line=__LINE__, file=__FILE__)) &
+!       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+  msg = "Completed FISOC_parent creation and registration"  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
   
 
-!------------------------------------------------------------------------------
-! FISOC time model 
-! 
-! FISOC runs one clock which increments with the ocean timestep. The ice 
-! timestep must be a multiple of the ocean timestep.  An ocean alarm is used 
-! to indicate whether the ocean model should be run.  The alarm is event driven 
-! and is set to always on for tightly coupled simulations.  An ice alarm is 
-! used to indicate whether the ice model should be run.  This is a periodic 
-! alarm.
-!
-! ***we could also have a clock in each component and do some checks that the 
-! clocks are on the same time?
-!
-! ***loose coupling needs more thought - logical switch sent to FISOC_proc state?
-!
-! FISOC time related variables:
-! FISOC_clock          the main FISOC clock
-! alarm_ice            the (periodic) alarm for the ice model 
-! alarm_ocn            the (event driven) alarm for the ocean model
-! tight_coupling (config) whether tight coupling (always call ocean) or loose 
-!                      coupling (call ocean after large geometry change) 
-! ts_ocn_sec (config)  ocean timestep in seconds
-! ts_ratio   (config)  timestep ratio 
-! ts_ice_sec           ice timestep in seconds  (=ts_ocn_sec*ts_ratio)
-! ts_ocn               ocean timestep in ESMF format
-! ts_ice               ice timestep in ESMF format
-! start_year  (config) start and end dates for FISOC simulation
-! start_month (config) ...
-! end_year    (config) ...
-! end_month   (config) ...
-!
-! variables marked (config) are set in the FISOC_config file.
-!
-  ts_ice_sec = ts_ocn_sec * ts_ratio
-!
-!------------------------------------------------------------------------------
-! setting up clocks and alarms
-!
-  CALL ESMF_TimeIntervalSet(ts_ocn, s=ts_ocn_sec, rc=rc)
+  !------------------------------------------------------------------------------
+  ! FISOC time model 
+  ! 
+  ! FISOC runs one clock which increments with the ocean timestep. The ice 
+  ! timestep must be a multiple of the ocean timestep.  An ocean alarm is used 
+  ! to indicate whether the ocean model should be run.  The alarm is event driven 
+  ! and is set to always on for tightly coupled simulations.  An ice alarm is 
+  ! used to indicate whether the ice model should be run.  This is a periodic 
+  ! alarm.
+  !
+  ! ***we could also have a clock in each component and do some checks that the 
+  ! clocks are on the same time?
+  !
+  ! ***loose coupling needs more thought - logical switch sent to FISOC_proc state?
+  !
+  ! FISOC time related variables:
+  ! FISOC_clock          the main FISOC clock
+  ! alarm_ice            the (periodic) alarm for the ice model 
+  ! alarm_ocn            the (event driven) alarm for the ocean model
+  ! tight_coupling (config) whether tight coupling (always call ocean) or loose 
+  !                      coupling (call ocean after large geometry change) 
+  ! OM_dt_sec (config)   ocean timestep in seconds
+  ! dt_ratio   (config)  timestep ratio 
+  ! ISM_dt_sec           ice timestep in seconds  (=OM_dt_sec*dt_ratio)
+  ! OM_dt                ocean timestep in ESMF format
+  ! ISM_dt               ice timestep in ESMF format
+  ! start_year  (config) start and end dates for FISOC simulation
+  ! start_month (config) ...
+  ! end_year    (config) ...
+  ! end_month   (config) ...
+  !
+  ! variables marked (config) are set in the FISOC_config file.
+  !
+  CALL ESMF_ConfigGetAttribute(FISOC_config, dt_ratio, label='dt_ratio:', rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  CALL ESMF_ConfigGetAttribute(FISOC_config, OM_dt_sec, label='OM_dt_sec:', rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  ISM_dt_sec = OM_dt_sec * dt_ratio
+
+  CALL ESMF_ConfigGetAttribute(FISOC_config, start_month, label='start_month:', rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  CALL ESMF_ConfigGetAttribute(FISOC_config, start_year, label='start_year:', rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  CALL ESMF_ConfigGetAttribute(FISOC_config, end_month, label='end_month:', rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  CALL ESMF_ConfigGetAttribute(FISOC_config, end_year, label='end_year:', rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  !
+  !------------------------------------------------------------------------------
+  ! setting up clocks and alarms
+  !
+  CALL ESMF_TimeIntervalSet(OM_dt, s=OM_dt_sec, rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
 
-  CALL ESMF_TimeIntervalSet(ts_ice, s=ts_ice_sec, rc=rc)
+  CALL ESMF_TimeIntervalSet(ISM_dt, s=ISM_dt_sec, rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
 
   CALL ESMF_TimeSet(startTime, yy=start_year, mm=start_month, dd=1, rc=rc)
@@ -167,7 +194,7 @@ PROGRAM FISOC_main
   CALL ESMF_TimeSet(endTime, yy=end_year, mm=end_month, dd=1, rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
 
-  FISOC_clock = ESMF_ClockCreate(ts_ocn, startTime, stopTime=endTime, &
+  FISOC_clock = ESMF_ClockCreate(OM_dt, startTime, stopTime=endTime, &
        name="FISOC main clock", rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
 
@@ -177,12 +204,12 @@ PROGRAM FISOC_main
 
   alarm_ice = ESMF_AlarmCreate(clock=FISOC_clock, name="alarm_ice", &
        ringTime=startTime, &
-       ringInterval=ts_ice, rc=rc)
+       ringInterval=ISM_dt, rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
   
 !***turn on ocn alarm if tight coupling... or do this in FISOC_proc ?
 
-  msg = "FISOC_caller: created and initialised clocks and alarms"  
+  msg = "created and initialised clocks and alarms"  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
@@ -191,31 +218,29 @@ PROGRAM FISOC_main
 ! The main bit: initialize, run and finalize FISOC_parent (the parent calls 
 ! all child components).
   CALL ESMF_GridCompInitialize(FISOC_parent, &
-       importState=FISOC_dummy_state, exportState=FISOC_dummy_state, &
        clock=FISOC_clock, userRc=urc, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   
   CALL ESMF_GridCompRun(FISOC_parent, &
-       importState=FISOC_dummy_state, exportState=FISOC_dummy_state, &
        clock=FISOC_clock, userRc=urc, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-  msg = "FISOC_caller: FISOC run complete, tidying up..."  
+
+  !------------------------------------------------------------------------------
+  msg = "FISOC run complete, tidying up..."  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
   CALL ESMF_GridCompFinalize(FISOC_parent, &
-       importState=FISOC_dummy_state, exportState=FISOC_dummy_state, &
        clock=FISOC_clock, userRc=urc, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   
-!------------------------------------------------------------------------------
-
+  !------------------------------------------------------------------------------
   CALL ESMF_AlarmDestroy(alarm_ice, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
@@ -233,9 +258,5 @@ PROGRAM FISOC_main
   
   CALL ESMF_Finalize()
 
-! this log write removed because log destroyed by esmf finalize!
-!  msg = "FISOC_caller: completed finalize and destruction routines"  
-!  CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-!       line=__LINE__, file=__FILE__, rc=rc)
-
 END PROGRAM FISOC_main
+!------------------------------------------------------------------------------

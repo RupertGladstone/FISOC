@@ -9,6 +9,8 @@ MODULE  FISOC_parent_mod
   !  use    CouplerMod, only : Coupler_register
 
   USE FISOC_ISM, ONLY : FISOC_ISM_register
+  USE FISOC_coupler, ONLY : FISOC_coupler_register
+  USE FISOC_OM, ONLY : FISOC_OM_register
   
   IMPLICIT NONE
   
@@ -16,17 +18,13 @@ MODULE  FISOC_parent_mod
   
   PUBLIC FISOC_parent_register
   
-  TYPE(ESMF_GridComp), SAVE :: FISOC_ISM, FISOC_OM, FISOC_proc
+  TYPE(ESMF_GridComp), SAVE :: FISOC_ISM, FISOC_OM
   TYPE(ESMF_CplComp),  SAVE :: FISOC_coupler
-  TYPE(ESMF_State),    SAVE :: FISOC_ice_import, FISOC_ice_export, &
-       FISOC_ocean_import, FISOC_ocean_export, FISOC_proc_import,  &
-       FISOC_proc_export ! might remove the proc ones? (time processing can be done within Elmer maybe?)
+  TYPE(ESMF_State),    SAVE :: ISM_ImpSt, ISM_ExpSt, OM_ImpSt, OM_ExpSt
   
 CONTAINS
   
   !------------------------------------------------------------------------------
-  ! register subroutines to be called for init, run, finalize for this 
-  ! parent component
   SUBROUTINE FISOC_parent_register(FISOC_parent, rc)
     
     TYPE(ESMF_GridComp)  :: FISOC_parent
@@ -58,23 +56,34 @@ CONTAINS
   SUBROUTINE FISOC_init(FISOC_parent, importState, exportState, FISOC_clock, rc)
     TYPE(ESMF_GridComp)  :: FISOC_parent
     TYPE(ESMF_State)     :: importState, exportState
+    TYPE(ESMF_State)     :: ISM_ImpSt, ISM_ExpSt, OM_ImpSt, OM_ExpSt
     TYPE(ESMF_Clock)     :: FISOC_clock
+    TYPE(ESMF_config)    :: config
     INTEGER              :: petCount, localrc, urc
     INTEGER, INTENT(OUT) :: rc
+
     
     rc = ESMF_SUCCESS
 
-    ! Get petCount from the component (pet is persistent execution thread)
-    call ESMF_GridCompGet(FISOC_parent, petCount=petCount, rc=localrc)
-    if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+    ! Get config and petCount from the component (pet is persistent execution thread)
+    CALL ESMF_GridCompGet(FISOC_parent, config=config, petCount=petCount, rc=localrc)
+    IF (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, &
          file=__FILE__, &
          rcToReturn=rc)) return ! bail out
 
-    print *,"petCount ",petCount
-
     ! Create and register child components and routines
-    FISOC_ISM = ESMF_GridCompCreate(name="Ice Sheet Model", rc=localrc)
+    FISOC_ISM = ESMF_GridCompCreate(name="Ice Sheet Model", config=config, rc=localrc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    FISOC_OM = ESMF_GridCompCreate(name="Ocean Model", config=config, rc=localrc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    FISOC_coupler = ESMF_CplCompCreate(name="FISOC coupler", config=config, rc=localrc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -84,20 +93,49 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CALL ESMF_GridCompSetServices(FISOC_OM, FISOC_OM_register, &
+         userRc=urc, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-! importState=INimp, exportState=INexp, &
+    CALL ESMF_CplCompSetServices(FISOC_coupler, FISOC_coupler_register, &
+         userRc=urc, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ISM_ImpSt = ESMF_StateCreate(name='ISM import state', stateintent=ESMF_STATEINTENT_IMPORT, rc=rc) 
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ISM_ExpSt = ESMF_StateCreate(name='ISM export state', stateintent=ESMF_STATEINTENT_EXPORT, rc=rc) 
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+print*,'need some log write calls'
+
     CALL ESMF_GridCompInitialize(FISOC_ISM, &
+         importState=ISM_ImpSt, exportState=ISM_ExpSt, &
          clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
-    IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
-    IF (urc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=urc)
-    
-    PRINT *, "Injection Model Initialize finished, rc = ", rc,"  and urc = ", urc
-    
-
-!*** how to set up a mesh
-
-!*** import and export states
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
 !***more child comps
 
