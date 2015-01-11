@@ -16,7 +16,7 @@ CONTAINS
     INTEGER, INTENT(OUT) :: rc
     
     rc = ESMF_FAILURE
-
+print*,'write FISOC OM dummy: like ISM but read mesh coords and use to create a slightly offset grid for testing regridding'
     rc = ESMF_SUCCESS
  
   END SUBROUTINE FISOC_OM_register

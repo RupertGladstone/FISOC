@@ -8,6 +8,8 @@ MODULE FISOC_ISM
   
   PUBLIC FISOC_ISM_register
   
+  CHARACTER(len=ESMF_MAXSTR) :: msg
+
 CONTAINS
   
   !------------------------------------------------------------------------------
@@ -18,8 +20,18 @@ CONTAINS
     
     rc = ESMF_FAILURE
 
+!    CALL ESMF_GridCompSetEntryPoint(FISOC_ISM, ESMF_METHOD_INITIALIZE, &
+!         userRoutine=FISOC_ISM_init, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) RETURN
+    
     CALL ESMF_GridCompSetEntryPoint(FISOC_ISM, ESMF_METHOD_INITIALIZE, &
-         userRoutine=FISOC_ISM_init, rc=rc)
+         userRoutine=FISOC_ISM_init_phase1, phase=1, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) RETURN
+
+    CALL ESMF_GridCompSetEntryPoint(FISOC_ISM, ESMF_METHOD_INITIALIZE, &
+         userRoutine=FISOC_ISM_init_phase2, phase=2, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) RETURN
     
@@ -38,18 +50,23 @@ CONTAINS
   END SUBROUTINE FISOC_ISM_register
 
   !------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_init(FISOC_ISM, ISM_ImpSt, ISM_ExpSt, FISOC_clock, rc)
-    TYPE(ESMF_GridComp)  :: FISOC_ISM
-    TYPE(ESMF_State)     :: ISM_ImpSt, ISM_ExpSt
-    TYPE(ESMF_Clock)     :: FISOC_clock
-    INTEGER, INTENT(OUT) :: rc
+  ! Initialisation is implemented in two stages.  The first stage is for independent 
+  ! initialisation of the ISM and the second stage occurrs after the OM has been 
+  ! initialised, to allow inter-component consistency checks or use of the OM 
+  ! state to complete ISM initalisation.
+  SUBROUTINE FISOC_ISM_init_phase1(FISOC_ISM, ISM_ImpSt, ISM_ExpSt, FISOC_clock, rc)
+    TYPE(ESMF_GridComp)    :: FISOC_ISM
+    TYPE(ESMF_State)       :: ISM_ImpSt, ISM_ExpSt
+    TYPE(ESMF_Clock)       :: FISOC_clock
+    INTEGER, INTENT(OUT)   :: rc
 
-    TYPE(ESMF_config)    :: config
-    TYPE(ESMF_mesh)      :: ISM_mesh
-    TYPE(ESMF_field)     :: ISM_temperature_l0, ISM_temperature_l1
-    TYPE(ESMF_field)     :: ISM_z_l0, ISM_z_l1
-    INTEGER              :: localrc
-    CHARACTER(len=ESMF_MAXSTR) :: ISM_meshFile, msg
+    TYPE(ESMF_config)      :: config
+    TYPE(ESMF_mesh)        :: ISM_mesh
+    TYPE(ESMF_field)       :: ISM_temperature_l0, ISM_temperature_l1
+    TYPE(ESMF_field)       :: ISM_z_l0, ISM_z_l1
+    TYPE(ESMF_fieldBundle) :: ISM_ImpFB, ISM_ExpFB
+    INTEGER                :: localrc
+    CHARACTER(len=ESMF_MAXSTR) :: ISM_meshFile
     REAL(ESMF_KIND_R8),POINTER :: ISM_temperature_l0_ptr(:),ISM_temperature_l1_ptr(:) 
     REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:),ISM_z_l1_ptr(:) 
 
@@ -62,6 +79,8 @@ CONTAINS
     type(ESMF_DistGrid)       :: nodalDistgrid
     type(ESMF_DistGrid)       :: elementDistgrid
     integer                   :: numOwnedNodes
+
+INTEGER :: fieldcount
     
     rc = ESMF_SUCCESS
 
@@ -128,22 +147,59 @@ CONTAINS
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
-print*,"make field bundle"
-print*,"add bundle to export state"
+    ISM_ExpFB = ESMF_FieldBundleCreate(name="ISM export fields", rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_temperature_l0/), rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_temperature_l1/), rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_z_l0/), rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_z_l1/), rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+!    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=fieldcount, rc=rc)
+!    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_StateAdd(ISM_ExpSt, (/ISM_ExpFB/), rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    msg = "ISM bundled fields and added to export state"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
 
 !    if (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+  END SUBROUTINE FISOC_ISM_init_phase1
 
-!get some mesh info, check it looks sensible
-!create a zeroed array on it as a new field
-!fields for export:
-!level0 temperature
-!level0 z coord
-!level1 temperature
-!level1 z coord
-!fields for import:
-!level0 melt rate
 
-  END SUBROUTINE FISOC_ISM_init
+  !------------------------------------------------------------------------------
+  SUBROUTINE FISOC_ISM_init_phase2(FISOC_ISM, ISM_ImpSt, ISM_ExpSt, FISOC_clock, rc)
+    TYPE(ESMF_GridComp)    :: FISOC_ISM
+    TYPE(ESMF_State)       :: ISM_ImpSt, ISM_ExpSt
+    TYPE(ESMF_Clock)       :: FISOC_clock
+    INTEGER, INTENT(OUT)   :: rc
+
+    rc = ESMF_FAILURE
+
+    msg = "ISM initialise phase 2 allows the ISM access to the OM initialisation"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_ISM_init_phase2
+  
+
   !------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_run(FISOC_ISM, importState, exportState, FISOC_clock, rc)
     TYPE(ESMF_GridComp)  :: FISOC_ISM
@@ -152,10 +208,15 @@ print*,"add bundle to export state"
     INTEGER              :: petCount, localrc
     INTEGER, INTENT(OUT) :: rc
     
+
+    rc = ESMF_FAILURE
+
+    msg = "ISM run has started"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
+    
     rc = ESMF_SUCCESS
 
-    print *," FISOC_ISM_run needs writing"
-    
   END SUBROUTINE FISOC_ISM_run
   !------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_finalise(FISOC_ISM, importState, exportState, FISOC_clock, rc)
@@ -165,10 +226,14 @@ print*,"add bundle to export state"
     INTEGER              :: petCount, localrc
     INTEGER, INTENT(OUT) :: rc
     
+    rc = ESMF_FAILURE
+
+    msg = "ISM finalise has started"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
+    
     rc = ESMF_SUCCESS
 
-    print *," FISOC_ISM_finalise needs writing"
-    
   END SUBROUTINE FISOC_ISM_finalise
   
 END MODULE FISOC_ISM
