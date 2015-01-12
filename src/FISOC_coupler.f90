@@ -53,29 +53,22 @@ CONTAINS
   ! the ISM state to the OM grid, and the second phase is to convert the OM state 
   ! to the ISM mesh.
   SUBROUTINE FISOC_coupler_init_phase1(FISOC_coupler, ISM_ExpSt, OM_ImpSt, FISOC_clock, rc)
+
     TYPE(ESMF_CplComp)     :: FISOC_coupler
     TYPE(ESMF_State)       :: ISM_ExpSt, OM_ImpSt
     TYPE(ESMF_Clock)       :: FISOC_clock
     INTEGER, INTENT(OUT)   :: rc
 
-    TYPE(ESMF_fieldBundle) :: ISM_ExpFB, OM_ImpFB
-    TYPE(ESMF_field)       :: ISM_temperature_l0, ISM_temperature_l1
-    TYPE(ESMF_grid)        :: OM_grid
-    TYPE(ESMF_config)      :: config
-    CHARACTER(len=ESMF_MAXSTR) :: ISM_name, OM_name
+    TYPE(ESMF_fieldBundle)       :: ISM_ExpFB, OM_ImpFB
+    TYPE(ESMF_field)             :: ISM_temperature_l0, ISM_temperature_l1
+    TYPE(ESMF_grid)              :: OM_grid
+    TYPE(ESMF_mesh)              :: ISM_mesh
+    TYPE(ESMF_config)            :: config
+    CHARACTER(len=ESMF_MAXSTR)   :: ISM_name, OM_name
+    INTEGER                      :: fieldCount, ii
+    TYPE(ESMF_Field),ALLOCATABLE :: fieldList(:)
 
-
-     integer                    :: fieldCount
-     type(ESMF_Field),ALLOCATABLE           :: fieldList(:)
-     character(len=ESMF_MAXSTR),ALLOCATABLE :: fieldNameList(:)
-!     character(len=*),          :: name
     rc = ESMF_FAILURE
-
-
-
-!     subroutine ESMF_FieldBundleGetListAll(fieldbundle, &
-!       itemorderflag, geomtype, grid, locstream, mesh, xgrid, &
-!       fieldCount, fieldList, fieldNameList, name, rc)
 
 ! make array of fields so we dont have to know all their names here in the coupler? 
 ! instead we just regrid them all?
@@ -110,15 +103,19 @@ CONTAINS
          line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
 
-    ! the current dummy coupling creates an OM grid on the fly from the ISM mesh
-    IF ((ISM_name.EQ."dummy").AND.(OM_name.EQ."dummy")) THEN
-print*,"get mesh from field"
-print*,"use mesh to make grid"
-!fieldList(1)
-!       OM_grid = function***(ISM_mesh)
-    ELSE
-       print*,"get OM_grid from OM state"
-    END IF
+    print*,"coupler needs log writes"
+    print*,"get OM_grid from OM state"
+    print*,"get ISM_mesh from first ISM field"
+
+    CALL ESMF_FieldGet(fieldList(1), mesh=ISM_mesh, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+
+    loop_over_fields: DO ii = 1,fieldCount 
+
+       print *,"now regrid the current field"
+       
+    END DO loop_over_fields
 
 !***coupler needs both grids
 !***therefore both OM and ISM must have initialisation phase 1 and 2 (OM1 > ISM1 > cpl1> OM2 > cpl2 > ISM2

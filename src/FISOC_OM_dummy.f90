@@ -53,9 +53,14 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-    msg = "OM initialise phase 1 is empty in dummy case"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-       line=__LINE__, file=__FILE__, rc=rc)
+print*,"need to create OM dummy grid here"
+
+print*,"create OM fields on OM grid"
+print*,"bundle OM fields"
+print*,"put bundle in OM exp state"
+print*,""
+print*,""
+
 
     rc = ESMF_SUCCESS
 
@@ -69,6 +74,11 @@ CONTAINS
     INTEGER, INTENT(OUT)   :: rc
 
     rc = ESMF_FAILURE
+
+    msg = "OM initialise phase 2 allows the OM access to the ISM initial state "// &
+         "(does nothing for dummy case)"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
 
     rc = ESMF_SUCCESS
 

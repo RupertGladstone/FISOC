@@ -190,7 +190,8 @@ INTEGER :: fieldcount
 
     rc = ESMF_FAILURE
 
-    msg = "ISM initialise phase 2 allows the ISM access to the OM initialisation"
+    msg = "ISM initialise phase 2 allows the ISM access to the OM initial state "// &
+         "(does nothing for dummy case)"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
