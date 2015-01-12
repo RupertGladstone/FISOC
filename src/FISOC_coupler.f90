@@ -12,6 +12,7 @@ MODULE FISOC_coupler
 
 CONTAINS
   
+  !------------------------------------------------------------------------------
   SUBROUTINE FISOC_coupler_register(FISOC_coupler, rc)
     
     TYPE(ESMF_CplComp)  :: FISOC_coupler
@@ -104,8 +105,9 @@ CONTAINS
 
 
     print*,"coupler needs log writes"
-    print*,"get OM_grid from OM state"
+    print*,"get OM_grid from OM imp state... via variable?"
     print*,"get ISM_mesh from first ISM field"
+print*,"how does the flow example get the target grid for regridding?"
 
     CALL ESMF_FieldGet(fieldList(1), mesh=ISM_mesh, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -156,6 +158,8 @@ CONTAINS
     INTEGER, INTENT(OUT)   :: rc
 
     rc = ESMF_FAILURE
+
+    print*,"is run phase 1 the same as init phase 1? if so can we call the same routine in both cases?"
 
     rc = ESMF_SUCCESS
 

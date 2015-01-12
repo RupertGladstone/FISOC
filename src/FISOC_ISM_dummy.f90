@@ -62,12 +62,15 @@ CONTAINS
 
     TYPE(ESMF_config)      :: config
     TYPE(ESMF_mesh)        :: ISM_mesh
-    TYPE(ESMF_field)       :: ISM_temperature_l0, ISM_temperature_l1
-    TYPE(ESMF_field)       :: ISM_z_l0, ISM_z_l1
     TYPE(ESMF_fieldBundle) :: ISM_ImpFB, ISM_ExpFB
     CHARACTER(len=ESMF_MAXSTR) :: ISM_meshFile
+
+    TYPE(ESMF_field)       :: ISM_temperature_l0, ISM_temperature_l1
+    TYPE(ESMF_field)       :: ISM_z_l0, ISM_z_l1
+    TYPE(ESMF_field)       :: ISM_dTdz_l0, ISM_z_l0_previous
     REAL(ESMF_KIND_R8),POINTER :: ISM_temperature_l0_ptr(:),ISM_temperature_l1_ptr(:) 
     REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:),ISM_z_l1_ptr(:) 
+    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:),ISM_z_l0_previous_ptr(:) 
 
 !    real(ESMF_KIND_R8)        :: ownedNodeCoords(:)
     integer                   :: numOwnedElements
@@ -79,8 +82,12 @@ CONTAINS
     type(ESMF_DistGrid)       :: elementDistgrid
     integer                   :: numOwnedNodes
 
-INTEGER :: fieldcount
+    INTEGER :: fieldcount
     
+print*,"ISM_init check which type declarations can be deleted"
+
+print*,"ISM_init create field bundle for import state too (shorter one!)"
+
     rc = ESMF_SUCCESS
 
     NULLIFY(ISM_temperature_l0_ptr)
@@ -142,6 +149,18 @@ INTEGER :: fieldcount
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     ISM_z_l1_ptr(:) = -75.0
     
+    ISM_dTdz_l0 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, name="ISM_dTdz_l0", rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_dTdz_l0, localDe=0, farrayPtr=ISM_dTdz_l0_ptr, rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ISM_dTdz_l0_ptr(:) = 0.0
+    
+    ISM_z_l0_previous = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, name="ISM_z_l0_previous", rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_z_l0_previous, localDe=0, farrayPtr=ISM_z_l0_previous_ptr, rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ISM_z_l0_previous_ptr(:) = ISM_z_l0_ptr(:)
+    
     msg = "ISM created mesh and fields"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
@@ -165,8 +184,20 @@ INTEGER :: fieldcount
     CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_z_l1/), rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_dTdz_l0/), rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_z_l0_previous/), rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
 !    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=fieldcount, rc=rc)
 !    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+CALL FISOC_ISM_calcDerivedFields(ISM_ExpFB,config,rc)
+print*,"derived fields!"
+print*,"lower layer thickness"
+print*,"dTdz_l0"
+print*,"derived fields!"
 
     CALL ESMF_StateAdd(ISM_ExpSt, (/ISM_ExpFB/), rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -236,4 +267,25 @@ INTEGER :: fieldcount
 
   END SUBROUTINE FISOC_ISM_finalise
   
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE FISOC_ISM_calcDerivedFields(ISM_ExpFB,config,rc)
+
+    TYPE(ESMF_config),INTENT(IN) :: config
+    INTEGER, INTENT(OUT)         :: rc
+    TYPE(ESMF_fieldBundle)       :: ISM_ExpFB
+
+    TYPE(ESMF_field)       :: ISM_temperature_l0, ISM_temperature_l1
+    TYPE(ESMF_field)       :: ISM_z_l0, ISM_z_l1
+    TYPE(ESMF_field)       :: ISM_dTdz_l0, ISM_z_l0_previous
+    REAL(ESMF_KIND_R8),POINTER :: ISM_temperature_l0_ptr(:),ISM_temperature_l1_ptr(:) 
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:),ISM_z_l1_ptr(:) 
+    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:),ISM_z_l0_previous_ptr(:) 
+
+print*,"derived fields!"
+print*,"get all the pointers ew need to the required fields!"
+print*,"lower layer thickness"
+print*,"dTdz_l0"
+END SUBROUTINE FISOC_ISM_calcDerivedFields
+
 END MODULE FISOC_ISM
