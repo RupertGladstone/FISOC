@@ -58,7 +58,80 @@ CONTAINS
     TYPE(ESMF_Clock)       :: FISOC_clock
     INTEGER, INTENT(OUT)   :: rc
 
+    TYPE(ESMF_fieldBundle) :: ISM_ExpFB, OM_ImpFB
+    TYPE(ESMF_field)       :: ISM_temperature_l0, ISM_temperature_l1
+    TYPE(ESMF_grid)        :: OM_grid
+    TYPE(ESMF_config)      :: config
+    CHARACTER(len=ESMF_MAXSTR) :: ISM_name, OM_name
+
+
+     integer                    :: fieldCount
+     type(ESMF_Field),ALLOCATABLE           :: fieldList(:)
+     character(len=ESMF_MAXSTR),ALLOCATABLE :: fieldNameList(:)
+!     character(len=*),          :: name
     rc = ESMF_FAILURE
+
+
+
+!     subroutine ESMF_FieldBundleGetListAll(fieldbundle, &
+!       itemorderflag, geomtype, grid, locstream, mesh, xgrid, &
+!       fieldCount, fieldList, fieldNameList, name, rc)
+
+! make array of fields so we dont have to know all their names here in the coupler? 
+! instead we just regrid them all?
+
+    ! Establish which ISM and OM components we are using (though we aim to remove dependency 
+    ! on this in the coupler if possible)
+    CALL ESMF_cplCompGet(FISOC_coupler, config=config, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+
+    CALL ESMF_ConfigGetAttribute(config, ISM_name, label='ISM_name:', rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(config, OM_name, label='OM_name:', rc=rc)
+    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+
+    ! Extract ISM field bundle for regridding...
+    CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+
+    ! ...how many fields?...
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=fieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+
+    ! ... get list of fields from bundle.
+    ALLOCATE(fieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=fieldCount, fieldList=fieldList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+
+
+    ! the current dummy coupling creates an OM grid on the fly from the ISM mesh
+    IF ((ISM_name.EQ."dummy").AND.(OM_name.EQ."dummy")) THEN
+print*,"get mesh from field"
+print*,"use mesh to make grid"
+!fieldList(1)
+!       OM_grid = function***(ISM_mesh)
+    ELSE
+       print*,"get OM_grid from OM state"
+    END IF
+
+!***coupler needs both grids
+!***therefore both OM and ISM must have initialisation phase 1 and 2 (OM1 > ISM1 > cpl1> OM2 > cpl2 > ISM2
+!print*,fieldNameList(:)
+!print*,size(fieldNameList)
+
+!    CALL ESMF_StateGet(state, "ISM export fields", ISM_temperature_l0, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+
+
+
+
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_coupler_init_phase1
@@ -72,6 +145,7 @@ CONTAINS
     INTEGER, INTENT(OUT)   :: rc
 
     rc = ESMF_FAILURE
+
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_coupler_init_phase2
@@ -85,6 +159,7 @@ CONTAINS
     INTEGER, INTENT(OUT)   :: rc
 
     rc = ESMF_FAILURE
+
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_coupler_run_phase1
@@ -98,6 +173,7 @@ CONTAINS
     INTEGER, INTENT(OUT)   :: rc
 
     rc = ESMF_FAILURE
+
     rc = ESMF_SUCCESS
     
   END SUBROUTINE FISOC_coupler_run_phase2
@@ -111,9 +187,26 @@ CONTAINS
     INTEGER, INTENT(OUT)   :: rc
 
     rc = ESMF_FAILURE
+
     rc = ESMF_SUCCESS
     
   END SUBROUTINE FISOC_coupler_finalise
 
+
+  !------------------------------------------------------------------------------
+  TYPE(ESMF_grid) FUNCTION dummyCreateGrid(mesh, rc)
+
+    TYPE(ESMF_mesh),INTENT(IN) :: mesh 
+    INTEGER, INTENT(OUT)       :: rc
+
+    TYPE(ESMF_grid)        :: grid 
+
+    rc = ESMF_FAILURE
+
+    dummyCreateGrid = grid
+
+    rc = ESMF_SUCCESS
+
+  END FUNCTION  dummyCreateGrid
 
 END MODULE FISOC_coupler

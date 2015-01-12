@@ -22,10 +22,10 @@
 
   ISM_meshFile:    longThinMIS.nc
   ISM_configFile:  someDir/someFile.sif
-  ISM_name:        Elmer
+  ISM_name:        dummy
 
   OM_configFile:   someDir/someFile
-  OM_name:         ROMS
+  OM_name:         dummy
   
   OM_dt_sec:       2000   
   dt_ratio:        4 

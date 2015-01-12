@@ -65,7 +65,6 @@ CONTAINS
     TYPE(ESMF_field)       :: ISM_temperature_l0, ISM_temperature_l1
     TYPE(ESMF_field)       :: ISM_z_l0, ISM_z_l1
     TYPE(ESMF_fieldBundle) :: ISM_ImpFB, ISM_ExpFB
-    INTEGER                :: localrc
     CHARACTER(len=ESMF_MAXSTR) :: ISM_meshFile
     REAL(ESMF_KIND_R8),POINTER :: ISM_temperature_l0_ptr(:),ISM_temperature_l1_ptr(:) 
     REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:),ISM_z_l1_ptr(:) 
@@ -91,19 +90,19 @@ INTEGER :: fieldcount
        line=__LINE__, file=__FILE__, rc=rc)
 
     ! Get mesh file name from the config file
-    CALL ESMF_GridCompGet(FISOC_ISM, config=config, rc=localrc)
-    IF (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+    CALL ESMF_GridCompGet(FISOC_ISM, config=config, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
-    CALL ESMF_ConfigGetAttribute(config, ISM_meshFile, label='ISM_meshFile:', rc=localrc)
-    IF (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+    CALL ESMF_ConfigGetAttribute(config, ISM_meshFile, label='ISM_meshFile:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
     ! create ISM mesh and use it to create zeroed fields for the ISM import and export states
     ISM_mesh = ESMF_MeshCreate(filename=ISM_meshFile, &
             filetypeflag=ESMF_FILEFORMAT_ESMFMESH, &
-            rc=localrc)
-    IF (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+            rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
@@ -115,7 +114,7 @@ INTEGER :: fieldcount
 !    print *,"check this with elmer mesh header file"
 !    print *,"mesh stuff", parametricDim, spatialDim, numOwnedNodes, numOwnedElements !, ownedNodeCoords
     
-    ISM_temperature_l0 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, rc=rc)
+    ISM_temperature_l0 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, name="ISM_temperature_l0", rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -125,19 +124,19 @@ INTEGER :: fieldcount
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     ISM_temperature_l0_ptr(:) = -1.0
 
-    ISM_temperature_l1 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, rc=rc)
+    ISM_temperature_l1 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, name="ISM_temperature_l1", rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_FieldGet(field=ISM_temperature_l1, localDe=0, farrayPtr=ISM_temperature_l1_ptr, rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     ISM_temperature_l1_ptr(:) = -1.1
     
-    ISM_z_l0 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, rc=rc)
+    ISM_z_l0 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, name="ISM_z_l0", rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     ISM_z_l0_ptr(:) = -100.0
     
-    ISM_z_l1 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, rc=rc)
+    ISM_z_l1 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, name="ISM_z_l1", rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_FieldGet(field=ISM_z_l1, localDe=0, farrayPtr=ISM_z_l1_ptr, rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -205,7 +204,7 @@ INTEGER :: fieldcount
     TYPE(ESMF_GridComp)  :: FISOC_ISM
     TYPE(ESMF_State)     :: importState, exportState
     TYPE(ESMF_Clock)     :: FISOC_clock
-    INTEGER              :: petCount, localrc
+    INTEGER              :: petCount
     INTEGER, INTENT(OUT) :: rc
     
 
@@ -223,7 +222,7 @@ INTEGER :: fieldcount
     TYPE(ESMF_GridComp)  :: FISOC_ISM
     TYPE(ESMF_State)     :: importState, exportState
     TYPE(ESMF_Clock)     :: FISOC_clock
-    INTEGER              :: petCount, localrc
+    INTEGER              :: petCount
     INTEGER, INTENT(OUT) :: rc
     
     rc = ESMF_FAILURE
