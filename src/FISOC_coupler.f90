@@ -23,27 +23,32 @@ CONTAINS
     CALL ESMF_CplCompSetEntryPoint(FISOC_coupler, ESMF_METHOD_INITIALIZE, &
          userRoutine=FISOC_coupler_init_phase1, phase=1, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) RETURN
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_CplCompSetEntryPoint(FISOC_coupler, ESMF_METHOD_INITIALIZE, &
          userRoutine=FISOC_coupler_init_phase2, phase=2, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) RETURN
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     CALL ESMF_CplCompSetEntryPoint(FISOC_coupler, ESMF_METHOD_RUN, &
          userRoutine=FISOC_coupler_run_phase1, phase=1, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) RETURN
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     CALL ESMF_CplCompSetEntryPoint(FISOC_coupler, ESMF_METHOD_RUN, &
          userRoutine=FISOC_coupler_run_phase2, phase=2, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) RETURN
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     CALL ESMF_CplCompSetEntryPoint(FISOC_coupler, ESMF_METHOD_FINALIZE, &
          userRoutine=FISOC_coupler_finalise, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) RETURN
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     rc = ESMF_SUCCESS
  
@@ -71,14 +76,12 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-! make array of fields so we dont have to know all their names here in the coupler? 
-! instead we just regrid them all?
-
     ! Establish which ISM and OM components we are using (though we aim to remove dependency 
     ! on this in the coupler if possible)
     CALL ESMF_cplCompGet(FISOC_coupler, config=config, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(config, ISM_name, label='ISM_name:', rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -90,18 +93,21 @@ CONTAINS
     ! Extract ISM field bundle for regridding...
     CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! ...how many fields?...
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=fieldCount, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! ... get list of fields from bundle.
     ALLOCATE(fieldList(fieldCount))
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=fieldCount, fieldList=fieldList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
 
     print*,"coupler needs log writes"
@@ -111,25 +117,14 @@ print*,"how does the flow example get the target grid for regridding?"
 
     CALL ESMF_FieldGet(fieldList(1), mesh=ISM_mesh, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     loop_over_fields: DO ii = 1,fieldCount 
 
        print *,"now regrid the current field"
        
     END DO loop_over_fields
-
-!***coupler needs both grids
-!***therefore both OM and ISM must have initialisation phase 1 and 2 (OM1 > ISM1 > cpl1> OM2 > cpl2 > ISM2
-!print*,fieldNameList(:)
-!print*,size(fieldNameList)
-
-!    CALL ESMF_StateGet(state, "ISM export fields", ISM_temperature_l0, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-
-
-
 
     rc = ESMF_SUCCESS
 
