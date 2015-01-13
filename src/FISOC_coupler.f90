@@ -110,10 +110,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
 
-    print*,"coupler needs log writes"
-    print*,"get OM_grid from OM imp state... via variable?"
-    print*,"get ISM_mesh from first ISM field"
-print*,"how does the flow example get the target grid for regridding?"
+    print *,"coupler needs log writes"
+    print *,"get OM_grid from OM imp state... via variable?"
+    print *,"get ISM_mesh from first ISM field"
+    print *,"create a route handle to add to the state objects"
+
 
     CALL ESMF_FieldGet(fieldList(1), mesh=ISM_mesh, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &

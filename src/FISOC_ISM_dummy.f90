@@ -90,7 +90,8 @@ print*,"ISM_init create field bundle for import state too (shorter one!)"
 
     rc = ESMF_SUCCESS
 
-    NULLIFY(ISM_temperature_l0_ptr)
+    NULLIFY (ISM_temperature_l0_ptr,ISM_temperature_l1_ptr,ISM_z_l0_ptr, &
+         ISM_z_l1_ptr,ISM_dTdz_l0_ptr,ISM_z_l0_previous_ptr)
 
     msg = "ISM initialise started"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
