@@ -62,7 +62,7 @@ CONTAINS
 
     TYPE(ESMF_config)      :: config
     TYPE(ESMF_mesh)        :: ISM_mesh
-    TYPE(ESMF_fieldBundle) :: ISM_ImpFB, ISM_ExpFB
+    TYPE(ESMF_fieldBundle) :: ISM_FB
     CHARACTER(len=ESMF_MAXSTR) :: ISM_meshFile
 
     TYPE(ESMF_field)       :: ISM_temperature_l0, ISM_temperature_l1
@@ -116,12 +116,6 @@ print*,"ISM_init create field bundle for import state too (shorter one!)"
 
 ! Note weakness: currently regridding in 2d instead of a 2d manifold in 3d space.
 
-!    CALL ESMF_MeshGet(ISM_mesh, parametricDim=parametricDim, spatialDim=spatialDim, &
-!                    nodalDistgrid=nodalDistgrid, numOwnedNodes=numOwnedNodes, &
-!                    numOwnedElements=numOwnedElements, rc=rc)
-!    print *,"check this with elmer mesh header file"
-!    print *,"mesh stuff", parametricDim, spatialDim, numOwnedNodes, numOwnedElements !, ownedNodeCoords
-    
     ISM_temperature_l0 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, name="ISM_temperature_l0", rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -166,39 +160,44 @@ print*,"ISM_init create field bundle for import state too (shorter one!)"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
-    ISM_ExpFB = ESMF_FieldBundleCreate(name="ISM export fields", rc=rc)
+    ISM_FB = ESMF_FieldBundleCreate(name="ISM fields", rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_temperature_l0/), rc=rc)
+    CALL ESMF_FieldBundleAdd(ISM_FB, (/ISM_temperature_l0/), rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_temperature_l1/), rc=rc)
+    CALL ESMF_FieldBundleAdd(ISM_FB, (/ISM_temperature_l1/), rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_z_l0/), rc=rc)
+    CALL ESMF_FieldBundleAdd(ISM_FB, (/ISM_z_l0/), rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_z_l1/), rc=rc)
+    CALL ESMF_FieldBundleAdd(ISM_FB, (/ISM_z_l1/), rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_dTdz_l0/), rc=rc)
+    CALL ESMF_FieldBundleAdd(ISM_FB, (/ISM_dTdz_l0/), rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_z_l0_previous/), rc=rc)
+    CALL ESMF_FieldBundleAdd(ISM_FB, (/ISM_z_l0_previous/), rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL FISOC_ISM_calcDerivedFields(ISM_ExpFB,config,rc)
+    CALL FISOC_ISM_calcDerivedFields(ISM_FB,config,rc)
 
-    CALL ESMF_StateAdd(ISM_ExpSt, (/ISM_ExpFB/), rc=rc)
+    CALL ESMF_StateAdd(ISM_ImpSt, (/ISM_FB/), rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    msg = "ISM bundled fields and added to export state"
+    CALL ESMF_StateAdd(ISM_ExpSt, (/ISM_FB/), rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    msg = "ISM bundled fields and added to import and export states"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
@@ -262,11 +261,11 @@ print*,"ISM_init create field bundle for import state too (shorter one!)"
   
 
   !------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_calcDerivedFields(ISM_ExpFB,config,rc)
+  SUBROUTINE FISOC_ISM_calcDerivedFields(ISM_FB,config,rc)
 
     TYPE(ESMF_config),INTENT(IN) :: config
     INTEGER, INTENT(OUT)         :: rc
-    TYPE(ESMF_fieldBundle)       :: ISM_ExpFB
+    TYPE(ESMF_fieldBundle)       :: ISM_FB
 
     TYPE(ESMF_field)       :: ISM_temperature_l0, ISM_temperature_l1
     TYPE(ESMF_field)       :: ISM_z_l0, ISM_z_l1
@@ -275,7 +274,7 @@ print*,"ISM_init create field bundle for import state too (shorter one!)"
     REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:),ISM_z_l1_ptr(:) 
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:),ISM_z_l0_previous_ptr(:) 
 
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_temperature_l0", field=ISM_temperature_l0, rc=rc)
+    CALL ESMF_FieldBundleGet(ISM_FB, fieldName="ISM_temperature_l0", field=ISM_temperature_l0, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -284,22 +283,22 @@ print*,"ISM_init create field bundle for import state too (shorter one!)"
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_temperature_l1", field=ISM_temperature_l1, rc=rc)
+    CALL ESMF_FieldBundleGet(ISM_FB, fieldName="ISM_temperature_l1", field=ISM_temperature_l1, rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_FieldGet(field=ISM_temperature_l1, localDe=0, farrayPtr=ISM_temperature_l1_ptr, rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
+    CALL ESMF_FieldBundleGet(ISM_FB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l1", field=ISM_z_l1, rc=rc)
+    CALL ESMF_FieldBundleGet(ISM_FB, fieldName="ISM_z_l1", field=ISM_z_l1, rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_FieldGet(field=ISM_z_l1, localDe=0, farrayPtr=ISM_z_l1_ptr, rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_dTdz_l0", field=ISM_dTdz_l0, rc=rc)
+    CALL ESMF_FieldBundleGet(ISM_FB, fieldName="ISM_dTdz_l0", field=ISM_dTdz_l0, rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_FieldGet(field=ISM_dTdz_l0, localDe=0, farrayPtr=ISM_dTdz_l0_ptr, rc=rc)
     IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)

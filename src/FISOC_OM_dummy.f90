@@ -59,25 +59,25 @@ CONTAINS
     TYPE(ESMF_grid)        :: OM_grid
     INTEGER                :: ii, jj, lbnd(1), ubnd(1)
     TYPE(ESMF_field)       :: OM_dBdt_l0
+    TYPE(ESMF_fieldBundle) :: OM_FB
     REAL(ESMF_KIND_R8),POINTER :: OM_dBdt_l0_ptr(:,:)
 
     rc = ESMF_FAILURE
 
     NULLIFY (coordY,coordX,OM_dBdt_l0_ptr)
 
-
     ! this next grid creation section is more or less a copy from the ref documentation example:
     ! http://www.earthsystemmodeling.org/esmf_releases/public/last/ESMF_refdoc/node5.html#SECTION05083200000000000000
-   !-------------------------------------------------------------------
-   ! Create the Grid:  Allocate space for the Grid object, define the
-   ! topology and distribution of the Grid, and specify that it 
-   ! will have global indices.  Note that here aperiodic bounds are
-   ! specified by the argument name. In this call the minIndex hasn't 
-   ! been set, so it defaults to (1,1,...). The default is to 
-   ! divide the index range as equally as possible among the DEs
-   ! specified in regDecomp. This behavior can be changed by 
-   ! specifying decompFlag. 
-   !-------------------------------------------------------------------
+    !-------------------------------------------------------------------
+    ! Create the Grid:  Allocate space for the Grid object, define the
+    ! topology and distribution of the Grid, and specify that it 
+    ! will have global indices.  Note that here aperiodic bounds are
+    ! specified by the argument name. In this call the minIndex hasn't 
+    ! been set, so it defaults to (1,1,...). The default is to 
+    ! divide the index range as equally as possible among the DEs
+    ! specified in regDecomp. This behavior can be changed by 
+    ! specifying decompFlag. 
+    !-------------------------------------------------------------------
     OM_grid=ESMF_GridCreateNoPeriDim(          &
          ! Define a regular distribution
          maxIndex=(/11,6/), & ! define index space
@@ -139,7 +139,29 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     OM_dBdt_l0_ptr(:,:) = 1.0
 
-print*,"put OM field in OM exp state"
+    OM_FB = ESMF_FieldBundleCreate(name="OM fields", rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleAdd(OM_FB, (/OM_dBdt_l0/), rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_StateAdd(OM_ImpSt, (/OM_FB/), rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_StateAdd(OM_ExpSt, (/OM_FB/), rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    msg = "OM created grid and field and added field to import and export states"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
 
     rc = ESMF_SUCCESS
 
