@@ -14,6 +14,10 @@ a.out
 FISOC_mesh1a_2D/
 FISOC_mesh1a_3D/
 FISOC_mesh1a_DEM/
+examples/MISevolSetup4Elmer/README
+examples/MISevolSetup4Elmer/longThinMIS.grd
+examples/MISevolSetup4Elmer/longThinMIS.sif.template
+examples/MISevolSetup4Elmer/makeSimpleDEM.py
 examples/ElmerIceSetup/
 examples/MISevolSetup4Elmer/longThinMIS.sif
 examples/MISevolSetup4Elmer/longThinMIS/

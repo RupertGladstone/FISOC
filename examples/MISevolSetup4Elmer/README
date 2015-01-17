@@ -13,6 +13,8 @@ ElmerGrid 2 3 longThinMIS
 # partition 2D grid into 16 or 32 partitions
 ElmerGrid 2 2 longThinMIS -metis 16 4
 ElmerGrid 2 2 longThinMIS -metis 32 4
+ElmerGrid 2 2 longThinMIS -metis 64 4
+ElmerGrid 2 2 longThinMIS -metis 128 4
 
 # These steps have created a 2d mesh but with no information about 
 # upper and lower ice surfaces or about bedrock elevations.
@@ -48,12 +50,7 @@ ElmerGrid 2 2 longThinMIS -metis 32 4
 # When you are ready to run, tar up all the files you need to run Elmer/Ice 
 # and copy them to the machine of your choice...
 tar -cf meshFiles.tar batchSubmit.sh ELMERSOLVER_STARTINFO longThinMIS_meshOnly.sif longThinMIS.sif longThinMIS_restart.sif longThinMIS_DEM longThinMIS
-#scp  meshFiles.tar rmg581@raijin.nci.org.au:/short/m68/rmg581/elmerIce/longThinMIS
+scp  meshFiles.tar rmg581@raijin.nci.org.au:/short/m68/rmg581/elmerIce/
 
 # TODO: at a later date: extend this example setup to cover real world domains
 # (should include script for converting upper and lower surfaces from netcdf files)
-
-# TODO: add auto creation of a restart sif to python script...
-# solvers to read in bedrock should be removed, restart file should be named at top of sif.
-# care with initialisation: which vars to be read in from restart, any to be initialised in sif? 
-# in particular check structured mesh mapper and free surface solvers

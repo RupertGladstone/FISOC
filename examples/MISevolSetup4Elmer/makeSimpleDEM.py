@@ -13,8 +13,8 @@ if not os.path.isdir(DEM_dir):
 # some hard coded parameters governing the DEMs
 bedShape = "MM_overdeepened" # MM is short for MISMIP, so this is Schoof's overdeepened bed
 #bedShape = "linear" 
-H = 200. # initial thickness in metres
-z0    = 100. # z0 and zlast are highest and lowest bed elevations for sue with linear bedShape.
+H     = 200. # initial thickness in metres
+z0    = 100. # z0 and zlast are highest and lowest bed elevations for use with linear bedShape.
 zlast = -900.
 
 # used in determining floatation
@@ -22,7 +22,7 @@ rho_i = 910.0   # ice density in kg/m^3
 rho_w = 1025.0  # ocean water density in kg/m^3
 
 # read some grid parameters from the elmergrid input file
-f = open('longThinMIS.grd','r')
+f = open('longThinMIS.grd','r') # change "element divisions" in this file to change resolution
 lines = f.readlines()
 f.close()
 noData=-999;nx=noData;ny=noData;xLen=noData;yLen=noData;dx=noData;dy=noData
@@ -98,8 +98,8 @@ replacements = {
     'XXX_Ny'             : str(ny+1),
     'XXX_execNever'      : '',
     'XXX_execReadInputs' : 'Exec Solver = Before Simulation',
-    'XXX_nt'             : '5000',
-    'XXX_outFreq'        : '10',
+    'XXX_nt'             : '20000',
+    'XXX_outFreq'        : '50',
     'XXX_restartFile'    :  '',
     'XXX_restartPosition':  '',
     'XXX_restartB4Init'  :  '',
