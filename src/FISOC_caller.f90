@@ -22,7 +22,7 @@ PROGRAM FISOC_main
   INTEGER                 :: start_year, end_year, start_month, end_month
   TYPE(ESMF_TimeInterval) :: ISM_dt, OM_dt
   TYPE(ESMF_Time)         :: startTime, endTime
-  TYPE(ESMF_Alarm)        :: alarm_ocn, alarm_ice
+  TYPE(ESMF_Alarm)        :: alarm_OM, alarm_ISM
   LOGICAL                 :: tight_coupling
 
   ! A parent gridded component is used to support the hierarchical approach  
@@ -30,6 +30,7 @@ PROGRAM FISOC_main
   ! merely coordinates the child components (ice, ocean and processing)
   TYPE(ESMF_GridComp)     :: FISOC_parent 
   TYPE(ESMF_config)       :: FISOC_config
+  TYPE(ESMF_state)        :: importstate, exportstate
 
 !------------------------------------------------------------------------------
 
@@ -114,8 +115,8 @@ PROGRAM FISOC_main
   !
   ! FISOC time related variables:
   ! FISOC_clock          the main FISOC clock
-  ! alarm_ice            the (periodic) alarm for the ice model 
-  ! alarm_ocn            the (event driven) alarm for the ocean model
+  ! alarm_ISM            the (periodic) alarm for the ice model 
+  ! alarm_OM            the (event driven) alarm for the ocean model
   ! tight_coupling (config) whether tight coupling (always call ocean) or loose 
   !                      coupling (call ocean after large geometry change) 
   ! OM_dt_sec (config)   ocean timestep in seconds
@@ -182,32 +183,42 @@ PROGRAM FISOC_main
        name="FISOC main clock", rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
 
-  alarm_ocn = ESMF_AlarmCreate(clock=FISOC_clock, name="alarm_ocn", &
-       ringTime=startTime, rc=rc)
+  alarm_OM = ESMF_AlarmCreate(clock=FISOC_clock, name="alarm_OM", &
+       ringTime=startTime, ringInterval=OM_dt, rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
 
-  alarm_ice = ESMF_AlarmCreate(clock=FISOC_clock, name="alarm_ice", &
-       ringTime=startTime, &
-       ringInterval=ISM_dt, rc=rc)
+  alarm_ISM = ESMF_AlarmCreate(clock=FISOC_clock, name="alarm_ISM", &
+       ringTime=startTime, ringInterval=ISM_dt, rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
   
-!***turn on ocn alarm if tight coupling... or do this in FISOC_proc ?
 
   msg = "created and initialised clocks and alarms"  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
 
-!------------------------------------------------------------------------------
-! The main bit: initialize, run and finalize FISOC_parent (the parent calls 
-! all child components).
+  !------------------------------------------------------------------------------
+  ! The main bit: initialize, run and finalize FISOC_parent (the parent calls 
+  ! all child components).
+  importState = ESMF_StateCreate(name='parent import state', stateintent=ESMF_STATEINTENT_IMPORT, rc=rc) 
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  exportState = ESMF_StateCreate(name='parent export state', stateintent=ESMF_STATEINTENT_IMPORT, rc=rc) 
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
   CALL ESMF_GridCompInitialize(FISOC_parent, &
+       importState=importState, exportState=exportState, &
        clock=FISOC_clock, userRc=urc, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   
   CALL ESMF_GridCompRun(FISOC_parent, &
+       importState=importState, exportState=exportState, &
        clock=FISOC_clock, userRc=urc, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
@@ -219,18 +230,19 @@ PROGRAM FISOC_main
        line=__LINE__, file=__FILE__, rc=rc)
 
   CALL ESMF_GridCompFinalize(FISOC_parent, &
+       importState=importState, exportState=exportState, &
        clock=FISOC_clock, userRc=urc, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   
   !------------------------------------------------------------------------------
-  CALL ESMF_AlarmDestroy(alarm_ice, rc=rc)
+  CALL ESMF_AlarmDestroy(alarm_ISM, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   
-  CALL ESMF_AlarmDestroy(alarm_ocn, rc=rc)
+  CALL ESMF_AlarmDestroy(alarm_OM, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)

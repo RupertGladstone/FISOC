@@ -20,21 +20,21 @@
  #    300     3000     295.8
  #  ::
 
-  ISM_meshFile:    longThinMIS.nc
-  ISM_configFile:  someDir/someFile.sif
-  ISM_name:        dummy
+  ISM_meshFile:     longThinMIS.nc
+  ISM_configFile:   someDir/someFile.sif
+  ISM_name:         dummy
 
-  OM_configFile:   someDir/someFile
-  OM_name:         dummy
+  OM_configFile:    someDir/someFile
+  OM_name:          dummy
   
-  OM_dt_sec:       2000   
-  dt_ratio:        4 
-  start_year:      2010
-  start_month:     1
-  end_year:        2010
-  end_month:       2
+  OM_dt_sec:        200000   
+  dt_ratio:         4 
+  start_year:       2010
+  start_month:      1
+  end_year:         2010
+  end_month:        2
 
-  tight_coupling:  .TRUE.
-
+!  verbose_coupling: .FALSE.
+     verbose_coupling: .TRUE.
 
 
