@@ -49,69 +49,75 @@
 !> \ingroup ElmerLib
 !> \{
 
-!------------------------------------------------------------------------------
+MODULE ElmerSolver_mod
+  
+  USE MainUtils
+  
+  IMPLICIT NONE
+  
+  PRIVATE
+  
+  PUBLIC :: ElmerSolver
+
+  INTERFACE
+     FUNCTION RealTime()
+       USE MainUtils
+       REAL(KIND=dp) :: RealTime
+     END FUNCTION RealTime
+  END INTERFACE
+  INTERFACE
+     FUNCTION CPUTime()
+       USE MainUtils
+       REAL(KIND=dp) :: CPUTime
+     END FUNCTION CPUTime
+  END INTERFACE
+  REAL(KIND=dp) :: CT0,RT0,tt  
+  
+  INTEGER :: NoArgs
+
+  INTEGER :: i,j,k,n,l,t,k1,k2,iter,Ndeg,istat,nproc,tlen,nthreads
+  CHARACTER(LEN=MAX_STRING_LEN) :: threads, CoordTransform  
+  REAL(KIND=dp) :: s,dt,dtfunc
+  REAL(KIND=dP), POINTER :: WorkA(:,:,:) => NULL()
+  REAL(KIND=dp), POINTER, SAVE :: sTime(:), sStep(:), sInterval(:), sSize(:), &
+       steadyIt(:),nonlinIt(:),sPrevSizes(:,:),sPeriodic(:)  
+  TYPE(Element_t),POINTER :: CurrentElement  
+  LOGICAL :: GotIt,Transient,Scanning,LastSaved  
+  INTEGER :: TimeIntervals,interval,timestep, &
+       TotalTimesteps,SavedSteps,CoupledMaxIter,CoupledMinIter  
+  INTEGER, POINTER, SAVE :: Timesteps(:),OutputIntervals(:)
+  INTEGER, POINTER, SAVE :: ActiveSolvers(:)
+  REAL(KIND=dp), POINTER, SAVE :: TimestepSizes(:,:)  
+  INTEGER(KIND=AddrInt) :: ControlProcedure
+  LOGICAL :: InitDirichlet, ExecThis  
+  TYPE(ElementType_t),POINTER :: elmt  
+  TYPE(ParEnv_t), POINTER :: ParallelEnv  
+  CHARACTER(LEN=MAX_NAME_LEN) :: ModelName, eq, ExecCommand
+  CHARACTER(LEN=MAX_STRING_LEN) :: OutputFile, PostFile, RestartFile, &
+       OutputName=' ',PostName=' ', When, OptionString  
+  TYPE(Variable_t), POINTER :: Var
+  TYPE(Mesh_t), POINTER :: Mesh
+  TYPE(Solver_t), POINTER :: Solver  
+  LOGICAL :: FirstLoad = .TRUE., FirstTime=.TRUE., Found
+  LOGICAL :: Silent, Version, GotModelName  
+  INTEGER :: ExtrudeLevels
+  TYPE(Mesh_t), POINTER :: ExtrudedMesh
+  INTEGER :: omp_get_max_threads
+
+  
+CONTAINS
+  
+  !------------------------------------------------------------------------------
 !> The main program for Elmer. Solves the equations as defined by the input files.
 !------------------------------------------------------------------------------
 SUBROUTINE ElmerSolver(initialize)
   !------------------------------------------------------------------------------
-  
-  USE MainUtils
-  
+    
   !------------------------------------------------------------------------------
   IMPLICIT NONE
   !------------------------------------------------------------------------------
   
   INTEGER :: Initialize
-  
-  !------------------------------------------------------------------------------
-  !    Local variables
-  !------------------------------------------------------------------------------
-  
-  INTEGER :: i,j,k,n,l,t,k1,k2,iter,Ndeg,istat,nproc,tlen,nthreads
-  CHARACTER(LEN=MAX_STRING_LEN) :: threads, CoordTransform
-  
-  REAL(KIND=dp) :: s,dt,dtfunc
-  REAL(KIND=dP), POINTER :: WorkA(:,:,:) => NULL()
-  REAL(KIND=dp), POINTER, SAVE :: sTime(:), sStep(:), sInterval(:), sSize(:), &
-       steadyIt(:),nonlinIt(:),sPrevSizes(:,:),sPeriodic(:)
-  
-  TYPE(Element_t),POINTER :: CurrentElement
-  
-  LOGICAL :: GotIt,Transient,Scanning,LastSaved
-  
-  INTEGER :: TimeIntervals,interval,timestep, &
-       TotalTimesteps,SavedSteps,CoupledMaxIter,CoupledMinIter
-  
-  INTEGER, POINTER, SAVE :: Timesteps(:),OutputIntervals(:), ActiveSolvers(:)
-  REAL(KIND=dp), POINTER, SAVE :: TimestepSizes(:,:)
-  
-  INTEGER(KIND=AddrInt) :: ControlProcedure
-
-  LOGICAL :: InitDirichlet, ExecThis
-  
-  TYPE(ElementType_t),POINTER :: elmt
-  
-  TYPE(ParEnv_t), POINTER :: ParallelEnv
-  
-  CHARACTER(LEN=MAX_NAME_LEN) :: ModelName, eq, ExecCommand
-  CHARACTER(LEN=MAX_STRING_LEN) :: OutputFile, PostFile, RestartFile, &
-       OutputName=' ',PostName=' ', When, OptionString
-  
-  TYPE(Variable_t), POINTER :: Var
-  TYPE(Mesh_t), POINTER :: Mesh
-  TYPE(Solver_t), POINTER :: Solver
-  
-  REAL(KIND=dp) :: RealTime,CPUTime,CT0,RT0,tt
-  
-  LOGICAL :: FirstLoad = .TRUE., FirstTime=.TRUE., Found
-  LOGICAL :: Silent, Version, GotModelName
-  
-  INTEGER :: iargc, NoArgs
-  
-  INTEGER :: ExtrudeLevels
-  TYPE(Mesh_t), POINTER :: ExtrudedMesh
-  
-  INTEGER :: omp_get_max_threads
   
 #ifdef HAVE_TRILINOS
   INTERFACE
@@ -556,8 +562,7 @@ SUBROUTINE ElmerSolver(initialize)
   CALL Fatal( 'ElmerSolver', 'Unable to find input file [' // &
        TRIM(Modelname) // '], can not execute.' )
   
-CONTAINS 
-  
+END SUBROUTINE ElmerSolver
 
      ! This is a dirty hack that adds an instance of ResultOutputSolver to the list of Solvers.
      ! The idea is that it is much easier for the end user to take into use the vtu output this way.
@@ -661,6 +666,7 @@ CONTAINS
              IF ( Found ) THEN
                 DO k=1,SIZE(ActiveSolvers)
                    IF ( ActiveSolvers(k) == i ) THEN
+!------------------------------------------------------------------------------------------
                       CALL ListAddLogical( CurrentModel % Equations(j) % Values, eq(1:nlen), .TRUE. )
                       EXIT
                    END IF
@@ -1814,7 +1820,7 @@ CONTAINS
 !------------------------------------------------------------------------------
 
 !------------------------------------------------------------------------------
-  END SUBROUTINE ElmerSolver
+END MODULE ElmerSolver_mod
 !------------------------------------------------------------------------------
 
 !> \} ElmerLib
