@@ -4,8 +4,11 @@ import shutil
 #print os.environ['ELMER_HOME']
 
 ElmerSolver = "/home/svali-user/Work/Source/trunk/fem/src/ElmerSolver.src"
+Solver = "/home/svali-user/Work/Source/trunk/fem/src/Solver.src"
 FISOC_ElmerSolver = "FISOC_ElmerSolver.f90"
+FISOC_Solver = "FISOC_Solver.f90"
 
 shutil.copyfile(FISOC_ElmerSolver,ElmerSolver)
+shutil.copyfile(FISOC_Solver,Solver)
 
 print "should probably try to replace on ly the relevant code section, but for now replace the whole file..."
