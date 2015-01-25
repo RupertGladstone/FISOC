@@ -57,7 +57,8 @@ MODULE ElmerSolver_mod
   
   PRIVATE
   
-  PUBLIC :: ElmerSolver
+  PUBLIC :: ElmerSolver, ElmerSolver_init, ElmerSolver_run, ElmerSolver_runAll, ElmerSolver_finalize
+
 
   INTERFACE
      FUNCTION RealTime()
@@ -75,40 +76,40 @@ MODULE ElmerSolver_mod
   REAL(KIND=dp),SAVE :: RT0
   INTEGER            :: NoArgs
 
+  INTEGER,SAVE       :: iter,Ndeg,istat,nproc,tlen,nthreads
 
-  INTEGER :: ii,jj,kk,nn,ll,tt,k1,k2
-
-  INTEGER :: iter,Ndeg,istat,nproc,tlen,nthreads
-
-  CHARACTER(LEN=MAX_STRING_LEN) :: threads, CoordTransform  
-  REAL(KIND=dp) :: ss,dt,dtfunc
-  REAL(KIND=dP), POINTER :: WorkA(:,:,:) => NULL()
-  REAL(KIND=dp), POINTER, SAVE :: sTime(:), sStep(:), sInterval(:), sSize(:), &
+  ! note: this declaration list needs checking for which variables actually
+  ! require the SAVE attribute (note also the SAVE attribute is imposed by 
+  ! setting a default).  It aslo needs checking for variables that can be 
+  ! removed to a subroutine.
+  CHARACTER(LEN=MAX_STRING_LEN),SAVE :: threads, CoordTransform  
+  REAL(KIND=dp),SAVE            :: ss,dt,dtfunc
+  REAL(KIND=dP), POINTER, SAVE  :: WorkA(:,:,:) => NULL()
+  REAL(KIND=dp), POINTER, SAVE  :: sTime(:), sStep(:), sInterval(:), sSize(:), &
        steadyIt(:),nonlinIt(:),sPrevSizes(:,:),sPeriodic(:)  
-  TYPE(Element_t),POINTER :: CurrentElement  
-  LOGICAL :: GotIt,Transient,Scanning,LastSaved  
-  INTEGER :: TimeIntervals,interval,timestep, &
+  TYPE(Element_t),POINTER, SAVE :: CurrentElement  
+  LOGICAL, SAVE                 :: GotIt,Transient,Scanning,LastSaved  
+  INTEGER, SAVE                 :: TimeIntervals,interval,timestep, &
        TotalTimesteps,SavedSteps,CoupledMaxIter,CoupledMinIter  
-  INTEGER, POINTER, SAVE :: Timesteps(:),OutputIntervals(:)
-  INTEGER, POINTER, SAVE :: ActiveSolvers(:)
-  REAL(KIND=dp), POINTER, SAVE :: TimestepSizes(:,:)  
-  INTEGER(KIND=AddrInt) :: ControlProcedure
-  LOGICAL :: InitDirichlet, ExecThis  
-  TYPE(ElementType_t),POINTER :: elmt  
-  TYPE(ParEnv_t), POINTER :: ParallelEnv  
-  CHARACTER(LEN=MAX_NAME_LEN) :: ModelName, eq, ExecCommand
-  CHARACTER(LEN=MAX_STRING_LEN) :: OutputFile, PostFile, RestartFile, &
+  INTEGER, POINTER, SAVE        :: Timesteps(:),OutputIntervals(:)
+  INTEGER, POINTER, SAVE        :: ActiveSolvers(:)
+  REAL(KIND=dp), POINTER, SAVE  :: TimestepSizes(:,:)  
+  INTEGER(KIND=AddrInt), SAVE   :: ControlProcedure
+  LOGICAL, SAVE                 :: InitDirichlet, ExecThis  
+  TYPE(ElementType_t),POINTER,SAVE :: elmt  
+  TYPE(ParEnv_t),POINTER,SAVE   :: ParallelEnv  
+  CHARACTER(LEN=MAX_NAME_LEN),SAVE :: ModelName, eq, ExecCommand
+  CHARACTER(LEN=MAX_STRING_LEN),SAVE :: OutputFile, PostFile, RestartFile, &
        OutputName=' ',PostName=' ', When, OptionString  
-  TYPE(Variable_t), POINTER :: Var
-  TYPE(Mesh_t), POINTER :: Mesh
-  TYPE(Solver_t), POINTER :: Solver  
-  LOGICAL :: FirstLoad = .TRUE., FirstTime=.TRUE., Found
-  LOGICAL :: Silent, Version, GotModelName  
-  INTEGER :: ExtrudeLevels
-  TYPE(Mesh_t), POINTER :: ExtrudedMesh
-  INTEGER :: omp_get_max_threads
-
-  INTEGER :: Initialize = 0
+  TYPE(Variable_t),POINTER,SAVE :: Var
+  TYPE(Mesh_t), POINTER, SAVE   :: Mesh
+  TYPE(Solver_t), POINTER, SAVE :: Solver  
+  LOGICAL, SAVE                 :: FirstLoad = .TRUE., FirstTime=.TRUE., Found
+  LOGICAL, SAVE                 :: Silent, Version, GotModelName  
+  INTEGER, SAVE                 :: ExtrudeLevels
+  TYPE(Mesh_t), POINTER, SAVE   :: ExtrudedMesh
+  INTEGER, SAVE                 :: omp_get_max_threads
+  INTEGER, SAVE                 :: Initialize = 0
   
 CONTAINS
   
@@ -142,6 +143,8 @@ CONTAINS
        END SUBROUTINE TrilinosCleanup
     END INTERFACE
 #endif
+
+    INTEGER :: ii, kk
 
     ! Start the watches, store later
     !--------------------------------
@@ -542,8 +545,18 @@ CONTAINS
   END SUBROUTINE ElmerSolver_runAll
   
   !------------------------------------------------------------------------------
+  SUBROUTINE  ElmerSolver_run()
+
+    CALL ExecSimulation( 1, CoupledMinIter, &
+            CoupledMaxIter, OutputIntervals, Transient, Scanning)
+  
+  END SUBROUTINE ElmerSolver_run
+  
+  !------------------------------------------------------------------------------
   SUBROUTINE ElmerSolver_finalize()
     
+    INTEGER :: ii
+
     !------------------------------------------------------------------------------
     !    Always save the last step to output
     !------------------------------------------------------------------------------
@@ -599,7 +612,7 @@ CONTAINS
      SUBROUTINE AddVtuOutputSolverHack()     
        TYPE(Solver_t), POINTER :: ABC(:), PSolver
        CHARACTER(LEN=MAX_NAME_LEN) :: str
-       INTEGER :: jj,j2,j3,kk,nn
+       INTEGER :: ii,jj,j2,j3,kk,nn
        TYPE(ValueList_t), POINTER :: Params
        LOGICAL :: gotIt, VtuFormat
 
@@ -781,7 +794,7 @@ CONTAINS
      INTEGER, ALLOCATABLE :: Indexes(:)
      REAL(KIND=dp),ALLOCATABLE :: Work(:)
 
-     INTEGER :: ii,jj,kk,ll,mm,tt,vect_dof,real_dof,dim
+     INTEGER :: ii,jj,kk,ll,nn,mm,tt,vect_dof,real_dof,dim
 
      REAL(KIND=dp) :: nrm(3),t1(3),t2(3),vec(3),tmp(3),udot
      TYPE(ValueList_t), POINTER :: BC
@@ -961,7 +974,7 @@ CONTAINS
 !------------------------------------------------------------------------------
      USE DefUtils
      TYPE(Element_t), POINTER :: Edge
-     INTEGER :: DOFs,ii,jj,kk,ll
+     INTEGER :: DOFs,bid,jj,kk,ll,k1,nn,tt
      CHARACTER(LEN=MAX_NAME_LEN) :: str
      LOGICAL :: Found, ThingsToDO
      TYPE(Solver_t), POINTER :: Solver
@@ -1021,10 +1034,10 @@ CONTAINS
            
            CurrentElement =>  Mesh % Elements(tt)
            
-           ii = CurrentElement % BodyId 
-           IF( ii == 0 ) CYCLE
+           bid = CurrentElement % BodyId 
+           IF( bid == 0 ) CYCLE
            
-           jj = ListGetInteger(CurrentModel % Bodies(ii) % Values, &
+           jj = ListGetInteger(CurrentModel % Bodies(bid) % Values, &
                'Initial Condition',GotIt, 1, CurrentModel % NumberOfICs )           
            IF ( .NOT. GotIt ) CYCLE
            
@@ -1080,7 +1093,7 @@ CONTAINS
                END IF
                
                IF(ASSOCIATED(Mesh % Edges)) THEN
-                 IF ( ii<=Mesh % NumberOfBulkElements) THEN
+                 IF ( bid<=Mesh % NumberOfBulkElements) THEN
                    Gotit = ListCheckPresent( IC, TRIM(Var % Name)//' {e}' )
                    IF ( Gotit ) THEN
                      DO kk=1,CurrentElement % TYPE % NumberOfedges
