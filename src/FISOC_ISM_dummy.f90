@@ -1,6 +1,7 @@
 MODULE FISOC_ISM
   
   USE ESMF
+  USE FISOC_ElmerWrapper
     
   IMPLICIT NONE
   
@@ -93,6 +94,7 @@ CONTAINS
     NULLIFY (ISM_temperature_l0_ptr,ISM_temperature_l1_ptr,ISM_z_l0_ptr, &
          ISM_z_l1_ptr,ISM_dTdz_l0_ptr,ISM_z_l0_previous_ptr)
 
+
     msg = "ISM initialise started"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
@@ -105,6 +107,9 @@ CONTAINS
     CALL ESMF_ConfigGetAttribute(config, ISM_meshFile, label='ISM_meshFile:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+
+    CALL ESMF_ElmerInit(ISM_ExpFB,ISM_mesh,config)
+
 
     ! Note that currently only meshes on spherical coords can be read in from file.  So 
     ! here we use the subroutine interfaces to create simple mesh instead.

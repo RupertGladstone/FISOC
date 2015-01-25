@@ -134,7 +134,7 @@ CONTAINS
   END SUBROUTINE ElmerSolver
   
   !------------------------------------------------------------------------------
-  SUBROUTINE ElmerSolver_init()
+  SUBROUTINE ElmerSolver_init(meshFootprint)
   
 #ifdef HAVE_TRILINOS
     INTERFACE
@@ -144,7 +144,10 @@ CONTAINS
     END INTERFACE
 #endif
 
+    TYPE(mesh_t),INTENT(INOUT),OPTIONAL :: meshFootprint
+
     INTEGER :: ii, kk
+
 
     ! Start the watches, store later
     !--------------------------------
@@ -296,6 +299,9 @@ CONTAINS
        !----------------------------------------------------------------------------------
        ExtrudeLevels=GetInteger(CurrentModel % Simulation,'Extruded Mesh Levels',Found)
        IF(ExtrudeLevels>1) THEN
+          IF (PRESENT(meshFootprint)) THEN
+             meshFootprint = CurrentModel % Meshes
+          END IF
           ExtrudedMesh => MeshExtrude(CurrentModel % Meshes, ExtrudeLevels-2)
           DO ii=1,CurrentModel % NumberOfSolvers
              IF(ASSOCIATED(CurrentModel % Solvers(ii) % Mesh,CurrentModel % Meshes)) &
