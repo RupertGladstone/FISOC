@@ -71,13 +71,17 @@ MODULE ElmerSolver_mod
        REAL(KIND=dp) :: CPUTime
      END FUNCTION CPUTime
   END INTERFACE
-  REAL(KIND=dp) :: CT0,RT0,tt  
-  
-  INTEGER :: NoArgs
+  REAL(KIND=dp)      :: CT0  
+  REAL(KIND=dp),SAVE :: RT0
+  INTEGER            :: NoArgs
 
-  INTEGER :: i,j,k,n,l,t,k1,k2,iter,Ndeg,istat,nproc,tlen,nthreads
+
+  INTEGER :: ii,jj,kk,nn,ll,tt,k1,k2
+
+  INTEGER :: iter,Ndeg,istat,nproc,tlen,nthreads
+
   CHARACTER(LEN=MAX_STRING_LEN) :: threads, CoordTransform  
-  REAL(KIND=dp) :: s,dt,dtfunc
+  REAL(KIND=dp) :: ss,dt,dtfunc
   REAL(KIND=dP), POINTER :: WorkA(:,:,:) => NULL()
   REAL(KIND=dp), POINTER, SAVE :: sTime(:), sStep(:), sInterval(:), sSize(:), &
        steadyIt(:),nonlinIt(:),sPrevSizes(:,:),sPeriodic(:)  
@@ -122,7 +126,7 @@ CONTAINS
     
     CALL ElmerSolver_init()
     IF ( Initialize /= 1 ) THEN       
-       CALL ElmerSolver_run()
+       CALL ElmerSolver_runAll()
        CALL ElmerSolver_finalize()
     END IF
     
@@ -150,7 +154,6 @@ CONTAINS
     ParallelEnv => ParallelInit()
     OutputPE = ParEnv % MyPE
     
-    !tt = realtime()
     IF ( FirstTime ) THEN
        !
        ! Print banner to output:
@@ -162,8 +165,8 @@ CONTAINS
        Silent = .FALSE.
        Version = .FALSE.
        IF( NoArgs > 0 ) THEN 
-          DO i = 1, NoArgs 
-             CALL getarg( i,OptionString )
+          DO ii = 1, NoArgs 
+             CALL getarg( ii,OptionString )
              Silent = Silent .OR. &
                   ( OptionString=='-s' .OR. OptionString=='--silent' ) 
              Version = Version .OR. &
@@ -291,22 +294,22 @@ CONTAINS
        ExtrudeLevels=GetInteger(CurrentModel % Simulation,'Extruded Mesh Levels',Found)
        IF(ExtrudeLevels>1) THEN
           ExtrudedMesh => MeshExtrude(CurrentModel % Meshes, ExtrudeLevels-2)
-          DO i=1,CurrentModel % NumberOfSolvers
-             IF(ASSOCIATED(CurrentModel % Solvers(i) % Mesh,CurrentModel % Meshes)) &
-                  CurrentModel % Solvers(i) % Mesh => ExtrudedMesh 
+          DO ii=1,CurrentModel % NumberOfSolvers
+             IF(ASSOCIATED(CurrentModel % Solvers(ii) % Mesh,CurrentModel % Meshes)) &
+                  CurrentModel % Solvers(ii) % Mesh => ExtrudedMesh 
           END DO
           ExtrudedMesh % Next => CurrentModel % Meshes % Next
           CurrentModel % Meshes => ExtrudedMesh
           
           ! If periodic BC given, compute boundary mesh projector:
           ! ------------------------------------------------------
-          DO i = 1,CurrentModel % NumberOfBCs
-             IF(ASSOCIATED(CurrentModel % Bcs(i) % PMatrix)) &
-                  CALL FreeMatrix( CurrentModel % BCs(i) % PMatrix )
-             CurrentModel % BCs(i) % PMatrix => NULL()
-             k = ListGetInteger( CurrentModel % BCs(i) % Values, 'Periodic BC', GotIt )
+          DO ii = 1,CurrentModel % NumberOfBCs
+             IF(ASSOCIATED(CurrentModel % Bcs(ii) % PMatrix)) &
+                  CALL FreeMatrix( CurrentModel % BCs(ii) % PMatrix )
+             CurrentModel % BCs(ii) % PMatrix => NULL()
+             kk = ListGetInteger( CurrentModel % BCs(ii) % Values, 'Periodic BC', GotIt )
              IF( GotIt ) THEN
-                CurrentModel % BCs(i) % PMatrix =>  PeriodicProjector( CurrentModel, ExtrudedMesh, i, k )
+                CurrentModel % BCs(ii) % PMatrix =>  PeriodicProjector( CurrentModel, ExtrudedMesh, ii, kk )
              END IF
           END DO
        END IF
@@ -484,8 +487,8 @@ CONTAINS
        END DO
     END DO
     
-    DO i=1,CurrentModel % NumberOfSolvers
-       Solver => CurrentModel % Solvers(i)
+    DO ii=1,CurrentModel % NumberOfSolvers
+       Solver => CurrentModel % Solvers(ii)
        IF(.NOT.ASSOCIATED(Solver % Variable)) CYCLE
        IF(.NOT.ASSOCIATED(Solver % Variable % Values)) CYCLE
        When = ListGetString( Solver % Values, 'Exec Solver', GotIt )
@@ -520,7 +523,7 @@ CONTAINS
   END SUBROUTINE ElmerSolver_init
     
   !------------------------------------------------------------------------------
-  SUBROUTINE  ElmerSolver_run()
+  SUBROUTINE  ElmerSolver_runAll()
 
     !------------------------------------------------------------------------------
     !      Here we actually start the simulation ....
@@ -535,12 +538,18 @@ CONTAINS
        CALL ExecSimulation( TimeIntervals, CoupledMinIter, &
             CoupledMaxIter, OutputIntervals, Transient, Scanning)
     END IF
+
+  END SUBROUTINE ElmerSolver_runAll
+  
+  !------------------------------------------------------------------------------
+  SUBROUTINE ElmerSolver_finalize()
+    
     !------------------------------------------------------------------------------
     !    Always save the last step to output
     !------------------------------------------------------------------------------
     IF ( .NOT.LastSaved ) THEN
-       DO i=1,CurrentModel % NumberOfSolvers
-          Solver => CurrentModel % Solvers(i)
+       DO ii=1,CurrentModel % NumberOfSolvers
+          Solver => CurrentModel % Solvers(ii)
           IF ( Solver % PROCEDURE == 0 ) CYCLE
           ExecThis = ( Solver % SolverExecWhen == SOLVER_EXEC_AHEAD_SAVE)
           When = ListGetString( Solver % Values, 'Exec Solver', GotIt )
@@ -551,8 +560,8 @@ CONTAINS
        CALL SaveToPost(0)
        CALL SaveCurrent(Timestep)
        
-       DO i=1,CurrentModel % NumberOfSolvers
-          Solver => CurrentModel % Solvers(i)
+       DO ii=1,CurrentModel % NumberOfSolvers
+          Solver => CurrentModel % Solvers(ii)
           IF ( Solver % PROCEDURE == 0 ) CYCLE
           ExecThis = ( Solver % SolverExecWhen == SOLVER_EXEC_AFTER_SAVE)
           When = ListGetString( Solver % Values, 'Exec Solver', GotIt )
@@ -560,13 +569,6 @@ CONTAINS
           IF( ExecThis ) CALL SolverActivate( CurrentModel,Solver,dt,Transient )
        END DO
     END IF
-    
-    IF ( Initialize >= 2 ) RETURN
-
-  END SUBROUTINE ElmerSolver_run
-  
-  !------------------------------------------------------------------------------
-  SUBROUTINE ElmerSolver_finalize()
     
     IF (Initialize==0) THEN 
        IF ( .NOT.ReloadInputFile(CurrentModel) ) CONTINUE
@@ -597,71 +599,71 @@ CONTAINS
      SUBROUTINE AddVtuOutputSolverHack()     
        TYPE(Solver_t), POINTER :: ABC(:), PSolver
        CHARACTER(LEN=MAX_NAME_LEN) :: str
-       INTEGER :: i,j,j2,j3,k,n
+       INTEGER :: jj,j2,j3,kk,nn
        TYPE(ValueList_t), POINTER :: Params
        LOGICAL :: gotIt, VtuFormat
 
        str = ListGetString( CurrentModel % Simulation,'Post File',GotIt) 
        IF(.NOT. GotIt) RETURN
-       k = INDEX( str,'.vtu' )
-       VtuFormat = ( k /= 0 ) 
+       kk = INDEX( str,'.vtu' )
+       VtuFormat = ( kk /= 0 ) 
 
        IF(.NOT. VtuFormat ) RETURN
        
        CALL Info('AddVtuOutputSolverHack','Adding ResultOutputSolver to write VTU output in file: '&
-           //TRIM(str(1:k-1)))
+           //TRIM(str(1:kk-1)))
      
        CALL ListRemove( CurrentModel % Simulation,'Post File')
-       n = CurrentModel % NumberOfSolvers+1
-       ALLOCATE( ABC(n) )
-       DO i=1,n-1
+       nn = CurrentModel % NumberOfSolvers+1
+       ALLOCATE( ABC(nn) )
+       DO ii=1,nn-1
          ! Def_Dofs is the only allocatable structure within Solver_t:
-         IF( ALLOCATED( CurrentModel % Solvers(i) % Def_Dofs ) ) THEN
-           j = SIZE(CurrentModel % Solvers(i) % Def_Dofs,1)
-           j2 = SIZE(CurrentModel % Solvers(i) % Def_Dofs,2)
-           j3 = SIZE(CurrentModel % Solvers(i) % Def_Dofs,3)
-           ALLOCATE( ABC(i) % Def_Dofs(j,j2,j3) )
+         IF( ALLOCATED( CurrentModel % Solvers(ii) % Def_Dofs ) ) THEN
+           jj = SIZE(CurrentModel % Solvers(ii) % Def_Dofs,1)
+           j2 = SIZE(CurrentModel % Solvers(ii) % Def_Dofs,2)
+           j3 = SIZE(CurrentModel % Solvers(ii) % Def_Dofs,3)
+           ALLOCATE( ABC(ii) % Def_Dofs(jj,j2,j3) )
          END IF
 
          ! Copy the content of the Solver structure
-         ABC(i) = CurrentModel % Solvers(i)
+         ABC(ii) = CurrentModel % Solvers(ii)
 
          ! Nullify the old structure since otherwise bad things may happen at deallocation
-         NULLIFY( CurrentModel % Solvers(i) % ActiveElements )
-         NULLIFY( CurrentModel % Solvers(i) % Values )
-         NULLIFY( CurrentModel % Solvers(i) % Mesh )
-         NULLIFY( CurrentModel % Solvers(i) % BlockMatrix )
-         NULLIFY( CurrentModel % Solvers(i) % Matrix )
-         NULLIFY( CurrentModel % Solvers(i) % Variable )
+         NULLIFY( CurrentModel % Solvers(ii) % ActiveElements )
+         NULLIFY( CurrentModel % Solvers(ii) % Values )
+         NULLIFY( CurrentModel % Solvers(ii) % Mesh )
+         NULLIFY( CurrentModel % Solvers(ii) % BlockMatrix )
+         NULLIFY( CurrentModel % Solvers(ii) % Matrix )
+         NULLIFY( CurrentModel % Solvers(ii) % Variable )
        END DO
 
        ! Deallocate the old structure and set the pointer to the new one
        DEALLOCATE( CurrentModel % Solvers )
        CurrentModel % Solvers => ABC
-       CurrentModel % NumberOfSolvers = n
+       CurrentModel % NumberOfSolvers = nn
 
        ! Now create the ResultOutputSolver instance on-the-fly
-       NULLIFY( CurrentModel % Solvers(n) % Values )
-       CurrentModel % Solvers(n) % PROCEDURE = 0
-       NULLIFY( CurrentModel % Solvers(n) % Matrix )
-       NULLIFY( CurrentModel % Solvers(n) % BlockMatrix )
-       NULLIFY( CurrentModel % Solvers(n) % Values )
-       NULLIFY( CurrentModel % Solvers(n) % Variable )
-       NULLIFY( CurrentModel % Solvers(n) % ActiveElements )
-       CurrentModel % Solvers(n) % NumberOfActiveElements = 0
-       NULLIFY( CurrentModel % Solvers(n) % Values )
-       j = CurrentModel % NumberOfBodies
-       ALLOCATE( CurrentModel % Solvers(n) % Def_Dofs(10,j,6))
-       CurrentModel % Solvers(n) % Def_Dofs(:,1:j,6) = -1
+       NULLIFY( CurrentModel % Solvers(nn) % Values )
+       CurrentModel % Solvers(nn) % PROCEDURE = 0
+       NULLIFY( CurrentModel % Solvers(nn) % Matrix )
+       NULLIFY( CurrentModel % Solvers(nn) % BlockMatrix )
+       NULLIFY( CurrentModel % Solvers(nn) % Values )
+       NULLIFY( CurrentModel % Solvers(nn) % Variable )
+       NULLIFY( CurrentModel % Solvers(nn) % ActiveElements )
+       CurrentModel % Solvers(nn) % NumberOfActiveElements = 0
+       NULLIFY( CurrentModel % Solvers(nn) % Values )
+       jj = CurrentModel % NumberOfBodies
+       ALLOCATE( CurrentModel % Solvers(nn) % Def_Dofs(10,jj,6))
+       CurrentModel % Solvers(nn) % Def_Dofs(:,1:jj,6) = -1
        
        ! Add some keywords to the list
-       CALL ListAddString(CurrentModel % Solvers(n) % Values,&
+       CALL ListAddString(CurrentModel % Solvers(nn) % Values,&
            'Procedure', 'ResultOutputSolve ResultOutputSolver',.FALSE.)
-       CALL ListAddString(CurrentModel % Solvers(n) % Values,'Output Format','vtu')
-       CALL ListAddString(CurrentModel % Solvers(n) % Values,'Output File Name',str(1:k-1))
-       CALL ListAddString(CurrentModel % Solvers(n) % Values,'Exec Solver','after saving')
-       CALL ListAddString(CurrentModel % Solvers(n) % Values,'Equation','InternalVtuOutputSolver')
-       CALL ListAddLogical(CurrentModel % Solvers(n) % Values,'Save Geometry IDs',.TRUE.)
+       CALL ListAddString(CurrentModel % Solvers(nn) % Values,'Output Format','vtu')
+       CALL ListAddString(CurrentModel % Solvers(nn) % Values,'Output File Name',str(1:kk-1))
+       CALL ListAddString(CurrentModel % Solvers(nn) % Values,'Exec Solver','after saving')
+       CALL ListAddString(CurrentModel % Solvers(nn) % Values,'Equation','InternalVtuOutputSolver')
+       CALL ListAddLogical(CurrentModel % Solvers(nn) % Values,'Save Geometry IDs',.TRUE.)
 
      END SUBROUTINE AddVtuOutputSolverHack
 
@@ -671,7 +673,7 @@ CONTAINS
 !------------------------------------------------------------------------------
     SUBROUTINE AddSolvers()
 !------------------------------------------------------------------------------
-      INTEGER :: i,j,k,nlen
+      INTEGER :: ii,jj,kk,nlen
       LOGICAL :: InitSolver, Found
 !------------------------------------------------------------------------------
 
@@ -679,20 +681,20 @@ CONTAINS
       ! The Equation flag is the legacy way of setting a Solver active and is still
       ! used internally.
       !----------------------------------------------------------------------------
-      DO i=1,CurrentModel % NumberOfSolvers
+      DO ii=1,CurrentModel % NumberOfSolvers
 
-        eq = ListGetString( CurrentModel % Solvers(i) % Values,'Equation', Found )
+        eq = ListGetString( CurrentModel % Solvers(ii) % Values,'Equation', Found )
      
         IF ( Found ) THEN
           nlen = LEN_TRIM(eq)
-          DO j=1,CurrentModel % NumberOFEquations
-             ActiveSolvers => ListGetIntegerArray( CurrentModel % Equations(j) % Values, &
+          DO jj=1,CurrentModel % NumberOFEquations
+             ActiveSolvers => ListGetIntegerArray( CurrentModel % Equations(jj) % Values, &
                                 'Active Solvers', Found )
              IF ( Found ) THEN
-                DO k=1,SIZE(ActiveSolvers)
-                   IF ( ActiveSolvers(k) == i ) THEN
+                DO kk=1,SIZE(ActiveSolvers)
+                   IF ( ActiveSolvers(kk) == ii ) THEN
 !------------------------------------------------------------------------------------------
-                      CALL ListAddLogical( CurrentModel % Equations(j) % Values, eq(1:nlen), .TRUE. )
+                      CALL ListAddLogical( CurrentModel % Equations(jj) % Values, eq(1:nlen), .TRUE. )
                       EXIT
                    END IF
                 END DO
@@ -701,10 +703,10 @@ CONTAINS
        END IF
      END DO
 
-     DO i=1,CurrentModel % NumberOfSolvers
-        eq = ListGetString( CurrentModel % Solvers(i) % Values,'Equation', Found )
+     DO ii=1,CurrentModel % NumberOfSolvers
+        eq = ListGetString( CurrentModel % Solvers(ii) % Values,'Equation', Found )
 
-        Solver => CurrentModel % Solvers(i)
+        Solver => CurrentModel % Solvers(ii)
         InitSolver = ListGetLogical( Solver % Values, 'Initialize', Found )
         IF ( Found .AND. InitSolver ) THEN
           CALL FreeMatrix( Solver % Matrix )
@@ -779,7 +781,7 @@ CONTAINS
      INTEGER, ALLOCATABLE :: Indexes(:)
      REAL(KIND=dp),ALLOCATABLE :: Work(:)
 
-     INTEGER :: i,j,k,l,m,vect_dof,real_dof,dim
+     INTEGER :: ii,jj,kk,ll,mm,tt,vect_dof,real_dof,dim
 
      REAL(KIND=dp) :: nrm(3),t1(3),t2(3),vec(3),tmp(3),udot
      TYPE(ValueList_t), POINTER :: BC
@@ -813,16 +815,16 @@ CONTAINS
          ALLOCATE( Work(Mesh % MaxElementDOFs) )
          CALL SetCurrentMesh( CurrentModel, Mesh )
 
-         DO t = Mesh % NumberOfBulkElements + 1, &
+         DO tt = Mesh % NumberOfBulkElements + 1, &
                  Mesh % NumberOfBulkElements + Mesh % NumberOfBoundaryElements
 
-           Element => Mesh % Elements(t)
+           Element => Mesh % Elements(tt)
 
            ! Set also the current element pointer in the model structure to
            ! reflect the element being processed:
            ! ---------------------------------------------------------------
            CurrentModel % CurrentElement => Element
-           n = Element % TYPE % NumberOfNodes
+           nn = Element % TYPE % NumberOfNodes
 
            BC => GetBC()
 
@@ -836,16 +838,16 @@ CONTAINS
 
 
              IF ( Var % DOFs <= 1 ) THEN
-               Work(1:n) = GetReal( BC,Var % Name, gotIt )
+               Work(1:nn) = GetReal( BC,Var % Name, gotIt )
                IF ( GotIt ) THEN
 
                  nt_boundary = .FALSE.
                  IF ( GetElementFamily() /= 1 ) THEN
-                   k = LEN_TRIM(var % name)
-                   vect_dof = ICHAR(Var % Name(k:k))-ICHAR('0');
+                   kk = LEN_TRIM(var % name)
+                   vect_dof = ICHAR(Var % Name(kk:kk))-ICHAR('0');
                    IF ( vect_dof>=1 .AND. vect_dof<= 3 ) THEN
                      nt_boundary =  GetLogical( BC, &
-                        'normal-tangential '//var % name(1:k-2), gotIt)
+                        'normal-tangential '//var % name(1:kk-2), gotIt)
 
                      IF ( nt_boundary ) THEN
                        nt_boundary = .FALSE.
@@ -886,55 +888,55 @@ CONTAINS
                    END IF
                  END IF
 
-                 DO j=1,n
-                   k = Element % NodeIndexes(j)
-                   IF ( ASSOCIATED(Var % Perm) ) k = Var % Perm(k)
-                   IF ( k>0 ) THEN
+                 DO jj=1,nn
+                   kk = Element % NodeIndexes(jj)
+                   IF ( ASSOCIATED(Var % Perm) ) kk = Var % Perm(kk)
+                   IF ( kk>0 ) THEN
                      IF ( nt_boundary ) THEN
-                       DO l=1,dim
-                         m = l+real_dof-vect_dof
-                         tmp(l)=Vect_var % Values(Vect_var % Dofs*(k-1)+m)
+                       DO ll=1,dim
+                         mm = ll+real_dof-vect_dof
+                         tmp(ll)=Vect_var % Values(Vect_var % Dofs*(kk-1)+mm)
                        END DO
                        udot = SUM(vec(1:dim)*tmp(1:dim))
-                       tmp(1:dim)=tmp(1:dim)+(work(j)-udot)*vec(1:dim)
-                       DO l=1,dim
-                         m = l+real_dof-vect_dof
-                         Vect_var % Values(Vect_var % Dofs*(k-1)+m)=tmp(l)
+                       tmp(1:dim)=tmp(1:dim)+(work(jj)-udot)*vec(1:dim)
+                       DO ll=1,dim
+                         mm = ll+real_dof-vect_dof
+                         Vect_var % Values(Vect_var % Dofs*(kk-1)+mm)=tmp(ll)
                        END DO
                      ELSE
-                       Var % Values(k) = Work(j)
+                       Var % Values(kk) = Work(jj)
                      END IF
                    END IF
                  END DO
                END IF
 
                IF ( Transient .AND. Solver % TimeOrder==2 ) THEN
-                  Work(1:n) = GetReal( BC, TRIM(Var % Name) // ' Velocity', GotIt )
+                  Work(1:nn) = GetReal( BC, TRIM(Var % Name) // ' Velocity', GotIt )
                   IF ( GotIt ) THEN
-                    DO j=1,n
-                      k = Element % NodeIndexes(j)
-                      IF ( ASSOCIATED(Var % Perm) ) k = Var % Perm(k)
-                      IF ( k>0 ) Var % PrevValues(k,1) = Work(j)
+                    DO jj=1,nn
+                      kk = Element % NodeIndexes(jj)
+                      IF ( ASSOCIATED(Var % Perm) ) kk = Var % Perm(kk)
+                      IF ( kk>0 ) Var % PrevValues(kk,1) = Work(jj)
                     END DO
                   END IF
-                  Work(1:n) = GetReal( BC, TRIM(Var % Name) // ' Acceleration', GotIt )
+                  Work(1:nn) = GetReal( BC, TRIM(Var % Name) // ' Acceleration', GotIt )
                   IF ( GotIt ) THEN
-                    DO j=1,n
-                      k = Element % NodeIndexes(j)
-                      IF ( ASSOCIATED(Var % Perm) ) k = Var % Perm(k)
-                      IF ( k>0 ) Var % PrevValues(k,2) = Work(j)
+                    DO jj=1,nn
+                      kk = Element % NodeIndexes(jj)
+                      IF ( ASSOCIATED(Var % Perm) ) kk = Var % Perm(kk)
+                      IF ( kk>0 ) Var % PrevValues(kk,2) = Work(jj)
                     END DO
                   END IF
                END IF
              ELSE
                CALL ListGetRealArray( BC, &
-                 Var % Name, WorkA, n, Element % NodeIndexes, gotIt )
+                 Var % Name, WorkA, nn, Element % NodeIndexes, gotIt )
                IF ( GotIt ) THEN
-                 DO j=1,n
-                   k = Element % NodeIndexes(j)
-                   DO l=1,MIN(SIZE(WorkA,1),Var % DOFs)
-                     IF ( ASSOCIATED(Var % Perm) ) k = Var % Perm(k)
-                     IF ( k>0 ) Var % Values(Var % DOFs*(k-1)+l) = WorkA(l,1,j)
+                 DO jj=1,nn
+                   kk = Element % NodeIndexes(jj)
+                   DO ll=1,MIN(SIZE(WorkA,1),Var % DOFs)
+                     IF ( ASSOCIATED(Var % Perm) ) kk = Var % Perm(kk)
+                     IF ( kk>0 ) Var % Values(Var % DOFs*(kk-1)+ll) = WorkA(ll,1,jj)
                    END DO
                  END DO
                ELSE
@@ -959,7 +961,7 @@ CONTAINS
 !------------------------------------------------------------------------------
      USE DefUtils
      TYPE(Element_t), POINTER :: Edge
-     INTEGER :: DOFs,i,j,k,l
+     INTEGER :: DOFs,ii,jj,kk,ll
      CHARACTER(LEN=MAX_NAME_LEN) :: str
      LOGICAL :: Found, ThingsToDO
      TYPE(Solver_t), POINTER :: Solver
@@ -976,9 +978,9 @@ CONTAINS
 
        ! First set the global variables and check whether there is anything left to do
        ThingsToDo = .FALSE.
-       DO j=1,CurrentModel % NumberOfICs
+       DO jj=1,CurrentModel % NumberOfICs
 
-         IC => CurrentModel % ICs(j) % Values
+         IC => CurrentModel % ICs(jj) % Values
          
          Var => Mesh % Variables
          DO WHILE( ASSOCIATED(Var) ) 
@@ -1015,20 +1017,20 @@ CONTAINS
        ! And now do the ordinary fields
        !--------------------------------
        IF( ThingsToDo ) THEN
-         DO t=1, Mesh % NumberOfBulkElements+Mesh % NumberOfBoundaryElements
+         DO tt=1, Mesh % NumberOfBulkElements+Mesh % NumberOfBoundaryElements
            
-           CurrentElement =>  Mesh % Elements(t)
+           CurrentElement =>  Mesh % Elements(tt)
            
-           i = CurrentElement % BodyId 
-           IF( i == 0 ) CYCLE
+           ii = CurrentElement % BodyId 
+           IF( ii == 0 ) CYCLE
            
-           j = ListGetInteger(CurrentModel % Bodies(i) % Values, &
+           jj = ListGetInteger(CurrentModel % Bodies(ii) % Values, &
                'Initial Condition',GotIt, 1, CurrentModel % NumberOfICs )           
            IF ( .NOT. GotIt ) CYCLE
            
-           IC => CurrentModel % ICs(j) % Values
+           IC => CurrentModel % ICs(jj) % Values
            CurrentModel % CurrentElement => CurrentElement
-           n = GetElementNOFNodes()
+           nn = GetElementNOFNodes()
            
            Var => Mesh % Variables
            DO WHILE( ASSOCIATED(Var) ) 
@@ -1046,49 +1048,49 @@ CONTAINS
                
              ELSE IF ( Var % DOFs <= 1 ) THEN
                
-               Work(1:n) = GetReal( IC, Var % Name, GotIt )
+               Work(1:nn) = GetReal( IC, Var % Name, GotIt )
                IF ( GotIt ) THEN
                  DOFs = GetElementDOFs( Indexes, USolver=Var % Solver )
-                 DO k=1,n
-                   k1 = Indexes(k)
+                 DO kk=1,nn
+                   k1 = Indexes(kk)
                    IF ( ASSOCIATED(Var % Perm) ) k1 = Var % Perm(k1)
-                   IF ( k1>0 ) Var % Values(k1) = Work(k)
+                   IF ( k1>0 ) Var % Values(k1) = Work(kk)
                  END DO
                END IF
                
                IF ( Transient .AND. Solver % TimeOrder==2 ) THEN
-                 Work(1:n) = GetReal( IC, TRIM(Var % Name) // ' Velocity', GotIt )
+                 Work(1:nn) = GetReal( IC, TRIM(Var % Name) // ' Velocity', GotIt )
                  IF ( GotIt ) THEN
                    DOFs = GetElementDOFs( Indexes, USolver=Var % Solver )
-                   DO k=1,n
-                     k1 = Indexes(k)
+                   DO kk=1,nn
+                     k1 = Indexes(kk)
                      IF ( ASSOCIATED(Var % Perm) ) k1 = Var % Perm(k1)
-                     IF ( k1>0 ) Var % PrevValues(k1,1) = Work(k)
+                     IF ( k1>0 ) Var % PrevValues(k1,1) = Work(kk)
                    END DO
                  END IF
-                 Work(1:n) = GetReal( IC, TRIM(Var % Name) // ' Acceleration', GotIt )
+                 Work(1:nn) = GetReal( IC, TRIM(Var % Name) // ' Acceleration', GotIt )
                  IF ( GotIt ) THEN
                    DOFs = GetElementDOFs( Indexes, USolver=Var % Solver )
-                   DO k=1,n
-                     k1 = Indexes(k)
+                   DO kk=1,nn
+                     k1 = Indexes(kk)
                      IF ( ASSOCIATED(Var % Perm) ) k1 = Var % Perm(k1)
-                     IF ( k1>0 ) Var % PrevValues(k1,2) = Work(k)
+                     IF ( k1>0 ) Var % PrevValues(k1,2) = Work(kk)
                    END DO
                  END IF
                END IF
                
                IF(ASSOCIATED(Mesh % Edges)) THEN
-                 IF ( i<=Mesh % NumberOfBulkElements) THEN
+                 IF ( ii<=Mesh % NumberOfBulkElements) THEN
                    Gotit = ListCheckPresent( IC, TRIM(Var % Name)//' {e}' )
                    IF ( Gotit ) THEN
-                     DO k=1,CurrentElement % TYPE % NumberOfedges
-                       Edge => Mesh % Edges(CurrentElement % EdgeIndexes(k))
-                       l = Var % Perm(CurrentElement % EdgeIndexes(k)+Mesh % NumberOfNodes)
-                       IF ( l>0 ) THEN
+                     DO kk=1,CurrentElement % TYPE % NumberOfedges
+                       Edge => Mesh % Edges(CurrentElement % EdgeIndexes(kk))
+                       ll = Var % Perm(CurrentElement % EdgeIndexes(kk)+Mesh % NumberOfNodes)
+                       IF ( ll>0 ) THEN
                          CALL LocalBcIntegral( IC, &
-                             Edge, Edge % TYPE % NumberOfNodes, CurrentElement, n, &
+                             Edge, Edge % TYPE % NumberOfNodes, CurrentElement, nn, &
                              TRIM(Var % Name)//' {e}', Work(1) )
-                         Var % Values(l) = Work(1)
+                         Var % Values(ll) = Work(1)
                        END IF
                      END DO
                    END IF
@@ -1097,14 +1099,14 @@ CONTAINS
                
              ELSE
                CALL ListGetRealArray( IC, &
-                   Var % Name, WorkA, n, CurrentElement % NodeIndexes, gotIt )
+                   Var % Name, WorkA, nn, CurrentElement % NodeIndexes, gotIt )
                
                IF ( GotIt ) THEN
-                 DO k=1,n
-                   k1 = Indexes(k)
-                   DO l=1,MIN(SIZE(WorkA,1),Var % DOFs)
+                 DO kk=1,nn
+                   k1 = Indexes(kk)
+                   DO ll=1,MIN(SIZE(WorkA,1),Var % DOFs)
                      IF ( ASSOCIATED(Var % Perm) ) k1 = Var % Perm(k1)
-                     IF ( k1>0 ) Var % Values(Var % DOFs*(k1-1)+l) = WorkA(l,1,k)
+                     IF ( k1>0 ) Var % Values(Var % DOFs*(k1-1)+ll) = WorkA(ll,1,kk)
                    END DO
                  END DO
                END IF
@@ -1130,7 +1132,7 @@ CONTAINS
 !------------------------------------------------------------------------------
      USE DefUtils
      LOGICAL :: Gotit
-     INTEGER :: k,StartTime
+     INTEGER :: kk,StartTime
 !------------------------------------------------------------------------------
 
 
@@ -1138,7 +1140,7 @@ CONTAINS
          'Restart File', GotIt )
 
      IF ( GotIt ) THEN
-       k = ListGetInteger( CurrentModel % Simulation,'Restart Position',GotIt, &
+       kk = ListGetInteger( CurrentModel % Simulation,'Restart Position',GotIt, &
                   minv=0 )
 
        Mesh => CurrentModel % Meshes
@@ -1153,7 +1155,7 @@ CONTAINS
            OutputName = TRIM(OutputName) // '.' // TRIM(i2s(ParEnv % MyPe))
 
          CALL SetCurrentMesh( CurrentModel, Mesh )
-         CALL LoadRestartFile( OutputName,k,Mesh )
+         CALL LoadRestartFile( OutputName,kk,Mesh )
 
          StartTime = ListGetConstReal( CurrentModel % Simulation,'Restart Time',GotIt)
          IF( GotIt ) THEN
@@ -1180,7 +1182,7 @@ CONTAINS
       INTEGER :: TimeIntervals,CoupledMinIter, CoupledMaxIter,OutputIntervals(:)
       LOGICAL :: Transient,Scanning
 !------------------------------------------------------------------------------
-     INTEGER :: interval, timestep, i, j, k, n
+     INTEGER :: interval, timestep, ii, jj, kk, nn
      REAL(KIND=dp) :: dt, ddt, dtfunc
      INTEGER :: timeleft,cum_timestep
      INTEGER, SAVE ::  stepcount=0, RealTimestep
@@ -1200,8 +1202,8 @@ CONTAINS
 !$   IF(.NOT.GaussPointsInitialized()) CALL GaussPointsInit
 !$omp end parallel
 
-     DO i=1,CurrentModel % NumberOfSolvers
-        Solver => CurrentModel % Solvers(i)
+     DO ii=1,CurrentModel % NumberOfSolvers
+        Solver => CurrentModel % Solvers(ii)
         IF ( Solver % PROCEDURE==0 ) CYCLE
         IF ( Solver % SolverExecWhen == SOLVER_EXEC_AHEAD_ALL ) THEN
            CALL SolverActivate( CurrentModel,Solver,dt,Transient )
@@ -1254,8 +1256,8 @@ CONTAINS
 
          ! Move the old timesteps one step down the ladder
          IF(timestep > 1 .OR. interval > 1) THEN
-           DO i = SIZE(sPrevSizes,2),2,-1
-             sPrevSizes(1,i) = sPrevSizes(1,i-1)
+           DO ii = SIZE(sPrevSizes,2),2,-1
+             sPrevSizes(1,ii) = sPrevSizes(1,ii-1)
            END DO
            sPrevSizes(1,1) = sSize(1)
          END IF 
@@ -1334,43 +1336,43 @@ CONTAINS
             AdaptiveKeepSmallest = ListGetInteger( CurrentModel % Simulation, &
                        'Adaptive Keep Smallest', GotIt, minv=0  )
 
-            n = CurrentModel % NumberOfSolvers
-            j = 0
-            k = 0
-            DO i=1,n
-               Solver => CurrentModel % Solvers(i)
+            nn = CurrentModel % NumberOfSolvers
+            jj = 0
+            kk = 0
+            DO ii=1,nn
+               Solver => CurrentModel % Solvers(ii)
                IF ( ASSOCIATED( Solver % Variable  % Values ) ) THEN
                   IF ( ASSOCIATED( Solver % Variable % PrevValues ) ) THEN
-                     j = MAX( j, SIZE( Solver % Variable % PrevValues,2 ) )
+                     jj = MAX( jj, SIZE( Solver % Variable % PrevValues,2 ) )
                   END IF
-                  k = MAX( k, SIZE( Solver % Variable % Values ) )
+                  kk = MAX( kk, SIZE( Solver % Variable % Values ) )
                END IF
             END DO
-            ALLOCATE( xx(n,k), yynrm(n), xxnrm(n), prevxx( n,k,j ) )
+            ALLOCATE( xx(nn,kk), yynrm(nn), xxnrm(nn), prevxx( nn,kk,jj ) )
 
             CumTime = 0.0d0
             IF ( ddt == 0.0d0 .OR. ddt > AdaptiveMaxTimestep ) ddt = AdaptiveMaxTimestep
 
-            s = sTime(1) - dt
+            ss = sTime(1) - dt
             SmallestCount = 0
             DO WHILE( CumTime < dt-1.0d-12 )
                ddt = MIN( dt - CumTime, ddt )
 
-               DO i=1,CurrentModel % NumberOFSolvers
-                  Solver => CurrentModel % Solvers(i)
+               DO ii=1,CurrentModel % NumberOFSolvers
+                  Solver => CurrentModel % Solvers(ii)
                   IF ( ASSOCIATED( Solver % Variable % Values ) ) THEN
-                     n = SIZE( Solver % Variable % Values )
-                     xx(i,1:n) = Solver % Variable % Values
-                     xxnrm(i) = Solver % Variable % Norm
+                     nn = SIZE( Solver % Variable % Values )
+                     xx(ii,1:nn) = Solver % Variable % Values
+                     xxnrm(ii) = Solver % Variable % Norm
                      IF ( ASSOCIATED( Solver % Variable % PrevValues ) ) THEN
-                        DO j=1,SIZE( Solver % Variable % PrevValues,2 )
-                           prevxx(i,1:n,j) = Solver % Variable % PrevValues(:,j)
+                        DO jj=1,SIZE( Solver % Variable % PrevValues,2 )
+                           prevxx(ii,1:nn,jj) = Solver % Variable % PrevValues(:,jj)
                         END DO
                      END IF
                   END IF
                END DO
 
-               sTime(1) = s + CumTime + ddt
+               sTime(1) = ss + CumTime + ddt
                sSize(1) = ddt
                CALL SolveEquations( CurrentModel, ddt, Transient, &
                  CoupledMinIter, CoupledMaxIter, SteadyStateReached, RealTimestep )
@@ -1379,25 +1381,25 @@ CONTAINS
                MaxErr = ListGetConstReal( CurrentModel % Simulation, &
                           'Adaptive Error Measure', GotIt )
 
-               DO i=1,CurrentModel % NumberOFSolvers
-                  Solver => CurrentModel % Solvers(i)
+               DO ii=1,CurrentModel % NumberOFSolvers
+                  Solver => CurrentModel % Solvers(ii)
                   IF ( ASSOCIATED( Solver % Variable % Values ) ) THEN
-                     n = SIZE(Solver % Variable % Values)
-                     yynrm(i) = Solver % Variable % Norm
-                     Solver % Variable % Values = xx(i,1:n)
+                     nn = SIZE(Solver % Variable % Values)
+                     yynrm(ii) = Solver % Variable % Norm
+                     Solver % Variable % Values = xx(ii,1:nn)
                      IF ( ASSOCIATED( Solver % Variable % PrevValues ) ) THEN
-                        DO j=1,SIZE( Solver % Variable % PrevValues,2 )
-                           Solver % Variable % PrevValues(:,j) = prevxx(i,1:n,j)
+                        DO jj=1,SIZE( Solver % Variable % PrevValues,2 )
+                           Solver % Variable % PrevValues(:,jj) = prevxx(ii,1:nn,jj)
                         END DO
                      END IF
                   END IF
                END DO
 
                sStep(1) = ddt / 2
-               sTime(1) = s + CumTime + ddt/2
+               sTime(1) = ss + CumTime + ddt/2
                CALL SolveEquations( CurrentModel, ddt/2, Transient, &
                   CoupledMinIter, CoupledMaxIter, SteadyStateReached, RealTimestep )
-               sTime(1) = s + CumTime + ddt
+               sTime(1) = ss + CumTime + ddt
                CALL SolveEquations( CurrentModel, ddt/2, Transient, &
                   CoupledMinIter, CoupledMaxIter, SteadyStateReached, RealTimestep )
 
@@ -1406,11 +1408,11 @@ CONTAINS
 
                IF ( .NOT. GotIt ) THEN
                   MaxErr = 0.0d0
-                  DO i=1,CurrentModel % NumberOFSolvers
-                     Solver => CurrentModel % Solvers(i)
+                  DO ii=1,CurrentModel % NumberOFSolvers
+                     Solver => CurrentModel % Solvers(ii)
                      IF ( ASSOCIATED( Solver % Variable % Values ) ) THEN
-                        IF ( yynrm(i) /= Solver % Variable % Norm ) THEN
-                           Maxerr = MAX(Maxerr,ABS(yynrm(i)-Solver % Variable % Norm)/yynrm(i))
+                        IF ( yynrm(ii) /= Solver % Variable % Norm ) THEN
+                           Maxerr = MAX(Maxerr,ABS(yynrm(ii)-Solver % Variable % Norm)/yynrm(ii))
                         END IF
                      END IF
                   END DO
@@ -1428,15 +1430,15 @@ CONTAINS
                     SmallestCount = SmallestCount + 1
                   END IF
                ELSE
-                  DO i=1,CurrentModel % NumberOFSolvers
-                     Solver => CurrentModel % Solvers(i)
+                  DO ii=1,CurrentModel % NumberOFSolvers
+                     Solver => CurrentModel % Solvers(ii)
                      IF ( ASSOCIATED( Solver % Variable % Values ) ) THEN
-                        n = SIZE(Solver % Variable % Values)
-                        Solver % Variable % Norm = xxnrm(i)
-                        Solver % Variable % Values = xx(i,1:n)
+                        nn = SIZE(Solver % Variable % Values)
+                        Solver % Variable % Norm = xxnrm(ii)
+                        Solver % Variable % Values = xx(ii,1:nn)
                         IF ( ASSOCIATED( Solver % Variable % PrevValues ) ) THEN
-                           DO j=1,SIZE( Solver % Variable % PrevValues,2 )
-                              Solver % Variable % PrevValues(:,j) = prevxx(i,1:n,j)
+                           DO jj=1,SIZE( Solver % Variable % PrevValues,2 )
+                              Solver % Variable % PrevValues(:,jj) = prevxx(ii,1:nn,jj)
                            END DO
                         END IF
                      END IF
@@ -1447,7 +1449,7 @@ CONTAINS
                WRITE(*,'(a,3e20.12)') 'Adaptive(cum,ddt,err): ', cumtime, ddt, maxerr
             END DO
             sSize(1) = dt
-            sTime(1) = s + dt
+            sTime(1) = ss + dt
   
             DEALLOCATE( xx, xxnrm, yynrm, prevxx )
          ELSE ! Adaptive timestepping
@@ -1463,11 +1465,11 @@ CONTAINS
          IF( OutputIntervals(Interval) /= 0 ) THEN
 
            CALL SaveToPost(0)
-           k = MOD( Timestep-1, OutputIntervals(Interval) )
-           IF ( k == 0 .OR. SteadyStateReached ) THEN
+           kk = MOD( Timestep-1, OutputIntervals(Interval) )
+           IF ( kk == 0 .OR. SteadyStateReached ) THEN
             
-             DO i=1,CurrentModel % NumberOfSolvers
-               Solver => CurrentModel % Solvers(i)
+             DO ii=1,CurrentModel % NumberOfSolvers
+               Solver => CurrentModel % Solvers(ii)
                IF ( Solver % PROCEDURE == 0 ) CYCLE
                ExecThis = ( Solver % SolverExecWhen == SOLVER_EXEC_AHEAD_SAVE)
                When = ListGetString( Solver % Values, 'Exec Solver', GotIt )
@@ -1478,8 +1480,8 @@ CONTAINS
              CALL SaveCurrent(Timestep)
              LastSaved = .TRUE.
 
-             DO i=1,CurrentModel % NumberOfSolvers
-               Solver => CurrentModel % Solvers(i)
+             DO ii=1,CurrentModel % NumberOfSolvers
+               Solver => CurrentModel % Solvers(ii)
                IF ( Solver % PROCEDURE == 0 ) CYCLE
                ExecThis = ( Solver % SolverExecWhen == SOLVER_EXEC_AFTER_SAVE)
                When = ListGetString( Solver % Values, 'Exec Solver', GotIt )
@@ -1516,8 +1518,8 @@ CONTAINS
      END DO ! timestep intervals, i.e. the simulation
 !------------------------------------------------------------------------------
 
-100   DO i=1,CurrentModel % NumberOfSolvers
-        Solver => CurrentModel % Solvers(i)
+100   DO ii=1,CurrentModel % NumberOfSolvers
+        Solver => CurrentModel % Solvers(ii)
         IF ( Solver % PROCEDURE == 0 ) CYCLE
         When = ListGetString( Solver % Values, 'Exec Solver', GotIt )
         IF ( GotIt ) THEN
@@ -1534,8 +1536,8 @@ CONTAINS
      END DO
 
      IF( .NOT. LastSaved ) THEN
-        DO i=1,CurrentModel % NumberOfSolvers
-           Solver => CurrentModel % Solvers(i)
+        DO ii=1,CurrentModel % NumberOfSolvers
+           Solver => CurrentModel % Solvers(ii)
            IF ( Solver % PROCEDURE == 0 ) CYCLE
            ExecThis = ( Solver % SolverExecWhen == SOLVER_EXEC_AHEAD_SAVE)
            When = ListGetString( Solver % Values, 'Exec Solver', GotIt )
@@ -1554,7 +1556,7 @@ CONTAINS
 !------------------------------------------------------------------------------
   SUBROUTINE SaveCurrent( CurrentStep )
 !------------------------------------------------------------------------------
-    INTEGER :: i, j,k,l,n,q,CurrentStep,nlen
+    INTEGER :: ii, jj,kk,ll,nn,qq,CurrentStep,nlen
     TYPE(Variable_t), POINTER :: Var
     LOGICAL :: EigAnal, GotIt
     CHARACTER(LEN=MAX_NAME_LEN) :: Simul
@@ -1565,11 +1567,11 @@ CONTAINS
     OutputFile = ListGetString(CurrentModel % Simulation,'Output File',GotIt)
     IF ( GotIt ) THEN
       IF ( ParEnv % PEs > 1 ) THEN
-        DO i=1,MAX_NAME_LEN
-          IF ( OutputFile(i:i) == ' ' ) EXIT
+        DO ii=1,MAX_NAME_LEN
+          IF ( OutputFile(ii:ii) == ' ' ) EXIT
         END DO
-        OutputFile(i:i) = '.'
-        WRITE( OutputFile(i+1:), '(a)' ) TRIM(i2s(ParEnv % MyPE))
+        OutputFile(ii:ii) = '.'
+        WRITE( OutputFile(ii+1:), '(a)' ) TRIM(i2s(ParEnv % MyPE))
       END IF
       
       BinaryOutput = ListGetLogical( CurrentModel % Simulation,'Binary Output',GotIt )
@@ -1590,47 +1592,47 @@ CONTAINS
           END IF
           
           EigAnal = .FALSE.
-          DO i=1,CurrentModel % NumberOfSolvers
-            IF ( ASSOCIATED( CurrentModel % Solvers(i) % Mesh, Mesh ) ) THEN
-              EigAnal = ListGetLogical( CurrentModel % Solvers(i) % Values, &
+          DO ii=1,CurrentModel % NumberOfSolvers
+            IF ( ASSOCIATED( CurrentModel % Solvers(ii) % Mesh, Mesh ) ) THEN
+              EigAnal = ListGetLogical( CurrentModel % Solvers(ii) % Values, &
                   'Eigen Analysis', GotIt )
-              EigAnal = EigAnal .OR. ListGetLogical( CurrentModel % Solvers(i) % Values, &
+              EigAnal = EigAnal .OR. ListGetLogical( CurrentModel % Solvers(ii) % Values, &
                   'Harmonic Analysis', GotIt )
               
               IF ( EigAnal ) THEN
-                Var => CurrentModel % Solvers(i) % Variable
+                Var => CurrentModel % Solvers(ii) % Variable
                 IF ( ASSOCIATED(Var % EigenValues) ) THEN
                   IF ( TotalTimesteps == 1 ) THEN
-                    DO j=1,CurrentModel % Solvers(i) % NOFEigenValues
-                      IF ( CurrentModel % Solvers(i) % Matrix % COMPLEX ) THEN
+                    DO jj=1,CurrentModel % Solvers(ii) % NOFEigenValues
+                      IF ( CurrentModel % Solvers(ii) % Matrix % COMPLEX ) THEN
 
-                        n = SIZE(Var % Values)/Var % DOFs
-                        DO k=1,n
-                          DO l=1,Var % DOFs/2
-                            q = Var % DOFs*(k-1)
-                            Var % Values(q+l) = REAL(Var % EigenVectors(j,q/2+l))
-                            Var % Values(q+l+Var % DOFs/2) = AIMAG(Var % EigenVectors(j,q/2+l))
+                        nn = SIZE(Var % Values)/Var % DOFs
+                        DO kk=1,nn
+                          DO ll=1,Var % DOFs/2
+                            qq = Var % DOFs*(kk-1)
+                            Var % Values(qq+ll) = REAL(Var % EigenVectors(jj,qq/2+ll))
+                            Var % Values(qq+ll+Var % DOFs/2) = AIMAG(Var % EigenVectors(jj,qq/2+ll))
                           END DO
                         END DO
                       ELSE
-                        Var % Values = REAL( Var % EigenVectors(j,:) )
+                        Var % Values = REAL( Var % EigenVectors(jj,:) )
                       END IF
                       SavedSteps = SaveResult( OutputName, Mesh, &
-                          j, sTime(1), BinaryOutput, SaveAll )
+                          jj, sTime(1), BinaryOutput, SaveAll )
                     END DO
                   ELSE
-                    j = MIN( CurrentStep, SIZE( Var % EigenVectors,1 ) )
-                    IF ( CurrentModel % Solvers(i) % Matrix % COMPLEX ) THEN
-                      n = SIZE(Var % Values)/Var % DOFs
-                      DO k=1,n
-                        DO l=1,Var % DOFs/2
-                          q = Var % DOFs*(k-1)
-                          Var % Values(q+l) = REAL(Var % EigenVectors(j,q/2+l))
-                          Var % Values(q+l+Var % DOFs/2) = AIMAG(Var % EigenVectors(j,q/2+l))
+                    jj = MIN( CurrentStep, SIZE( Var % EigenVectors,1 ) )
+                    IF ( CurrentModel % Solvers(ii) % Matrix % COMPLEX ) THEN
+                      nn = SIZE(Var % Values)/Var % DOFs
+                      DO kk=1,nn
+                        DO ll=1,Var % DOFs/2
+                          qq = Var % DOFs*(kk-1)
+                          Var % Values(qq+ll) = REAL(Var % EigenVectors(jj,qq/2+ll))
+                          Var % Values(qq+ll+Var % DOFs/2) = AIMAG(Var % EigenVectors(jj,qq/2+ll))
                         END DO
                       END DO
                     ELSE
-                      Var % Values = REAL(Var % EigenVectors(j,:))
+                      Var % Values = REAL(Var % EigenVectors(jj,:))
                     END IF
                     SavedSteps = SaveResult( OutputName, Mesh, &
                         CurrentStep, sTime(1), BinaryOutput, SaveAll )
@@ -1668,7 +1670,7 @@ CONTAINS
 !------------------------------------------------------------------------------
     TYPE(Variable_t), POINTER :: Var
     LOGICAL :: EigAnal = .FALSE., Found
-    INTEGER :: i, j,k,l,n,q,CurrentStep,nlen,timesteps,SavedEigenValues
+    INTEGER :: ii, jj,kk,ll,nn,qq,CurrentStep,nlen,timesteps,SavedEigenValues
     CHARACTER(LEN=MAX_NAME_LEN) :: Simul, SaveWhich
     
     Simul = ListGetString( CurrentModel % Simulation,  'Simulation Type' )
@@ -1676,11 +1678,11 @@ CONTAINS
     OutputFile = ListGetString( CurrentModel % Simulation,'Output File',GotIt )
     IF ( Gotit ) THEN
       IF ( ParEnv % PEs > 1 ) THEN
-        DO i=1,MAX_NAME_LEN
-          IF ( OutputFile(i:i) == ' ' ) EXIT
+        DO ii=1,MAX_NAME_LEN
+          IF ( OutputFile(ii:ii) == ' ' ) EXIT
         END DO
-        OutputFile(i:i) = '.'
-        WRITE( OutputFile(i+1:), '(a)' ) TRIM(i2s(ParEnv % MyPE))
+        OutputFile(ii:ii) = '.'
+        WRITE( OutputFile(ii+1:), '(a)' ) TRIM(i2s(ParEnv % MyPE))
       END IF
     END IF
     
@@ -1688,11 +1690,11 @@ CONTAINS
     IF( .NOT. GotIt ) RETURN
 
     IF ( ParEnv % PEs > 1 ) THEN
-      DO i=1,MAX_NAME_LEN
-        IF ( PostFile(i:i) == ' ' ) EXIT
+      DO ii=1,MAX_NAME_LEN
+        IF ( PostFile(ii:ii) == ' ' ) EXIT
       END DO
-      PostFile(i:i) = '.'
-      WRITE( PostFile(i+1:), '(a)' ) TRIM(i2s(ParEnv % MyPE))
+      PostFile(ii:ii) = '.'
+      WRITE( PostFile(ii+1:), '(a)' ) TRIM(i2s(ParEnv % MyPE))
     END IF
 
     ! Loop over all meshes
@@ -1735,37 +1737,37 @@ CONTAINS
         !------------------------------------------------
         EigAnal = .FALSE.
         timesteps = TotalTimeSteps
-        DO i=1,CurrentModel % NumberOfSolvers
-          IF (ASSOCIATED(CurrentModel % Solvers(i) % Mesh, Mesh)) THEN
+        DO ii=1,CurrentModel % NumberOfSolvers
+          IF (ASSOCIATED(CurrentModel % Solvers(ii) % Mesh, Mesh)) THEN
             EigAnal = ListGetLogical( CurrentModel % &
-                Solvers(i) % Values, 'Eigen Analysis', GotIt )
+                Solvers(ii) % Values, 'Eigen Analysis', GotIt )
             
             EigAnal = EigAnal .OR. ListGetLogical( CurrentModel % &
-                Solvers(i) % Values, 'Harmonic Analysis', GotIt )
+                Solvers(ii) % Values, 'Harmonic Analysis', GotIt )
             
             IF ( EigAnal ) timesteps = MAX( timesteps, &
-                CurrentModel % Solvers(i) % NOFEigenValues )
+                CurrentModel % Solvers(ii) % NOFEigenValues )
           END IF
         END DO
 
-        DO i=1,CurrentModel % NumberOfSolvers
-          IF (ASSOCIATED(CurrentModel % Solvers(i) % Mesh, Mesh)) THEN
+        DO ii=1,CurrentModel % NumberOfSolvers
+          IF (ASSOCIATED(CurrentModel % Solvers(ii) % Mesh, Mesh)) THEN
             EigAnal = ListGetLogical( CurrentModel % &
-                Solvers(i) % Values, 'Eigen Analysis', GotIt )
+                Solvers(ii) % Values, 'Eigen Analysis', GotIt )
             
             EigAnal = EigAnal .OR. ListGetLogical( CurrentModel % &
-                Solvers(i) % Values, 'Harmonic Analysis', GotIt )
+                Solvers(ii) % Values, 'Harmonic Analysis', GotIt )
             
             IF ( EigAnal ) THEN
-              SaveWhich = ListGetString( CurrentModel % Solvers(i) % Values, &
+              SaveWhich = ListGetString( CurrentModel % Solvers(ii) % Values, &
                   'Eigen and Harmonic Solution Output', Found )
               
-              SavedEigenValues = CurrentModel % Solvers(i) % NOFEigenValues
+              SavedEigenValues = CurrentModel % Solvers(ii) % NOFEigenValues
               IF( TotalTimesteps > 1 ) THEN
 !                SavedEiegnValues = MIN( CurrentStep, SIZE( Var % EigenVectors,1 ) )
               END IF
 
-              DO j=1, SavedEigenValues
+              DO jj=1, SavedEigenValues
                 Var => Mesh % Variables
                 DO WHILE(ASSOCIATED(Var))
                   IF ( .NOT. ASSOCIATED(Var % EigenValues) ) THEN
@@ -1773,34 +1775,34 @@ CONTAINS
                     CYCLE
                   END IF
                   
-                  IF ( CurrentModel % Solvers(i) % Matrix % COMPLEX ) THEN
+                  IF ( CurrentModel % Solvers(ii) % Matrix % COMPLEX ) THEN
                     IF(Var % DOFs==1) THEN
                       Var => Var % Next
                       CYCLE
                     END IF
 
-                    n = SIZE(Var % Values)/Var % DOFs
-                    DO k=1,n
-                      DO l=1,Var % DOFs/2
-                        q = Var % DOFs*(k-1)
-                        Var % Values(q+l) = REAL(Var % EigenVectors(j,q/2+l))
-                        Var % Values(q+l+Var % DOFs/2) = AIMAG(Var % EigenVectors(j,q/2+l))
+                    nn = SIZE(Var % Values)/Var % DOFs
+                    DO kk=1,nn
+                      DO ll=1,Var % DOFs/2
+                        qq = Var % DOFs*(kk-1)
+                        Var % Values(qq+ll) = REAL(Var % EigenVectors(jj,qq/2+ll))
+                        Var % Values(qq+ll+Var % DOFs/2) = AIMAG(Var % EigenVectors(jj,qq/2+ll))
                       END DO
                     END DO
 
                   ELSE
                     SELECT CASE( SaveWhich )
                     CASE('real part')
-                      Var % Values = Var % EigenVectors(j,:)
+                      Var % Values = Var % EigenVectors(jj,:)
                     CASE('imag part')
-                      Var % Values = AIMAG(Var % EigenVectors(j,:))
+                      Var % Values = AIMAG(Var % EigenVectors(jj,:))
                     CASE('abs value')
-                      Var % Values = ABS(Var % EigenVectors(j,:))
+                      Var % Values = ABS(Var % EigenVectors(jj,:))
                     CASE('phase angle')
-                      Var % Values = ATAN2(AIMAG(Var % EigenVectors(j,:)), &
-                          REAL(Var % EigenVectors(j,:)))
+                      Var % Values = ATAN2(AIMAG(Var % EigenVectors(jj,:)), &
+                          REAL(Var % EigenVectors(jj,:)))
                     CASE DEFAULT
-                      Var % CValues => Var % EigenVectors(j,:)
+                      Var % CValues => Var % EigenVectors(jj,:)
                     END SELECT
                   END IF
                   Var => Var % Next
@@ -1809,13 +1811,13 @@ CONTAINS
                 IF ( CurrentStep > 0 ) THEN
                   IF ( Mesh % SavesDone /= 0 ) THEN
                     IF( TotalTimeSteps == 1 ) THEN
-                      Mesh % SavesDone = j
+                      Mesh % SavesDone = jj
                     ELSE
                       Mesh % SavesDone = CurrentStep
                     END IF
                   END IF
                   CALL WritePostFile( PostName,OutputName, CurrentModel, &
-                      CurrentModel % Solvers(i) % NOFEigenValues, .TRUE. )
+                      CurrentModel % Solvers(ii) % NOFEigenValues, .TRUE. )
                 END IF
               END DO
               EXIT
