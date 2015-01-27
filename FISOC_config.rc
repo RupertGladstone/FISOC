@@ -24,6 +24,11 @@
   ISM_configFile:   someDir/someFile.sif
   ISM_name:         dummy
 
+  FISOC_ISM_ReqVars:  ISM_temperature_l0 ISM_temperature_l1 ISM_z_l0 ISM_z_l1
+  ISM_ReqVars:      
+  ISM_DerVars:        ISM_dTdz_l0 ISM_z_l0_previous
+
+
   OM_configFile:    someDir/someFile
   OM_name:          dummy
   

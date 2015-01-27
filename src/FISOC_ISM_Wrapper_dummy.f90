@@ -1,5 +1,5 @@
 
-MODULE FISOC_ElmerWrapper
+MODULE FISOC_ISM_Wrapper
 
   USE ESMF
   USE ElmerSolver_mod
@@ -68,4 +68,4 @@ CONTAINS
 
   END SUBROUTINE Elmer2ESMF_mesh
 
-END MODULE FISOC_ElmerWrapper
+END MODULE FISOC_ISM_Wrapper

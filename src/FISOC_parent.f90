@@ -6,6 +6,7 @@ MODULE  FISOC_parent_mod
   USE FISOC_ISM, ONLY : FISOC_ISM_register
   USE FISOC_coupler, ONLY : FISOC_coupler_register
   USE FISOC_OM, ONLY : FISOC_OM_register
+  USE FISOC_utils
   
   IMPLICIT NONE
   
@@ -64,21 +65,26 @@ CONTAINS
     INTEGER              :: petCount, localrc, urc
     LOGICAL              :: verbose_coupling
 
+
     rc = ESMF_FAILURE
 
     CALL ESMF_GridCompGet(FISOC_parent, config=config, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    
     IF (verbose_coupling) THEN
        PRINT*,""
        PRINT*,"************************************************************************************"
        PRINT*,"This is a verbose run, set by the verbose_coupling flag in the FISOC_config.rc file."
-       PRINT*,"(this affects only printing to screen, not writing to the log file(s)) "
+       PRINT*,"(this affects only printing to screen, not writing to the log file(s), which occurs "
+       PRINT*,"in any case)"
        PRINT*,"************************************************************************************"
        PRINT*,""
     END IF

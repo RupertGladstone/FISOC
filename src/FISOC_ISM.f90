@@ -1,7 +1,8 @@
 MODULE FISOC_ISM
   
   USE ESMF
-  USE FISOC_ElmerWrapper
+  USE FISOC_ISM_Wrapper
+  USE FISOC_utils
     
   IMPLICIT NONE
   
@@ -77,6 +78,11 @@ CONTAINS
     INTEGER,ALLOCATABLE    :: nodeOwners(:), nodeIds(:),elemIds(:), elemTypes(:), elemConn(:)
     REAL(ESMF_KIND_R8),ALLOCATABLE :: nodeCoords(:) 
 
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: ISM_ReqVarList(:)
+    CHARACTER(len=ESMF_MAXSTR) :: label
+
+
+
 !    real(ESMF_KIND_R8)        :: ownedNodeCoords(:)
 !    integer                   :: numOwnedElements
 !    logical                   :: isMemFreed
@@ -104,11 +110,17 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
+    label = 'FISOC_ISM_ReqVars:'
+    CALL FISOC_getStringListFromConfig(config, label, ISM_ReqVarList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     CALL ESMF_ConfigGetAttribute(config, ISM_meshFile, label='ISM_meshFile:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
-    CALL ESMF_ElmerInit(ISM_ExpFB,ISM_mesh,config)
+    CALL FISOC_ISM_Wrapper_Init(ISM_ExpFB,ISM_mesh,config)
 
 
     ! Note that currently only meshes on spherical coords can be read in from file.  So 
