@@ -57,55 +57,33 @@ CONTAINS
   ! initialised, to allow inter-component consistency checks or use of the OM 
   ! state to complete ISM initalisation.
   SUBROUTINE FISOC_ISM_init_phase1(FISOC_ISM, ISM_ImpSt, ISM_ExpSt, FISOC_clock, rc)
-    TYPE(ESMF_GridComp)    :: FISOC_ISM
-    TYPE(ESMF_State)       :: ISM_ImpSt, ISM_ExpSt
-    TYPE(ESMF_Clock)       :: FISOC_clock
-    INTEGER, INTENT(OUT)   :: rc
+    TYPE(ESMF_GridComp)        :: FISOC_ISM
+    TYPE(ESMF_State)           :: ISM_ImpSt, ISM_ExpSt
+    TYPE(ESMF_Clock)           :: FISOC_clock
+    INTEGER, INTENT(OUT)       :: rc
 
-    TYPE(ESMF_config)      :: config
-    TYPE(ESMF_mesh)        :: ISM_mesh
-    TYPE(ESMF_fieldBundle) :: ISM_ExpFB
+    TYPE(ESMF_config)          :: config
+    TYPE(ESMF_mesh)            :: ISM_mesh
+    TYPE(ESMF_fieldBundle)     :: ISM_ExpFB
     CHARACTER(len=ESMF_MAXSTR) :: ISM_meshFile
 
-    TYPE(ESMF_field)       :: ISM_temperature_l0, ISM_temperature_l1
-    TYPE(ESMF_field)       :: ISM_z_l0, ISM_z_l1
-    TYPE(ESMF_field)       :: ISM_dTdz_l0, ISM_z_l0_previous
+    TYPE(ESMF_field)           :: ISM_temperature_l0, ISM_temperature_l1
+    TYPE(ESMF_field)           :: ISM_z_l0, ISM_z_l1
+    TYPE(ESMF_field)           :: ISM_dTdz_l0, ISM_z_l0_previous
     REAL(ESMF_KIND_R8),POINTER :: ISM_temperature_l0_ptr(:),ISM_temperature_l1_ptr(:) 
     REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:),ISM_z_l1_ptr(:) 
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:),ISM_z_l0_previous_ptr(:) 
 
-    INTEGER                :: numNodes, numQuadElems, numTriElems, numTotElems
-    INTEGER,ALLOCATABLE    :: nodeOwners(:), nodeIds(:),elemIds(:), elemTypes(:), elemConn(:)
-    REAL(ESMF_KIND_R8),ALLOCATABLE :: nodeCoords(:) 
-
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: ISM_ReqVarList(:)
     CHARACTER(len=ESMF_MAXSTR) :: label
+    INTEGER                    :: ii
 
-
-
-!    real(ESMF_KIND_R8)        :: ownedNodeCoords(:)
-!    integer                   :: numOwnedElements
-!    logical                   :: isMemFreed
-!    type(ESMF_CoordSys_Flag)  :: coordSys
-!    integer                   :: parametricDim
-!    integer                   :: spatialDim
-!    type(ESMF_DistGrid)       :: nodalDistgrid
-!    type(ESMF_DistGrid)       :: elementDistgrid
-!    integer                   :: numOwnedNodes
-
-!    INTEGER :: fieldcount
 
     rc = ESMF_SUCCESS
 
     NULLIFY (ISM_temperature_l0_ptr,ISM_temperature_l1_ptr,ISM_z_l0_ptr, &
          ISM_z_l1_ptr,ISM_dTdz_l0_ptr,ISM_z_l0_previous_ptr)
 
-
-    msg = "ISM initialise started"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-       line=__LINE__, file=__FILE__, rc=rc)
-
-    ! Get mesh file name from the config file
     CALL ESMF_GridCompGet(FISOC_ISM, config=config, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__, rcToReturn=rc)) return
@@ -116,115 +94,17 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_ConfigGetAttribute(config, ISM_meshFile, label='ISM_meshFile:', rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+    DO ii = 1,SIZE(ISM_ReqVarList)
+       print*, "create ",ISM_ReqVarList(ii)
+    END DO
+
+    msg = "ISM initialise started"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
+
+print*,"create esmf fields here using elmer mesh in esmf format"
 
     CALL FISOC_ISM_Wrapper_Init(ISM_ExpFB,ISM_mesh,config)
-
-
-    ! Note that currently only meshes on spherical coords can be read in from file.  So 
-    ! here we use the subroutine interfaces to create simple mesh instead.
-  
-    ! Set number of nodes
-    numNodes=9
-
-    ! Allocate and fill the node id array.
-    allocate(nodeIds(numNodes))
-    nodeIds=(/1,2,3,4,5,6,7,8,9/) 
-
-    ! Allocate and fill node coordinate array.
-    ! Since this is a 2D Mesh the size is 2x the
-    ! number of nodes.
-    allocate(nodeCoords(2*numNodes))
-    nodeCoords=(/0.0,0.0,    & ! node id 1
-         1000000.0,0.0,      & ! node id 2
-         2000000.0,0.0,      & ! node id 3
-         0.0,20000.0,        & ! node id 4
-         1000000.0,20000.0,  & ! node id 5
-         2000000.0,20000.0,  & ! node id 6
-         0.0,40000.0,        & ! node id 7
-         1000000.0,40000.0,  & ! node id 8
-         2000000.0,40000.0 /)  ! node id 9
-    ! if node coords go from 0 to 2000000 and from 0 to 40000 then domain is 2000km by 40km    
-
-    ! Allocate and fill the node owner array.
-    ! Since this Mesh is all on PET 0, it's just set to all 0.
-    allocate(nodeOwners(numNodes))
-    nodeOwners=0 ! everything on PET 0
-
-    ! Set the number of each type of element, plus the total number.
-    numQuadElems=3
-    numTriElems=2
-    numTotElems=numQuadElems+numTriElems
-
-    ! Allocate and fill the element id array.
-    allocate(elemIds(numTotElems))
-    elemIds=(/1,2,3,4,5/) 
-
-    ! Allocate and fill the element topology type array.
-    allocate(elemTypes(numTotElems))
-    elemTypes=(/ESMF_MESHELEMTYPE_QUAD, & ! elem id 1
-         ESMF_MESHELEMTYPE_TRI,  & ! elem id 2
-         ESMF_MESHELEMTYPE_TRI,  & ! elem id 3
-         ESMF_MESHELEMTYPE_QUAD, & ! elem id 4
-         ESMF_MESHELEMTYPE_QUAD/)  ! elem id 5
-
-
-    ! Allocate and fill the element connection type array.
-    ! Note that entries in this array refer to the 
-    ! positions in the nodeIds, etc. arrays and that
-    ! the order and number of entries for each element
-    ! reflects that given in the Mesh options 
-    ! section for the corresponding entry
-    ! in the elemTypes array. The number of 
-    ! entries in this elemConn array is the
-    ! number of nodes in a quad. (4) times the 
-    ! number of quad. elements plus the number
-    ! of nodes in a triangle (3) times the number
-    ! of triangle elements. 
-    allocate(elemConn(4*numQuadElems+3*numTriElems))
-    elemConn=(/1,2,5,4, &  ! elem id 1
-         2,3,5,   &  ! elem id 2
-         3,6,5,   &  ! elem id 3
-         4,5,8,7, &  ! elem id 4
-         5,6,9,8/)   ! elem id 5
-
-    ! Create Mesh structure in 1 step
-    ISM_mesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
-         nodeIds=nodeIds, nodeCoords=nodeCoords, &
-         nodeOwners=nodeOwners, elementIds=elemIds,&
-         elementTypes=elemTypes, elementConn=elemConn, &
-         rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
-    
-    ! After the creation we are through with the arrays, so they may be
-    ! deallocated.
-    deallocate(nodeIds)
-    deallocate(nodeCoords)
-    deallocate(nodeOwners)
-    deallocate(elemIds)
-    deallocate(elemTypes)
-    deallocate(elemConn)
-    
-    ! At this point the mesh is ready to use. For example, as is 
-    ! illustrated here, to have a field created on it. Note that 
-    ! the Field only contains data for nodes owned by the current PET.
-    ! Please see Section "Create a Field from a Mesh" under Field
-    ! for more information on creating a Field on a Mesh. 
-!    field = ESMF_FieldCreate(mesh, ESMF_TYPEKIND_R8,  rc=localrc)
-
-! no longer creating mesh from file... currently ESMF will only do spherical coord meshes from file
-!    ! create ISM mesh and use it to create zeroed fields for the ISM import and export states
-!    ISM_mesh = ESMF_MeshCreate(filename=ISM_meshFile, &
-!            filetypeflag=ESMF_FILEFORMAT_ESMFMESH, &
-!            rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
 ! Note weakness: currently regridding in 2d instead of a 2d manifold in 3d space.
 

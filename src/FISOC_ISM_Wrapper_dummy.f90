@@ -2,70 +2,143 @@
 MODULE FISOC_ISM_Wrapper
 
   USE ESMF
-  USE ElmerSolver_mod
-  USE MainUtils
 
   IMPLICIT NONE
 
   PRIVATE
 
-  PUBLIC :: ESMF_ElmerInit,  ESMF_ElmerRun, ESMF_ElmerFinalize
-
-  ! Note that CurrentModel is shared through the Types module
+  PUBLIC :: FISOC_ISM_Wrapper_Init,  FISOC_ISM_Wrapper_Run, FISOC_ISM_Wrapper_Finalize
 
 CONTAINS
 
-  ! This initialisation wrapper aims to convert the Elmer mesh and required variables 
-  ! to the ESMF formats.  It also performs simple sanity/consistency checks.
-  SUBROUTINE ESMF_ElmerInit(ESMF_ElmerFieldBundle,ESMF_ElmerMesh,ESMF_ElmerConfig)
+  ! This dummy wrapper aims to create the dummy mesh and required variables 
+  ! in the ESMF formats.  
+  SUBROUTINE FISOC_ISM_Wrapper_Init(ESMF_dummyFieldBundle,ESMF_dummyMesh,ESMF_dummyConfig)
 
-    TYPE(ESMF_fieldBundle),INTENT(INOUT) :: ESMF_ElmerFieldBundle
-    TYPE(ESMF_mesh),INTENT(INOUT)        :: ESMF_ElmerMesh
-    TYPE(ESMF_config),INTENT(IN)         :: ESMF_ElmerConfig
+    TYPE(ESMF_fieldBundle),INTENT(INOUT) :: FISOC_dummyFieldBundle
+    TYPE(ESMF_mesh),INTENT(INOUT)        :: FISOC_dummyMesh
+    TYPE(ESMF_config),INTENT(IN)         :: FISOC_dummyConfig
 
-    TYPE(Mesh_t)                         :: Elmer_Mesh
 
-! get elmer input params, especially time stepping information
 
-! get elmer variables list, recieve esmf required variables list (from esmf_config?), 
-! check the elmer contains those variables
-! (use a look up table? or lookup table embedded in esmf config object?).
-
-!convert required variables to esmf format
-
-!store required vars with mesh in export state 
-
-!sanity checks: timestep size, number of time intervals to run for
-
-    CALL ElmerSolver_init(Elmer_Mesh) ! Intended to return the mesh prior to extrusion (need to add check for this mesh)
-
-    CALL Elmer2ESMF_mesh(Elmer_mesh,ESMF_ElmerMesh)
-
-!note: variables tobe input (basal melt rate) should be defined (perhaps as exported vars) in the 
-! sif.  These also to be checked for their presence against a list of required vars from ESMF
-
-  END SUBROUTINE ESMF_ElmerInit
+  END SUBROUTINE FISOC_ISM_Wrapper_Init
   
-  SUBROUTINE ESMF_ElmerRun()
+  SUBROUTINE FISOC_ISM_Wrapper_Run()
 
-! get hold of the elmer variables for receiving inputs, and convert them here from esmf to elmer type.
-    CALL ElmerSolver_run()
-! get hold of list of required variables from Elmer and convert them here from elmer to esmf type.
 
-  END SUBROUTINE ESMF_ElmerRun
+  END SUBROUTINE FISOC_ISM_Wrapper_Run
 
-  SUBROUTINE ESMF_ElmerFinalize()
+  SUBROUTINE FISOC_ISM_Wrapper_Finalize()
 
-    CALL ElmerSolver_finalize()
 
-  END SUBROUTINE ESMF_ElmerFinalize
+  END SUBROUTINE FISOC_ISM_Wrapper_Finalize
 
-  SUBROUTINE Elmer2ESMF_mesh(Elmer_mesh,ESMF_ElmerMesh)
-    TYPE(ESMF_mesh),INTENT(INOUT)        :: ESMF_ElmerMesh
-    TYPE(Mesh_t)                         :: Elmer_Mesh
 
-    print*,"need to convert the mesh here"
+  SUBROUTINE dummyCreateMesh(ESMF_dummyMesh)
+    
+    TYPE(ESMF_mesh),INTENT(INOUT)        :: ESMF_dummyMesh
+    
+    INTEGER,ALLOCATABLE    :: nodeOwners(:), nodeIds(:),elemIds(:), elemTypes(:), elemConn(:)
+    REAL(ESMF_KIND_R8),ALLOCATABLE :: nodeCoords(:) 
+    INTEGER                :: numNodes, numQuadElems, numTriElems, numTotElems
 
-  END SUBROUTINE Elmer2ESMF_mesh
+
+    ! Note that currently only meshes on spherical coords can be read in from file.  So 
+    ! here we use the subroutine interfaces to create simple mesh instead.
+  
+    ! Set number of nodes
+    numNodes=9
+
+    ! Allocate and fill the node id array.
+    allocate(nodeIds(numNodes))
+    nodeIds=(/1,2,3,4,5,6,7,8,9/) 
+
+    ! Allocate and fill node coordinate array.
+    ! Since this is a 2D Mesh the size is 2x the
+    ! number of nodes.
+    allocate(nodeCoords(2*numNodes))
+    nodeCoords=(/0.0,0.0,    & ! node id 1
+         1000000.0,0.0,      & ! node id 2
+         2000000.0,0.0,      & ! node id 3
+         0.0,20000.0,        & ! node id 4
+         1000000.0,20000.0,  & ! node id 5
+         2000000.0,20000.0,  & ! node id 6
+         0.0,40000.0,        & ! node id 7
+         1000000.0,40000.0,  & ! node id 8
+         2000000.0,40000.0 /)  ! node id 9
+    ! if node coords go from 0 to 2000000 and from 0 to 40000 then domain is 2000km by 40km    
+
+    ! Allocate and fill the node owner array.
+    ! Since this Mesh is all on PET 0, it's just set to all 0.
+    allocate(nodeOwners(numNodes))
+    nodeOwners=0 ! everything on PET 0
+
+    ! Set the number of each type of element, plus the total number.
+    numQuadElems=3
+    numTriElems=2
+    numTotElems=numQuadElems+numTriElems
+
+    ! Allocate and fill the element id array.
+    allocate(elemIds(numTotElems))
+    elemIds=(/1,2,3,4,5/) 
+
+    ! Allocate and fill the element topology type array.
+    allocate(elemTypes(numTotElems))
+    elemTypes=(/ESMF_MESHELEMTYPE_QUAD, & ! elem id 1
+         ESMF_MESHELEMTYPE_TRI,  & ! elem id 2
+         ESMF_MESHELEMTYPE_TRI,  & ! elem id 3
+         ESMF_MESHELEMTYPE_QUAD, & ! elem id 4
+         ESMF_MESHELEMTYPE_QUAD/)  ! elem id 5
+
+
+    ! Allocate and fill the element connection type array.
+    ! Note that entries in this array refer to the 
+    ! positions in the nodeIds, etc. arrays and that
+    ! the order and number of entries for each element
+    ! reflects that given in the Mesh options 
+    ! section for the corresponding entry
+    ! in the elemTypes array. The number of 
+    ! entries in this elemConn array is the
+    ! number of nodes in a quad. (4) times the 
+    ! number of quad. elements plus the number
+    ! of nodes in a triangle (3) times the number
+    ! of triangle elements. 
+    allocate(elemConn(4*numQuadElems+3*numTriElems))
+    elemConn=(/1,2,5,4, &  ! elem id 1
+         2,3,5,   &  ! elem id 2
+         3,6,5,   &  ! elem id 3
+         4,5,8,7, &  ! elem id 4
+         5,6,9,8/)   ! elem id 5
+
+    ! Create Mesh structure in 1 step
+    ISM_mesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
+         nodeIds=nodeIds, nodeCoords=nodeCoords, &
+         nodeOwners=nodeOwners, elementIds=elemIds,&
+         elementTypes=elemTypes, elementConn=elemConn, &
+         rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    
+    ! After the creation we are through with the arrays, so they may be
+    ! deallocated.
+    deallocate(nodeIds)
+    deallocate(nodeCoords)
+    deallocate(nodeOwners)
+    deallocate(elemIds)
+    deallocate(elemTypes)
+    deallocate(elemConn)
+    
+    ! At this point the mesh is ready to use. For example, as is 
+    ! illustrated here, to have a field created on it. Note that 
+    ! the Field only contains data for nodes owned by the current PET.
+    ! Please see Section "Create a Field from a Mesh" under Field
+    ! for more information on creating a Field on a Mesh. 
+!    field = ESMF_FieldCreate(mesh, ESMF_TYPEKIND_R8,  rc=localrc)
+
+
+
+  END SUBROUTINE dummyCreateMesh
 
 END MODULE FISOC_ISM_Wrapper
