@@ -52,17 +52,18 @@ include $(ESMFMKFILE)
 
 ################################################################################
 
-FISOC_caller: $(SRCDIR)/FISOC_caller.o $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_OM.o  $(SRCDIR)/FISOC_ISM.o $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o $(SRCDIR)/FISOC_coupler.o $(SRCDIR)/FISOC_utils.o $(ELMER_SO) 
+FISOC_caller: $(SRCDIR)/FISOC_caller.o $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_OM.o  $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o $(SRCDIR)/FISOC_ISM.o $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o $(SRCDIR)/FISOC_coupler.o $(SRCDIR)/FISOC_utils.o $(ELMER_SO) 
 	$(ESMF_F90LINKER) $(ESMF_F90LINKOPTS) $(ESMF_F90LINKPATHS) $(ESMF_F90LINKRPATHS) -o $@ $^ $(ESMF_F90ESMFLINKLIBS)  
-$(SRCDIR)/FISOC_caller.o:       $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_caller.f90
 
-$(SRCDIR)/FISOC_parent.o:       $(SRCDIR)/FISOC_parent.f90 $(SRCDIR)/FISOC_OM.o  $(SRCDIR)/FISOC_ISM.o $(SRCDIR)/FISOC_coupler.o
-$(SRCDIR)/FISOC_coupler.o:      $(SRCDIR)/FISOC_coupler.f90
-$(SRCDIR)/FISOC_ISM.o:          $(SRCDIR)/FISOC_ISM.f90 $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o $(SRCDIR)/FISOC_utils.o
-$(SRCDIR)/FISOC_OM.o:           $(SRCDIR)/FISOC_OM.f90
-$(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o:  $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).f90 $(SRCDIR)/FISOC_$(FISOC_ISM)_types.o
-$(SRCDIR)/FISOC_$(FISOC_ISM)_types.o:  $(SRCDIR)/FISOC_$(FISOC_ISM)_types.f90
-$(SRCDIR)/FISOC_utils.o:        $(SRCDIR)/FISOC_utils.f90
+$(SRCDIR)/FISOC_caller.o:                   $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_caller.f90
+$(SRCDIR)/FISOC_parent.o:                   $(SRCDIR)/FISOC_parent.f90 $(SRCDIR)/FISOC_OM.o  $(SRCDIR)/FISOC_ISM.o $(SRCDIR)/FISOC_coupler.o
+$(SRCDIR)/FISOC_coupler.o:                  $(SRCDIR)/FISOC_coupler.f90
+$(SRCDIR)/FISOC_ISM.o:                      $(SRCDIR)/FISOC_ISM.f90 $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o $(SRCDIR)/FISOC_utils.o
+$(SRCDIR)/FISOC_OM.o:                       $(SRCDIR)/FISOC_OM.f90 $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o  $(SRCDIR)/FISOC_utils.o
+$(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o: $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).f90 $(SRCDIR)/FISOC_$(FISOC_ISM)_types.o  $(SRCDIR)/FISOC_utils.o
+$(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o:   $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).f90  $(SRCDIR)/FISOC_utils.o
+$(SRCDIR)/FISOC_$(FISOC_ISM)_types.o:       $(SRCDIR)/FISOC_$(FISOC_ISM)_types.f90
+$(SRCDIR)/FISOC_utils.o:                    $(SRCDIR)/FISOC_utils.f90
 
 
 ################################################################################

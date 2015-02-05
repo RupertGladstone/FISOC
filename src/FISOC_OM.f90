@@ -1,6 +1,8 @@
 MODULE FISOC_OM
   
   USE ESMF
+  USE FISOC_utils
+  USE FISOC_OM_Wrapper
     
   IMPLICIT NONE
   
@@ -55,101 +57,45 @@ CONTAINS
     TYPE(ESMF_Clock)       :: FISOC_clock
     INTEGER, INTENT(OUT)   :: rc
 
-    REAL(ESMF_KIND_R8),POINTER :: coordY(:),coordX(:)
+    TYPE(ESMF_config)      :: config
     TYPE(ESMF_grid)        :: OM_grid
-    INTEGER                :: ii, jj, lbnd(1), ubnd(1)
-    TYPE(ESMF_field)       :: OM_dBdt_l0
+!    TYPE(ESMF_field)       :: OM_dBdt_l0
     TYPE(ESMF_fieldBundle) :: OM_ExpFB
-    REAL(ESMF_KIND_R8),POINTER :: OM_dBdt_l0_ptr(:,:)
+!    REAL(ESMF_KIND_R8),POINTER :: OM_dBdt_l0_ptr(:,:)
+
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: OM_ReqVarList(:)
+    CHARACTER(len=ESMF_MAXSTR) :: label
 
     rc = ESMF_FAILURE
 
-    NULLIFY (coordY,coordX,OM_dBdt_l0_ptr)
+    
+    msg = "OM initialise started"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
 
-    ! this next grid creation section is more or less a copy from the ref documentation example:
-    ! http://www.earthsystemmodeling.org/esmf_releases/public/last/ESMF_refdoc/node5.html#SECTION05083200000000000000
-    !-------------------------------------------------------------------
-    ! Create the Grid:  Allocate space for the Grid object, define the
-    ! topology and distribution of the Grid, and specify that it 
-    ! will have global indices.  Note that here aperiodic bounds are
-    ! specified by the argument name. In this call the minIndex hasn't 
-    ! been set, so it defaults to (1,1,...). The default is to 
-    ! divide the index range as equally as possible among the DEs
-    ! specified in regDecomp. This behavior can be changed by 
-    ! specifying decompFlag. 
-    !-------------------------------------------------------------------
-    OM_grid=ESMF_GridCreateNoPeriDim(          &
-         ! Define a regular distribution
-         maxIndex=(/11,6/), & ! define index space
-         !         regDecomp=(/2,3/),  & ! define how to divide among DEs
-         coordSys=ESMF_COORDSYS_CART, &
-         ! Specify mapping of coords dim to Grid dim
-         coordDep1=(/1/), & ! 1st coord is 1D and depends on 1st Grid dim
-         coordDep2=(/2/), & ! 2nd coord is 1D and depends on 2nd Grid dim
-         indexflag=ESMF_INDEX_GLOBAL, &
-         rc=rc)
-    
-    !-------------------------------------------------------------------
-    ! Allocate coordinate storage and associate it with the center
-    ! stagger location.  Since no coordinate values are specified in
-    ! this call no coordinate values are set yet.
-    !-------------------------------------------------------------------
-    CALL ESMF_GridAddCoord(OM_grid,  & 
-         staggerloc=ESMF_STAGGERLOC_CENTER, rc=rc)
-    
-    !-------------------------------------------------------------------
-    ! Get the pointer to the first coordinate array and the bounds
-    ! of its global indices on the local DE.   
-    !-------------------------------------------------------------------
-    CALL ESMF_GridGetCoord(OM_grid, coordDim=1, localDE=0, &
-         staggerloc=ESMF_STAGGERLOC_CENTER, &
-         computationalLBound=lbnd, computationalUBound=ubnd, &
-         farrayPtr=coordX, rc=rc)
-    
-    !-------------------------------------------------------------------
-    ! Calculate and set coordinates in the first dimension.
-    !-------------------------------------------------------------------
-    DO ii=lbnd(1),ubnd(1)
-       coordX(ii) = (ii-1)*180000.0
-    END DO
-    
-    !-------------------------------------------------------------------
-    ! Get the pointer to the second coordinate array and the bounds of
-    ! its global indices on the local DE.
-    !-------------------------------------------------------------------
-    CALL ESMF_GridGetCoord(OM_grid, coordDim=2, localDE=0, &
-         staggerloc=ESMF_STAGGERLOC_CENTER, &
-         computationalLBound=lbnd, computationalUBound=ubnd, &
-         farrayPtr=coordY, rc=rc)
-    
-    !-------------------------------------------------------------------
-    ! Calculate and set coordinates in the second dimension 
-    !-------------------------------------------------------------------
-    DO jj=lbnd(1),ubnd(1)
-       coordY(jj) = (jj-1)*10000.0
-    END DO
-    
-    OM_dBdt_l0 = ESMF_FieldCreate(OM_grid, typekind=ESMF_TYPEKIND_R8, name="OM_dBdt_l0", rc=rc)
+    ! extract a list of required ocean variables from the FISOC config object
+    CALL ESMF_GridCompGet(FISOC_OM, config=config, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=OM_dBdt_l0, localDe=0, farrayPtr=OM_dBdt_l0_ptr, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    OM_dBdt_l0_ptr(:,:) = 1.0
-
-    OM_ExpFB = ESMF_FieldBundleCreate(name="OM export fields", rc=rc)
+         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+    label = 'FISOC_OM_ReqVars:'
+    CALL FISOC_getStringListFromConfig(config, label, OM_ReqVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleAdd(OM_ExpFB, (/OM_dBdt_l0/), rc=rc)
+    ! create empty field bundle
+    OM_ExpFB = ESMF_FieldBundleCreate(name='OM export fields', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! we only add the field to the import state as a way of letting the coupler get hold of the 
+    ! model-specific initialisation
+    CALL FISOC_OM_Wrapper_Init(OM_ReqVarList,OM_ExpFB,OM_grid,config,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! we only add the OM field bundle to the import state as a way of letting the coupler get hold of the 
     ! grid.  There must be a better way to do this.
     CALL ESMF_StateAdd(OM_ImpSt, (/OM_ExpFB/), rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -161,7 +107,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    msg = "OM created grid and field and added field to import and export states"
+    msg = "OM initialise phase 1 complete"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 

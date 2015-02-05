@@ -2,6 +2,7 @@
 MODULE FISOC_ISM_Wrapper
 
   USE FISOC_Elmer_types
+  USE FISOC_utils
   USE ESMF
   USE ElmerSolver_mod
   USE MainUtils
@@ -14,49 +15,52 @@ MODULE FISOC_ISM_Wrapper
 
   CHARACTER(len=ESMF_MAXSTR) :: msg
 
-  INTEGER                    :: rc
-
   ! Note that CurrentModel is shared through the Types module
 
 CONTAINS
 
+  !--------------------------------------------------------------------------------------
   ! This initialisation wrapper aims to convert the Elmer mesh and required variables 
   ! to the ESMF formats.  It also performs simple sanity/consistency checks.
-  SUBROUTINE FISOC_ISM_Wrapper_Init(FISOC_ElmerFieldBundle,FISOC_ElmerMesh,FISOC_config)
+  SUBROUTINE FISOC_ISM_Wrapper_Init(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,FISOC_config,rc)
 
-    TYPE(ESMF_fieldBundle),INTENT(INOUT) :: FISOC_ElmerFieldBundle
-    TYPE(ESMF_mesh),INTENT(INOUT)        :: FISOC_ElmerMesh
-    TYPE(ESMF_config),INTENT(IN)         :: FISOC_config
+    TYPE(ESMF_config),INTENT(IN)          :: FISOC_config
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: ISM_ReqVarList(:)
 
-    TYPE(Mesh_t)                         :: Elmer_Mesh
+    TYPE(ESMF_mesh),INTENT(OUT)           :: ISM_mesh
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
+    TYPE(Mesh_t)                          :: Elmer_Mesh
 
-!double check that the sif really does specify to extrude the mesh, and that the non-extruded mesh really is 2d.
+! TODO:
+! -get access to the sif
+! -double check that the sif really does specify to extrude the mesh, and that the non-extruded mesh really is 2d.
+! -do some consistency checks between elmer and fisoc config files: time stepping mainly
+! -get elmer variables list, recieve esmf required variables list
+! -check the elmer contains those variables (also get Elmer names list from config for variable name checking
+! -convert required variables to esmf format (a new subroutine fr this, to be called in init and run)
+! -store required vars with mesh in export state (higher level wrapper can manage the states, here we just care about field bundles)
 
-!do some consistency checks between elmer and fisoc config files: time stepping mainly
-
-! get elmer input params, especially time stepping information
-
-! get elmer variables list, recieve esmf required variables list (from esmf_config?), 
-! check the elmer contains those variables
-! (use a look up table? or lookup table embedded in esmf config object?).
-
-!convert required variables to esmf format
-
-!store required vars with mesh in export state 
-
-!sanity checks: timestep size, number of time intervals to run for
-
-    CALL ElmerSolver_init(Elmer_Mesh) ! Intended to return the mesh prior to extrusion (need to add check for this mesh)
-
-    CALL Elmer2ESMF_mesh(Elmer_mesh,FISOC_ElmerMesh)
-
-!note: variables tobe input (basal melt rate) should be defined (perhaps as exported vars) in the 
+! note: variables tobe input to Elmer (basal melt rate) should be defined (perhaps as exported vars) in the 
 ! sif.  These also to be checked for their presence against a list of required vars from ESMF
+
+    CALL ElmerSolver_init(Elmer_Mesh) ! Intended to return the mesh prior to extrusion 
+
+    CALL Elmer2ESMF_mesh(Elmer_mesh,ISM_mesh)
+
+    CALL FISOC_populateFieldBundle(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   END SUBROUTINE FISOC_ISM_Wrapper_Init
   
+
+  !--------------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_Wrapper_Run()
+
+  INTEGER                    :: rc
 
 ! get hold of the elmer variables for receiving inputs, and convert them here from esmf to elmer type.
     CALL ElmerSolver_run()
@@ -64,11 +68,16 @@ CONTAINS
 
   END SUBROUTINE FISOC_ISM_Wrapper_Run
 
+
+  !--------------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_Wrapper_Finalize()
+
+  INTEGER                    :: rc
 
     CALL ElmerSolver_finalize()
 
   END SUBROUTINE FISOC_ISM_Wrapper_Finalize
+
 
   !------------------------------------------------------------------------------
   !
@@ -91,8 +100,9 @@ CONTAINS
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
     INTEGER                          :: numNodes, numQuadElems, numTriElems, numTotElems
 
+    INTEGER                          :: rc
 
-    msg = "Starting Elmer to ESMF mesh format conversion"
+    msg = "Elmer to ESMF mesh format conversion"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
          line=__LINE__, file=__FILE__)
 

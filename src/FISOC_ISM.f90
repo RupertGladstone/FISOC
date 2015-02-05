@@ -67,118 +67,62 @@ CONTAINS
     TYPE(ESMF_fieldBundle)     :: ISM_ExpFB
     CHARACTER(len=ESMF_MAXSTR) :: ISM_meshFile
 
-    TYPE(ESMF_field)           :: ISM_temperature_l0, ISM_temperature_l1
-    TYPE(ESMF_field)           :: ISM_z_l0, ISM_z_l1
-    TYPE(ESMF_field)           :: ISM_dTdz_l0, ISM_z_l0_previous
-    REAL(ESMF_KIND_R8),POINTER :: ISM_temperature_l0_ptr(:),ISM_temperature_l1_ptr(:) 
-    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:),ISM_z_l1_ptr(:) 
-    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:),ISM_z_l0_previous_ptr(:) 
+!    TYPE(ESMF_field)           :: ISM_temperature_l0, ISM_temperature_l1
+!    TYPE(ESMF_field)           :: ISM_z_l0, ISM_z_l1
+!    TYPE(ESMF_field)           :: ISM_dTdz_l0, ISM_z_l0_previous
+!    REAL(ESMF_KIND_R8),POINTER :: ISM_temperature_l0_ptr(:),ISM_temperature_l1_ptr(:) 
+!    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:),ISM_z_l1_ptr(:) 
+!    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:),ISM_z_l0_previous_ptr(:) 
 
-    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: ISM_ReqVarList(:)
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: ISM_ReqVarList(:),ISM_DerVarList(:)
     CHARACTER(len=ESMF_MAXSTR) :: label
     INTEGER                    :: ii
 
-
     rc = ESMF_SUCCESS
-
-    NULLIFY (ISM_temperature_l0_ptr,ISM_temperature_l1_ptr,ISM_z_l0_ptr, &
-         ISM_z_l1_ptr,ISM_dTdz_l0_ptr,ISM_z_l0_previous_ptr)
-
-    CALL ESMF_GridCompGet(FISOC_ISM, config=config, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-
-    label = 'FISOC_ISM_ReqVars:'
-    CALL FISOC_getStringListFromConfig(config, label, ISM_ReqVarList,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    DO ii = 1,SIZE(ISM_ReqVarList)
-       print*, "create ",ISM_ReqVarList(ii)
-    END DO
 
     msg = "ISM initialise started"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
-print*,"create esmf fields here using elmer mesh in esmf format"
-
-    CALL FISOC_ISM_Wrapper_Init(ISM_ExpFB,ISM_mesh,config)
-
-! Note weakness: currently regridding in 2d instead of a 2d manifold in 3d space.
-
-    ISM_temperature_l0 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, name="ISM_temperature_l0", rc=rc)
+    ! extract a list of required ISM variables from the FISOC config object
+    CALL ESMF_GridCompGet(FISOC_ISM, config=config, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+    label = 'FISOC_ISM_ReqVars:'
+    CALL FISOC_getStringListFromConfig(config, label, ISM_ReqVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=ISM_temperature_l0, localDe=0, farrayPtr=ISM_temperature_l0_ptr, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ISM_temperature_l0_ptr(:) = -1.0
-    ISM_temperature_l0_ptr(1) = -10.0
-
-    ISM_temperature_l1 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, name="ISM_temperature_l1", rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=ISM_temperature_l1, localDe=0, farrayPtr=ISM_temperature_l1_ptr, rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ISM_temperature_l1_ptr(:) = -1.1
-    
-    ISM_z_l0 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, name="ISM_z_l0", rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ISM_z_l0_ptr(:) = -100.0
-    
-    ISM_z_l1 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, name="ISM_z_l1", rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=ISM_z_l1, localDe=0, farrayPtr=ISM_z_l1_ptr, rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ISM_z_l1_ptr(:) = -75.0
-    
-    ISM_dTdz_l0 = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, name="ISM_dTdz_l0", rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=ISM_dTdz_l0, localDe=0, farrayPtr=ISM_dTdz_l0_ptr, rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ISM_dTdz_l0_ptr(:) = 0.0
-    
-    ISM_z_l0_previous = ESMF_FieldCreate(ISM_mesh, typekind=ESMF_TYPEKIND_R8, name="ISM_z_l0_previous", rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=ISM_z_l0_previous, localDe=0, farrayPtr=ISM_z_l0_previous_ptr, rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ISM_z_l0_previous_ptr(:) = ISM_z_l0_ptr(:)
-    
-    msg = "ISM created mesh and fields"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-       line=__LINE__, file=__FILE__, rc=rc)
-
-    ISM_ExpFB = ESMF_FieldBundleCreate(name="ISM export fields", rc=rc)
+    label = 'FISOC_ISM_DerVars:' ! also derived ISM variables
+    CALL FISOC_getStringListFromConfig(config, label, ISM_DerVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_temperature_l0/), rc=rc)
+    ! create empty field bundle
+    ISM_ExpFB = ESMF_FieldBundleCreate(name='ISM export fields', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_temperature_l1/), rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ! model-specific initialisation
+    CALL FISOC_ISM_Wrapper_Init(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,config,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_z_l0/), rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ! The model-specific initialisation added the ISM vars to the field bundle, 
+    ! and here we add non-model-specific derived variables. 
+    CALL FISOC_populateFieldBundle(ISM_DerVarList,ISM_ExpFB,ISM_mesh,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_z_l1/), rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_dTdz_l0/), rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL ESMF_FieldBundleAdd(ISM_ExpFB, (/ISM_z_l0_previous/), rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-
+    ! Calculate values for derived variables from the model-specific ISM vars.
     CALL FISOC_ISM_calcDerivedFields(ISM_ExpFB,config,rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! we only add the fields to the import state as a way of letting the coupler get hold of the 
     ! grid.  There must be a better way to do this.
@@ -192,7 +136,7 @@ print*,"create esmf fields here using elmer mesh in esmf format"
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    msg = "ISM bundled fields and added to import and export states"
+    msg = "ISM initialise phase 1 complete"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 

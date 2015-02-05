@@ -252,6 +252,9 @@ PROGRAM FISOC_main
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   
+  msg = "FISOC finished"  
+  CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
   CALL ESMF_Finalize()
 
 END PROGRAM FISOC_main

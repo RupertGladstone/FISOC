@@ -68,8 +68,8 @@ CONTAINS
     TYPE(ESMF_fieldBundle)        :: ISM_ExpFB, OM_ExpFB, OM_ImpFB
     TYPE(ESMF_grid)               :: OM_grid
     TYPE(ESMF_mesh)               :: ISM_mesh
-    TYPE(ESMF_config)             :: config
-    CHARACTER(len=ESMF_MAXSTR)    :: ISM_name, OM_name, fieldName
+!    TYPE(ESMF_config)             :: config
+    CHARACTER(len=ESMF_MAXSTR)    :: fieldName
     INTEGER                       :: ISM_ExpFieldCount, OM_ExpFieldCount, ii
     TYPE(ESMF_Field),ALLOCATABLE  :: ISM_ExpFieldList(:), OM_ImpFieldList(:), OM_ExpFieldList(:)
     TYPE(ESMF_RouteHandle)        :: ISM2OM_regridRouteHandle
@@ -81,19 +81,11 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-    ! Establish which ISM and OM components we are using (probably not used, but provides
-    ! an example of accessing the config)
-    CALL ESMF_cplCompGet(FISOC_coupler, config=config, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL ESMF_ConfigGetAttribute(config, ISM_name, label='ISM_name:', rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL ESMF_ConfigGetAttribute(config, OM_name, label='OM_name:', rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-
+!    ! access to config may be required
+!    CALL ESMF_cplCompGet(FISOC_coupler, config=config, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Extract ISM field bundle for regridding...
     CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
@@ -137,7 +129,6 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
     
     msg = "coupler extracted OM fields from OM import state"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
@@ -221,8 +212,7 @@ CONTAINS
 
     ! create empty OM_ImpFB field bundle. We will create fields corresponding to the ISM export field 
     ! names in this bundle, use the OM grid to regrid the ISM export fields onto the newly created OM 
-    ! import fields, then add the bundle to the OM imprt state 
-! or create from field list after regridding...***
+    ! import fields, then add the bundle to the OM import state 
 
     ALLOCATE(OM_ImpFieldList(ISM_ExpFieldCount))
 
@@ -290,8 +280,8 @@ CONTAINS
     TYPE(ESMF_fieldBundle)        :: ISM_ExpFB, OM_ExpFB, ISM_ImpFB
     TYPE(ESMF_grid)               :: OM_grid
     TYPE(ESMF_mesh)               :: ISM_mesh
-    TYPE(ESMF_config)             :: config
-    CHARACTER(len=ESMF_MAXSTR)    :: ISM_name, OM_name, fieldName
+!    TYPE(ESMF_config)             :: config
+    CHARACTER(len=ESMF_MAXSTR)    :: fieldName
     INTEGER                       :: ISM_ExpFieldCount, OM_ExpFieldCount, ii
     TYPE(ESMF_Field),ALLOCATABLE  :: ISM_ExpFieldList(:), ISM_ImpFieldList(:), OM_ExpFieldList(:)
     TYPE(ESMF_RouteHandle)        :: OM2ISM_regridRouteHandle
@@ -300,10 +290,10 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-    CALL ESMF_cplCompGet(FISOC_coupler, config=config, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    CALL ESMF_cplCompGet(FISOC_coupler, config=config, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Extract OM field bundle for regridding...
     CALL ESMF_StateGet(OM_ExpSt, "OM export fields", OM_ExpFB, rc=rc)
@@ -380,7 +370,6 @@ CONTAINS
     CALL ESMF_FieldRegridStore(OM_ExpFieldList(1), ISM_ExpFieldList(1), &
          regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
-!         name="OM2ISM_regridRouteHandle", &
          routehandle=OM2ISM_regridRouteHandle, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &

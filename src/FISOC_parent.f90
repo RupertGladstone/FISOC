@@ -78,7 +78,6 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    
     IF (verbose_coupling) THEN
        PRINT*,""
        PRINT*,"************************************************************************************"
