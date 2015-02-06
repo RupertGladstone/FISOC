@@ -164,80 +164,45 @@ CONTAINS
 
   !------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_run(FISOC_ISM, ISM_ImpSt, ISM_ExpSt, FISOC_clock, rc)
-    TYPE(ESMF_GridComp)  :: FISOC_ISM
-    TYPE(ESMF_State)     :: ISM_ImpSt, ISM_ExpSt
-    TYPE(ESMF_Clock)     :: FISOC_clock
-    INTEGER              :: petCount
-    INTEGER, INTENT(OUT) :: rc
+    TYPE(ESMF_GridComp)    :: FISOC_ISM
+    TYPE(ESMF_State)       :: ISM_ImpSt, ISM_ExpSt
+    TYPE(ESMF_Clock)       :: FISOC_clock
+    INTEGER                :: petCount
+    INTEGER, INTENT(OUT)   :: rc
     
+    TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
     LOGICAL                :: verbose_coupling
     TYPE(ESMF_config)      :: config
-    TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
-    TYPE(ESMF_field)       :: OM_dBdt_l0, ISM_z_l0, ISM_z_l1
-    TYPE(ESMF_fieldBundle) :: OM_FB
-    REAL(ESMF_KIND_R8),POINTER :: OM_dBdt_l0_ptr(:),ISM_z_l0_ptr(:),ISM_z_l1_ptr(:)
-
 
     rc = ESMF_FAILURE
 
+    ! query the FISOC config
     CALL ESMF_GridCompGet(FISOC_ISM, config=config, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
     CALL ESMF_ConfigGetAttribute(config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    ! extract field bundles from import and export states to send to model-specific wrapper
 
     CALL ESMF_StateGet(ISM_ImpSt, "ISM import fields", ISM_ImpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-    
-    CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldName="OM_dBdt_l0", field=OM_dBdt_l0, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
-    CALL ESMF_FieldGet(field=OM_dBdt_l0, localDe=0, farrayPtr=OM_dBdt_l0_ptr, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    IF (verbose_coupling) THEN
-       PRINT*,"ISM run phase. Lets just adjust depth coords according to basal melt rate from ocean."
-       PRINT*,"Melt rates dont look quite right on the ISM mesh, needs checking..."
-       PRINT*,OM_dBdt_l0_ptr
-    END IF
 
     CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
+    CALL FISOC_ISM_Wrapper_Run(ISM_ImpFB,ISM_ExpFB,config,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l1", field=ISM_z_l1, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     
-    CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=ISM_z_l1, localDe=0, farrayPtr=ISM_z_l1_ptr, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    ISM_z_l0_ptr = ISM_z_l0_ptr + OM_dBdt_l0_ptr
-    ISM_z_l1_ptr = ISM_z_l1_ptr + OM_dBdt_l0_ptr
-
     msg = "ISM run complete for current timestep"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)

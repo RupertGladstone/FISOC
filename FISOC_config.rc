@@ -20,26 +20,25 @@
  #    300     3000     295.8
  #  ::
 
-  ISM_meshFile:     longThinMIS.nc
-  ISM_configFile:   someDir/someFile.sif
-  ISM_name:         dummy
-
-  FISOC_ISM_ReqVars:  ISM_temperature_l0 ISM_temperature_l1 ISM_z_l0 ISM_z_l1
+  ISM_meshFile:      longThinMIS.nc
+  ISM_configFile:    someDir/someFile.sif
+  FISOC_ISM_ReqVars: ISM_temperature_l0 ISM_temperature_l1 ISM_z_l0 ISM_z_l1
   ISM_ReqVars:      
-  ISM_DerVars:        ISM_dTdz_l0 ISM_z_l0_previous
+  FISOC_ISM_DerVars: ISM_dTdz_l0 ISM_z_l0_previous
 
+  OM_configFile:     someDir/someFile
+  FISOC_OM_ReqVars:  OM_dBdt_l0
+  OM_ReqVars:      
+  FISOC_OM_DerVars:        
 
-  OM_configFile:    someDir/someFile
-  OM_name:          dummy
-  
-  OM_dt_sec:        200000   
-  dt_ratio:         4 
-  start_year:       2010
-  start_month:      1
-  end_year:         2010
-  end_month:        2
+  OM_dt_sec:         200000   
+  dt_ratio:          4 
+  start_year:        2010
+  start_month:       1
+  end_year:          2010
+  end_month:         2
 
-!  verbose_coupling: .FALSE.
-     verbose_coupling: .TRUE.
+  verbose_coupling:  .FALSE.
+!  verbose_coupling:  .TRUE.
 
 
