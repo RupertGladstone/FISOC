@@ -10,8 +10,6 @@ MODULE FISOC_ISM_Wrapper
 
   PUBLIC :: FISOC_ISM_Wrapper_Init,  FISOC_ISM_Wrapper_Run, FISOC_ISM_Wrapper_Finalize
 
-  CHARACTER(len=ESMF_MAXSTR) :: msg
-
 CONTAINS
 
   !--------------------------------------------------------------------------------------

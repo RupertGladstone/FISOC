@@ -444,7 +444,7 @@ CONTAINS
   
 
   !------------------------------------------------------------------------------
-  SUBROUTINE FISOC_coupler_run_phase1(FISOC_coupler, ISM_ExpSt, OM_ImpSt, FISOC_clock, rc)
+  SUBROUTINE FISOC_coupler_run_phase2(FISOC_coupler, ISM_ExpSt, OM_ImpSt, FISOC_clock, rc)
     TYPE(ESMF_CplComp)     :: FISOC_coupler
     TYPE(ESMF_State)       :: ISM_ExpSt, OM_ImpSt
     TYPE(ESMF_Clock)       :: FISOC_clock
@@ -571,11 +571,11 @@ CONTAINS
 
     rc = ESMF_SUCCESS
 
-  END SUBROUTINE FISOC_coupler_run_phase1
+  END SUBROUTINE FISOC_coupler_run_phase2
 
 
   !------------------------------------------------------------------------------
-  SUBROUTINE FISOC_coupler_run_phase2(FISOC_coupler, OM_ExpSt, ISM_ImpSt, FISOC_clock, rc)
+  SUBROUTINE FISOC_coupler_run_phase1(FISOC_coupler, OM_ExpSt, ISM_ImpSt, FISOC_clock, rc)
     TYPE(ESMF_CplComp)     :: FISOC_coupler
     TYPE(ESMF_State)       :: OM_ExpSt, ISM_ImpSt
     TYPE(ESMF_Clock)       :: FISOC_clock
@@ -702,7 +702,7 @@ CONTAINS
 
     rc = ESMF_SUCCESS
     
-  END SUBROUTINE FISOC_coupler_run_phase2
+  END SUBROUTINE FISOC_coupler_run_phase1
 
 
   !------------------------------------------------------------------------------

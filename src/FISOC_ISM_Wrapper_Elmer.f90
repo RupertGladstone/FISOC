@@ -13,8 +13,6 @@ MODULE FISOC_ISM_Wrapper
 
   PUBLIC :: FISOC_ISM_Wrapper_Init,  FISOC_ISM_Wrapper_Run, FISOC_ISM_Wrapper_Finalize
 
-  CHARACTER(len=ESMF_MAXSTR) :: msg
-
   ! Note that CurrentModel is shared through the Types module
 
 CONTAINS
@@ -58,9 +56,20 @@ CONTAINS
   
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Run()
+  SUBROUTINE FISOC_ISM_Wrapper_Run(ISM_ImpFB,ISM_ExpFB,config,rc)
 
-  INTEGER                    :: rc
+    TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
+    TYPE(ESMF_config)      :: config
+
+    INTEGER,INTENT(OUT),OPTIONAL :: rc
+
+    TYPE(ESMF_field)             :: OM_dBdt_l0, ISM_z_l0, ISM_z_l1
+    REAL(ESMF_KIND_R8),POINTER   :: OM_dBdt_l0_ptr(:),ISM_z_l0_ptr(:),ISM_z_l1_ptr(:)
+    LOGICAL                      :: verbose_coupling
+
+    rc = ESMF_FAILURE
+
+! make sure to run only one timestep
 
 ! get hold of the elmer variables for receiving inputs, and convert them here from esmf to elmer type.
     CALL ElmerSolver_run()

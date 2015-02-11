@@ -2,7 +2,7 @@
 PROGRAM FISOC_main
 
   USE ESMF
-
+  USE FISOC_utils
   USE FISOC_parent_mod, ONLY : FISOC_parent_register
 
   IMPLICIT NONE
@@ -14,15 +14,15 @@ PROGRAM FISOC_main
   ! code and passed through ESMF) 
   INTEGER :: rc, urc
   INTEGER :: fileunit
-  CHARACTER(len=ESMF_MAXSTR) :: msg
 
   ! Timekeeping
   TYPE(ESMF_Clock)        :: FISOC_clock
   INTEGER                 :: ISM_dt_sec, OM_dt_sec, dt_ratio
   INTEGER                 :: start_year, end_year, start_month, end_month
+  INTEGER                 :: OM_outputInterval
   TYPE(ESMF_TimeInterval) :: ISM_dt, OM_dt
   TYPE(ESMF_Time)         :: startTime, endTime
-  TYPE(ESMF_Alarm)        :: alarm_OM, alarm_ISM
+  TYPE(ESMF_Alarm)        :: alarm_OM, alarm_OM_output, alarm_ISM, alarm_ISM_exportAvailable
   LOGICAL                 :: tight_coupling
 
   ! A parent gridded component is used to support the hierarchical approach  
@@ -141,7 +141,10 @@ PROGRAM FISOC_main
        line=__LINE__, file=__FILE__, rcToReturn=rc)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-  ISM_dt_sec = OM_dt_sec * dt_ratio
+  CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt_sec, 'ISM_dt_sec',rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   CALL ESMF_ConfigGetAttribute(FISOC_config, start_month, label='start_month:', rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -163,6 +166,18 @@ PROGRAM FISOC_main
        line=__LINE__, file=__FILE__, rcToReturn=rc)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+  CALL ESMF_ConfigGetAttribute(FISOC_config, OM_outputInterval, label='OM_outputInterval:', rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+  
+  IF (MOD(dt_ratio,OM_outputInterval).NE.0) THEN
+     msg = "ERROR: dt_ratio/OM_outputInterval is required to be integer"
+     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+          line=__LINE__, file=__FILE__, rc=rc)
+     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+  END IF
+  
   !
   !------------------------------------------------------------------------------
   ! setting up clocks and alarms
@@ -184,14 +199,22 @@ PROGRAM FISOC_main
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
 
   alarm_OM = ESMF_AlarmCreate(clock=FISOC_clock, name="alarm_OM", &
+       ringTime=startTime, ringInterval=OM_dt*OM_outputInterval, rc=rc)
+  IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
+
+  alarm_OM_output = ESMF_AlarmCreate(clock=FISOC_clock, name="alarm_OM_output", &
        ringTime=startTime, ringInterval=OM_dt, rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
 
   alarm_ISM = ESMF_AlarmCreate(clock=FISOC_clock, name="alarm_ISM", &
-       ringTime=startTime, ringInterval=ISM_dt, rc=rc)
+       ringTime=((startTime+ISM_dt)-OM_dt), ringInterval=ISM_dt, rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
   
-
+  alarm_ISM_exportAvailable = ESMF_AlarmCreate(clock=FISOC_clock, &
+       name="alarm_ISM_exportAvailable", &
+       ringTime=(startTime+ISM_dt), ringInterval=ISM_dt, rc=rc)
+  IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
+  
   msg = "created and initialised clocks and alarms"  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)

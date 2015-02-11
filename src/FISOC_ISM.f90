@@ -10,8 +10,6 @@ MODULE FISOC_ISM
   
   PUBLIC FISOC_ISM_register
   
-  CHARACTER(len=ESMF_MAXSTR) :: msg
-
 CONTAINS
   
   !------------------------------------------------------------------------------

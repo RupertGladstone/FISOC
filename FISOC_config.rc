@@ -31,6 +31,7 @@
   OM_ReqVars:      
   FISOC_OM_DerVars:        
 
+  OM_outputInterval: 2
   OM_dt_sec:         200000   
   dt_ratio:          4 
   start_year:        2010
@@ -38,7 +39,7 @@
   end_year:          2010
   end_month:         2
 
-  verbose_coupling:  .FALSE.
-!  verbose_coupling:  .TRUE.
+!  verbose_coupling:  .FALSE.
+  verbose_coupling:  .TRUE.
 
 

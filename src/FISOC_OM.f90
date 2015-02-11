@@ -10,8 +10,6 @@ MODULE FISOC_OM
   
   PUBLIC FISOC_OM_register
     
-  CHARACTER(len=ESMF_MAXSTR) :: msg
-
 CONTAINS
   
   SUBROUTINE FISOC_OM_register(FISOC_OM, rc)
@@ -60,7 +58,7 @@ CONTAINS
     TYPE(ESMF_config)      :: config
     TYPE(ESMF_grid)        :: OM_grid
 !    TYPE(ESMF_field)       :: OM_dBdt_l0
-    TYPE(ESMF_fieldBundle) :: OM_ExpFB
+    TYPE(ESMF_fieldBundle) :: OM_ExpFB,OM_ExpFBcum
 !    REAL(ESMF_KIND_R8),POINTER :: OM_dBdt_l0_ptr(:,:)
 
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: OM_ReqVarList(:)
@@ -89,8 +87,23 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    OM_ExpFBcum = ESMF_FieldBundleCreate(name='OM export field cumulator', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     ! model-specific initialisation
     CALL FISOC_OM_Wrapper_Init(OM_ReqVarList,OM_ExpFB,OM_grid,config,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL FISOC_initCumulatorFB(OM_ExpFB,OM_ExpFBcum,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL FISOC_zeroBundle(OM_ExpFBcum,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -103,6 +116,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_StateAdd(OM_ExpSt, (/OM_ExpFB/), rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_StateAdd(OM_ExpSt, (/OM_ExpFBcum/), rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -190,11 +208,9 @@ CONTAINS
     TYPE(ESMF_Clock)       :: FISOC_clock
     INTEGER, INTENT(OUT)   :: rc
 
-    TYPE(ESMF_fieldbundle) :: OM_ImpFB, OM_ExpFB
-    TYPE(ESMF_field)       :: ISM_dTdz_l0,ISM_z_l0, OM_dBdt_l0
-    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)
+    TYPE(ESMF_fieldbundle) :: OM_ImpFB, OM_ExpFB, OM_ExpFBcum
     TYPE(ESMF_config)      :: config
-    TYPE(ESMF_Alarm)       :: alarm_ISM
+    TYPE(ESMF_Alarm)       :: alarm_OM_output, alarm_ISM, alarm_ISM_exportAvailable
     LOGICAL                :: verbose_coupling
 
     rc = ESMF_FAILURE
@@ -214,64 +230,82 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    IF (ESMF_AlarmIsRinging(alarm_ISM, rc=rc)) THEN
-       IF (verbose_coupling) THEN
-          PRINT*,""
-          PRINT*,"We are in the OM run phase and ISM alarm is ringing.  Thus we expect "
-          PRINT*,"to find updated ISM fields in the OM import state."
-          PRINT*,""
-       END IF
-
-       ! Lets get pointers to the depth of the ice base and the temperature gradient.  These we 
-       ! get fromthe OM import state, which contains the ISM export fields on the ocean grid.
-       CALL ESMF_StateGet(OM_ImpSt, "OM import fields", OM_ImpFB, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-       
-       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
-       CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_dTdz_l0", field=ISM_dTdz_l0, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
-       CALL ESMF_FieldGet(field=ISM_dTdz_l0, localDe=0, farrayPtr=ISM_dTdz_l0_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-    ELSE
-       IF (verbose_coupling) THEN
-          PRINT*,""
-          PRINT*,"We are in the OM run phase and ISM alarm is not ringing."
-          PRINT*,""
-       END IF
-    END IF
-
-
-    ! Lets get a pointer to the basal melt rate.  This we get from the OM export state, which 
-    ! contains the OM variables to be exported to the ISM.
-    CALL ESMF_StateGet(OM_ExpSt, "OM export fields", OM_ExpFB, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-    
-    CALL ESMF_FieldBundleGet(OM_ExpFB, fieldName="OM_dBdt_l0", field=OM_dBdt_l0, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
-    CALL ESMF_FieldGet(field=OM_dBdt_l0, localDe=0, farrayPtr=OM_dBdt_l0_ptr, rc=rc)
+    CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_ISM_exportAvailable", alarm_ISM_exportAvailable, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_OM_output", alarm_OM_output, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Decide how to call OM run wrapper depending on relevant alarms
+    OM_output: IF (ESMF_AlarmIsRinging(alarm_OM_output, rc=rc)) THEN
+
+       CALL ESMF_StateGet(OM_ExpSt, "OM export fields", OM_ExpFB, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+       ISM_exportAvailable: IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN
+
+          CALL ESMF_StateGet(OM_ImpSt, "OM import fields", OM_ImpFB, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+          
+          CALL FISOC_OM_Wrapper_Run(config,OM_ExpFB=OM_ExpFB,OM_ImpFB=OM_ImpFB,rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+          CALL ESMF_AlarmRingerOff(alarm_ISM_exportAvailable, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+       ELSE
+          CALL FISOC_OM_Wrapper_Run(config,OM_ExpFB=OM_ExpFB,rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
+       END IF ISM_exportAvailable
+
+    ELSE
+       CALL FISOC_OM_Wrapper_Run(config,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)           
+    END IF OM_output
+    
+    ! cumulate the outputs if we have new outputs from the OM this step
+    OM_cumulate: IF (ESMF_AlarmIsRinging(alarm_OM_output)) THEN
+       CALL ESMF_StateGet(OM_ExpSt, "OM export field cumulator", OM_ExpFBcum, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+       
+       CALL FISOC_cumulateFB(OM_ExpFB,OM_ExpFBcum,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+       ! ...and process the cumulated outputs if this is an ISM step
+       IF (ESMF_AlarmIsRinging(alarm_ISM)) THEN
+          CALL FISOC_processCumulator(OM_ExpFB,OM_ExpFBcum,config,rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+       END IF
+
+       CALL ESMF_AlarmRingerOff(alarm_OM_output, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+       
+    END IF OM_cumulate
+    
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_OM_run
