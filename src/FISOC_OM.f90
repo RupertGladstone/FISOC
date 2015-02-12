@@ -65,7 +65,6 @@ CONTAINS
     CHARACTER(len=ESMF_MAXSTR) :: label
 
     rc = ESMF_FAILURE
-
     
     msg = "OM initialise started"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
@@ -74,7 +73,8 @@ CONTAINS
     ! extract a list of required ocean variables from the FISOC config object
     CALL ESMF_GridCompGet(FISOC_OM, config=FISOC_config, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     label = 'FISOC_OM_ReqVars:'
     CALL FISOC_getStringListFromConfig(FISOC_config, label, OM_ReqVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &

@@ -20,11 +20,6 @@ CONTAINS
     
     rc = ESMF_FAILURE
 
-!    CALL ESMF_GridCompSetEntryPoint(FISOC_ISM, ESMF_METHOD_INITIALIZE, &
-!         userRoutine=FISOC_ISM_init, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) RETURN
-    
     CALL ESMF_GridCompSetEntryPoint(FISOC_ISM, ESMF_METHOD_INITIALIZE, &
          userRoutine=FISOC_ISM_init_phase1, phase=1, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -60,17 +55,10 @@ CONTAINS
     TYPE(ESMF_Clock)           :: FISOC_clock
     INTEGER, INTENT(OUT)       :: rc
 
-    TYPE(ESMF_config)          :: config
+    TYPE(ESMF_config)          :: FISOC_config
     TYPE(ESMF_mesh)            :: ISM_mesh
     TYPE(ESMF_fieldBundle)     :: ISM_ExpFB
     CHARACTER(len=ESMF_MAXSTR) :: ISM_meshFile
-
-!    TYPE(ESMF_field)           :: ISM_temperature_l0, ISM_temperature_l1
-!    TYPE(ESMF_field)           :: ISM_z_l0, ISM_z_l1
-!    TYPE(ESMF_field)           :: ISM_dTdz_l0, ISM_z_l0_previous
-!    REAL(ESMF_KIND_R8),POINTER :: ISM_temperature_l0_ptr(:),ISM_temperature_l1_ptr(:) 
-!    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:),ISM_z_l1_ptr(:) 
-!    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:),ISM_z_l0_previous_ptr(:) 
 
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: ISM_ReqVarList(:),ISM_DerVarList(:)
     CHARACTER(len=ESMF_MAXSTR) :: label
@@ -83,16 +71,16 @@ CONTAINS
        line=__LINE__, file=__FILE__, rc=rc)
 
     ! extract a list of required ISM variables from the FISOC config object
-    CALL ESMF_GridCompGet(FISOC_ISM, config=config, rc=rc)
+    CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__, rcToReturn=rc)) return
     label = 'FISOC_ISM_ReqVars:'
-    CALL FISOC_getStringListFromConfig(config, label, ISM_ReqVarList,rc=rc)
+    CALL FISOC_getStringListFromConfig(FISOC_config, label, ISM_ReqVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     label = 'FISOC_ISM_DerVars:' ! also derived ISM variables
-    CALL FISOC_getStringListFromConfig(config, label, ISM_DerVarList,rc=rc)
+    CALL FISOC_getStringListFromConfig(FISOC_config, label, ISM_DerVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -104,7 +92,7 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! model-specific initialisation
-    CALL FISOC_ISM_Wrapper_Init(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,config,rc=rc)
+    CALL FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,FISOC_config,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -117,7 +105,7 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Calculate values for derived variables from the model-specific ISM vars.
-    CALL FISOC_ISM_calcDerivedFields(ISM_ExpFB,config,rc)
+    CALL FISOC_ISM_calcDerivedFields(ISM_ExpFB,FISOC_config,rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -143,15 +131,33 @@ CONTAINS
 
   !------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_init_phase2(FISOC_ISM, ISM_ImpSt, ISM_ExpSt, FISOC_clock, rc)
+
     TYPE(ESMF_GridComp)    :: FISOC_ISM
     TYPE(ESMF_State)       :: ISM_ImpSt, ISM_ExpSt
     TYPE(ESMF_Clock)       :: FISOC_clock
     INTEGER, INTENT(OUT)   :: rc
 
+    TYPE(ESMF_config)      :: FISOC_config
+    TYPE(ESMF_fieldbundle) :: ISM_ImpFB
+
     rc = ESMF_FAILURE
 
-    msg = "ISM initialise phase 2 allows the ISM access to the OM initial state "// &
-         "(does nothing for dummy case)"
+    CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_StateGet(ISM_ImpSt, "ISM import fields", ISM_ImpFB, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+    CALL FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    msg = "ISM initialise phase 2 (allows the ISM access to the OM initial state) "
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
@@ -170,16 +176,16 @@ CONTAINS
     
     TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
     LOGICAL                :: verbose_coupling
-    TYPE(ESMF_config)      :: config
+    TYPE(ESMF_config)      :: FISOC_config
 
     rc = ESMF_FAILURE
 
     ! query the FISOC config
-    CALL ESMF_GridCompGet(FISOC_ISM, config=config, rc=rc)
+    CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_ConfigGetAttribute(config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -196,7 +202,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     
-    CALL FISOC_ISM_Wrapper_Run(ISM_ImpFB,ISM_ExpFB,config,rc=rc)
+    CALL FISOC_ISM_Wrapper_Run(ISM_ImpFB,ISM_ExpFB,FISOC_config,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
@@ -218,6 +224,7 @@ CONTAINS
     INTEGER              :: petCount
     INTEGER, INTENT(OUT) :: rc
 
+    TYPE(ESMF_config)            :: FISOC_config
     TYPE(ESMF_fieldbundle)       :: ISM_ImpFB, ISM_ExpFB
     INTEGER                      :: FieldCount,ii
     TYPE(ESMF_field),ALLOCATABLE :: FieldList(:)
@@ -229,6 +236,10 @@ CONTAINS
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
+    CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_StateGet(ISM_ImpSt, "ISM import fields", ISM_ImpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -272,8 +283,6 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
 
-
-
     CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -306,15 +315,20 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
+    CALL FISOC_ISM_Wrapper_Finalize(FISOC_config,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_ISM_finalise
   
 
   !------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_calcDerivedFields(ISM_ExpFB,config,rc)
+  SUBROUTINE FISOC_ISM_calcDerivedFields(ISM_ExpFB,FISOC_config,rc)
 
-    TYPE(ESMF_config),INTENT(IN) :: config
+    TYPE(ESMF_config),INTENT(IN) :: FISOC_config
     INTEGER, INTENT(OUT)         :: rc
     TYPE(ESMF_fieldBundle)       :: ISM_ExpFB
 
