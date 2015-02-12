@@ -252,6 +252,7 @@ CONTAINS
  
     TYPE(ESMF_State)     :: ISM_ImpSt, ISMExpSt, OM_ImpSt, OM_ExpSt
     TYPE(ESMF_Alarm)     :: alarm_OM, alarm_ISM
+    TYPE(ESMF_Alarm)     :: alarm_ISM_exportAvailable, alarm_OM_output
     LOGICAL              :: verbose_coupling
     TYPE(ESMF_config)    :: config
     INTEGER              :: urc
@@ -307,6 +308,18 @@ CONTAINS
 
        IF (verbose_coupling) THEN
           CALL ESMF_ClockPrint(FISOC_clock, options="advanceCount string isofrac", rc=rc)
+          CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_OM_output", alarm_OM_output, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_ISM_exportAvailable", alarm_ISM_exportAvailable, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          PRINT*,"Alarm status: ",ESMF_AlarmIsRinging(alarm_OM),&
+               ESMF_AlarmIsRinging(alarm_OM_output),&
+               ESMF_AlarmIsRinging(alarm_ISM),&
+               ESMF_AlarmIsRinging(alarm_ISM_exportAvailable)
        END IF
        
        IF (ESMF_AlarmIsRinging(alarm_OM, rc=rc)) THEN
@@ -358,18 +371,18 @@ CONTAINS
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-          CALL ESMF_AlarmRingerOff(alarm_OM, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+!          CALL ESMF_AlarmRingerOff(alarm_OM, rc=rc)
+!          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!               line=__LINE__, file=__FILE__)) &
+!               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
        END IF
 
-       IF (ESMF_AlarmIsRinging(alarm_ISM, rc=rc)) THEN
-          CALL ESMF_AlarmRingerOff(alarm_ISM, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-       END IF
+!       IF (ESMF_AlarmIsRinging(alarm_ISM, rc=rc)) THEN
+!          CALL ESMF_AlarmRingerOff(alarm_ISM, rc=rc)
+!          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!               line=__LINE__, file=__FILE__)) &
+!               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+!       END IF
 
        CALL ESMF_ClockAdvance(FISOC_clock, rc=rc)   
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &

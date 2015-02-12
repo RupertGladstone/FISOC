@@ -199,20 +199,20 @@ PROGRAM FISOC_main
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
 
   alarm_OM = ESMF_AlarmCreate(clock=FISOC_clock, name="alarm_OM", &
-       ringTime=startTime, ringInterval=OM_dt*OM_outputInterval, rc=rc)
+       ringTime=startTime, ringInterval=OM_dt, sticky=.FALSE., rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
 
   alarm_OM_output = ESMF_AlarmCreate(clock=FISOC_clock, name="alarm_OM_output", &
-       ringTime=startTime, ringInterval=OM_dt, rc=rc)
+       ringTime=(startTime+(OM_dt*(OM_outputInterval-1))), ringInterval=OM_dt*OM_outputInterval, sticky=.FALSE., rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
 
   alarm_ISM = ESMF_AlarmCreate(clock=FISOC_clock, name="alarm_ISM", &
-       ringTime=((startTime+ISM_dt)-OM_dt), ringInterval=ISM_dt, rc=rc)
+       ringTime=((startTime+ISM_dt)-OM_dt), ringInterval=ISM_dt, sticky=.FALSE., rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
   
   alarm_ISM_exportAvailable = ESMF_AlarmCreate(clock=FISOC_clock, &
        name="alarm_ISM_exportAvailable", &
-       ringTime=(startTime+ISM_dt), ringInterval=ISM_dt, rc=rc)
+       ringTime=(startTime+ISM_dt), ringInterval=ISM_dt, sticky=.FALSE.,rc=rc)
   IF (rc /= ESMF_SUCCESS) CALL ESMF_Finalize(endflag=ESMF_END_ABORT, rc=rc)
   
   msg = "created and initialised clocks and alarms"  

@@ -8,21 +8,40 @@ MODULE FISOC_OM_Wrapper
 
   PRIVATE
 
-  PUBLIC :: FISOC_OM_Wrapper_Init,  FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize
+  PUBLIC :: FISOC_OM_Wrapper_Init_Phase1,  FISOC_OM_Wrapper_Init_Phase2,  &
+       FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize
 
 CONTAINS
 
   !--------------------------------------------------------------------------------------
   ! This dummy wrapper aims to create the dummy grid and required variables 
   ! in the ESMF formats.  
-  SUBROUTINE FISOC_OM_Wrapper_Init(OM_ReqVarList,OM_ExpFB,OM_dummyGrid,FISOC_config,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ReqVarList,OM_ExpFB,OM_dummyGrid,FISOC_config,rc)
 
-    TYPE(ESMF_config),INTENT(IN)          :: FISOC_config
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: OM_ReqVarList(:)
 
     TYPE(ESMF_grid),INTENT(OUT)           :: OM_dummyGrid
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ExpFB
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
+
+    LOGICAL                               :: verbose_coupling
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF (verbose_coupling) THEN
+       PRINT*,"******************************************************************************"
+       PRINT*,"**********    OM dummy wrapper.  Init phase 1 method.    *********************"
+       PRINT*,"******************************************************************************"
+       PRINT*,""
+       PRINT*,"Here we need to get the OM grid information into the ESMF_grid type. "
+       PRINT*,"We also need to create and initialise the required variables using the "
+       PRINT*,"ESMF_field type and put them into an ESMF_fieldBundle type."
+       PRINT*,""
+    END IF
 
     CALL dummyCreateGrid(OM_dummyGrid,rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -34,19 +53,79 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-  END SUBROUTINE FISOC_OM_Wrapper_Init
+  END SUBROUTINE FISOC_OM_Wrapper_Init_Phase1
   
+  !--------------------------------------------------------------------------------------
+  ! This dummy wrapper aims to create the dummy grid and required variables 
+  ! in the ESMF formats.  
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(OM_ImpFB,FISOC_config,rc)
 
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+
+    LOGICAL                               :: verbose_coupling
+
+    TYPE(ESMF_field)             :: ISM_temperature_l0
+    REAL(ESMF_KIND_R8),POINTER   :: ISM_temperature_l0_ptr(:,:)
+    CHARACTER(len=ESMF_MAXSTR)   :: nameList(10)
+
+    rc = ESMF_FAILURE
+
+    NULLIFY(ISM_temperature_l0_ptr)
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF (verbose_coupling) THEN
+       PRINT*,"******************************************************************************"
+       PRINT*,"**********    OM dummy wrapper.  Init phase 2 method.    *********************"
+       PRINT*,"******************************************************************************"
+       PRINT*,""
+       PRINT*,"Here we have access to the initialised ISM fields, just in case the OM needs "
+       PRINT*,"to know about these in order to complete its initialisation."
+       PRINT*,""
+    END IF
+
+
+    IF (verbose_coupling) THEN
+       
+       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_temperature_l0", field=ISM_temperature_l0, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldGet(field=ISM_temperature_l0, localDe=0, farrayPtr=ISM_temperature_l0_ptr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       PRINT*,"Temperature field size in x direction is ",SIZE(ISM_temperature_l0_ptr(:,1))
+       PRINT*,"Temperature field size in y direction is ",SIZE(ISM_temperature_l0_ptr(1,:))
+       PRINT*,"Show a few rows of data... we originally set the regridding to fill with zeros where source (ISM)"
+       PRINT*,"grid doesn't cover destination (OM) grid."
+       PRINT*,"Row 1 data:  ",ISM_temperature_l0_ptr(1,:)
+       PRINT*,"Row 2 data:  ",ISM_temperature_l0_ptr(2,:)
+       PRINT*,"Row 3 data:  ",ISM_temperature_l0_ptr(3,:)
+       PRINT*,"Row 11 data: ",ISM_temperature_l0_ptr(11,:)
+       PRINT*,""
+       
+    END IF
+    
+  END SUBROUTINE FISOC_OM_Wrapper_Init_Phase2
+  
+  
   !--------------------------------------------------------------------------------------
   SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,OM_ExpFB,OM_ImpFB,rc)
-
+    
     TYPE(ESMF_config),INTENT(INOUT)                :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT),OPTIONAL  :: OM_ExpFB, OM_ImpFB 
     INTEGER,INTENT(OUT),OPTIONAL                   :: rc
 
-    LOGICAL                :: verbose_coupling
-
-    TYPE(ESMF_field)       :: ISM_dTdz_l0,ISM_z_l0, OM_dBdt_l0
+    LOGICAL                    :: verbose_coupling
+    TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_dBdt_l0
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)
 
     rc = ESMF_FAILURE
@@ -70,16 +149,15 @@ CONTAINS
        END IF
 
        IF ((PRESENT(OM_ExpFB)).AND.(PRESENT(OM_ImpFB))) THEN
-          PRINT*,"We have new inputs for the OM from the ISM in the OMimport field bundle. "
-          PRINT*,"We need to send these inputs to the OM,run one timestep, and record the OM "
+          PRINT*,"We have new inputs for the OM from the ISM in the OM import field bundle. "
+          PRINT*,"We need to send these inputs to the OM, run one timestep, and record the OM "
           PRINT*,"outputs. "
        END IF
        
        IF ((.NOT.(PRESENT(OM_ExpFB))).AND.(PRESENT(OM_ImpFB))) THEN
-          msg = "OM run error: it is an ISM step but not an ocean output step."
-          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-               line=__LINE__, file=__FILE__, rc=rc)
-          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+          PRINT*,"We have new inputs for the OM from the ISM in the OM import field bundle. "
+          PRINT*,"We need to send these inputs to the OM and run one timestep. We do not "
+          PRINT*,"need to collect OM outputs.  Just run the OM one timestep."
        END IF
 
        IF ((.NOT.(PRESENT(OM_ExpFB))).AND.(.NOT.(PRESENT(OM_ImpFB)))) THEN
@@ -126,16 +204,33 @@ CONTAINS
     END IF
     
     rc = ESMF_SUCCESS
-
+    
   END SUBROUTINE FISOC_OM_Wrapper_Run
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_OM_Wrapper_Finalize(rc)
+  SUBROUTINE FISOC_OM_Wrapper_Finalize(FISOC_config,rc)
 
-    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+    TYPE(ESMF_config),INTENT(INOUT)    :: FISOC_config
+    INTEGER,INTENT(OUT),OPTIONAL       :: rc
+
+    LOGICAL                            :: verbose_coupling
 
     rc = ESMF_FAILURE
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF (verbose_coupling) THEN
+       PRINT*,"******************************************************************************"
+       PRINT*,"************    OM dummy wrapper.  Finalise method.     **********************"
+       PRINT*,"******************************************************************************"
+       PRINT*,""
+       PRINT*,"FISOC has taken care of clearing up ESMF types.  Here we just need to call the "
+       PRINT*,"OM finalise method."
+    END IF
 
     rc = ESMF_SUCCESS
 
