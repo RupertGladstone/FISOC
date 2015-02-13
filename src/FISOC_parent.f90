@@ -60,13 +60,14 @@ CONTAINS
 
     TYPE(ESMF_State)     :: ISM_ImpSt, ISM_ExpSt, OM_ImpSt, OM_ExpSt
     TYPE(ESMF_config)    :: config
-    INTEGER              :: petCount, localrc, urc
+    INTEGER              :: petCount, localrc, urc, localPet
+    TYPE(ESMF_VM)        :: VM
     LOGICAL              :: verbose_coupling
 
 
     rc = ESMF_FAILURE
 
-    CALL ESMF_GridCompGet(FISOC_parent, config=config, rc=rc)
+    CALL ESMF_GridCompGet(FISOC_parent, config=config, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -76,8 +77,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-
-    IF (verbose_coupling) THEN
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
        PRINT*,"************************************************************************************"
        PRINT*,"This is a verbose run, set by the verbose_coupling flag in the FISOC_config.rc file."
@@ -87,29 +87,49 @@ CONTAINS
        PRINT*,""
     END IF
 
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       PRINT*,""
+       PRINT*,"******************************************************************************"
+       PRINT*,"************    FISOC parent.  Initialise method.       **********************"
+       PRINT*,"******************************************************************************"
+       PRINT*,""
+    END IF
+
     msg = "Starting FISOC parent initialisation"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
     ! Get config and petCount from the component object (pet is persistent execution thread)
-    CALL ESMF_GridCompGet(FISOC_parent, config=config, petCount=petCount, rc=localrc)
-    IF (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, &
-         file=__FILE__, &
-         rcToReturn=rc)) return ! bail out
+    CALL ESMF_GridCompGet(FISOC_parent, config=config, petCount=petCount, vm=vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       PRINT*,"The VM object contains information about the execution environment of "
+       PRINT*,"the Component.  Printing info about parent VM..."
+       PRINT*,""
+       CALL ESMF_VMPrint(vm, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
 
     ! Create and register child components and routines
-    FISOC_ISM = ESMF_GridCompCreate(name="Ice Sheet Model", config=config, rc=localrc)
+    FISOC_ISM = ESMF_GridCompCreate(name="Ice Sheet Model", config=config, &
+         contextflag=ESMF_CONTEXT_PARENT_VM,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    FISOC_OM = ESMF_GridCompCreate(name="Ocean Model", config=config, rc=localrc)
+    FISOC_OM = ESMF_GridCompCreate(name="Ocean Model", config=config, &
+         contextflag=ESMF_CONTEXT_PARENT_VM,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    FISOC_coupler = ESMF_CplCompCreate(name="FISOC coupler", config=config, rc=localrc)
+    FISOC_coupler = ESMF_CplCompCreate(name="FISOC coupler", config=config, &
+         contextflag=ESMF_CONTEXT_PARENT_VM,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -189,6 +209,11 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CALL ESMF_VMBarrier(vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+    
     CALL ESMF_cplCompInitialize(FISOC_coupler, &
          importState=ISM_ExpSt, exportState=OM_ImpSt, &
          clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
@@ -209,6 +234,11 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CALL ESMF_VMBarrier(vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+    
     CALL ESMF_cplCompInitialize(FISOC_coupler, &
          importState=OM_ExpSt, exportState=ISM_ImpSt, &
          clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
@@ -255,19 +285,39 @@ CONTAINS
     TYPE(ESMF_Alarm)     :: alarm_ISM_exportAvailable, alarm_OM_output
     LOGICAL              :: verbose_coupling
     TYPE(ESMF_config)    :: config
-    INTEGER              :: urc
+    INTEGER              :: urc, localPet
+    TYPE(ESMF_VM)        :: vm
 
+    rc = ESMF_FAILURE
 
-    CALL ESMF_GridCompGet(FISOC_parent, config=config, rc=rc)
+    CALL ESMF_GridCompGet(FISOC_parent, config=config, vm=vm, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_VMBarrier(vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+    
     CALL ESMF_ConfigGetAttribute(config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       PRINT*,""
+       PRINT*,"******************************************************************************"
+       PRINT*,"************    FISOC parent.  Run method.              **********************"
+       PRINT*,"******************************************************************************"
+       PRINT*,""
+    END IF
+
     CALL ESMF_StateGet(importstate, "ISM import state", ISM_ImpSt, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -302,11 +352,15 @@ CONTAINS
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
+    CALL ESMF_VMBarrier(vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+    
+    mainTimeStepping: DO WHILE (.NOT. ESMF_ClockIsStopTime(FISOC_clock, rc=rc))
 
-    ! main timestepping loop
-    DO WHILE (.NOT. ESMF_ClockIsStopTime(FISOC_clock, rc=rc))
-
-       IF (verbose_coupling) THEN
+       IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+          PRINT*,""
           CALL ESMF_ClockPrint(FISOC_clock, options="advanceCount string isofrac", rc=rc)
           CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_OM_output", alarm_OM_output, rc=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -320,6 +374,7 @@ CONTAINS
                ESMF_AlarmIsRinging(alarm_OM_output),&
                ESMF_AlarmIsRinging(alarm_ISM),&
                ESMF_AlarmIsRinging(alarm_ISM_exportAvailable)
+          PRINT*,""
        END IF
        
        IF (ESMF_AlarmIsRinging(alarm_OM, rc=rc)) THEN
@@ -371,25 +426,19 @@ CONTAINS
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!          CALL ESMF_AlarmRingerOff(alarm_OM, rc=rc)
-!          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!               line=__LINE__, file=__FILE__)) &
-!               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
        END IF
-
-!       IF (ESMF_AlarmIsRinging(alarm_ISM, rc=rc)) THEN
-!          CALL ESMF_AlarmRingerOff(alarm_ISM, rc=rc)
-!          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!               line=__LINE__, file=__FILE__)) &
-!               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-!       END IF
 
        CALL ESMF_ClockAdvance(FISOC_clock, rc=rc)   
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
-    END DO
+       CALL ESMF_VMBarrier(vm, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+    END DO mainTimeStepping
 
     msg = "FISOC parent run: complete"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
@@ -410,10 +459,17 @@ CONTAINS
     TYPE(ESMF_State)     :: ISM_ImpSt, ISMExpSt, OM_ImpSt, OM_ExpSt
     TYPE(ESMF_config)    :: config
     LOGICAL              :: verbose_coupling
+    INTEGER              :: localPet
+    TYPE(ESMF_VM)        :: vm
 
     rc = ESMF_FAILURE
 
-    CALL ESMF_GridCompGet(FISOC_ISM, config=config, rc=rc)
+    CALL ESMF_GridCompGet(FISOC_ISM, config=config, vm=vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -423,8 +479,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    IF (verbose_coupling) THEN
-       PRINT*,"Now some finalising/destroying stuff, not very exciting"
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       PRINT*,""
+       PRINT*,"******************************************************************************"
+       PRINT*,"************    FISOC parent.  Finalise method.         **********************"
+       PRINT*,"******************************************************************************"
+       PRINT*,""
     END IF
 
     msg = "FISOC parent finalise: getting child states"

@@ -16,13 +16,15 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! This dummy wrapper aims to create the dummy mesh and required variables 
   ! in the ESMF formats.  
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_dummyMesh,FISOC_config,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_dummyMesh,&
+       FISOC_config,mpic,localPet,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: ISM_ReqVarList(:)
-
+    INTEGER,INTENT(IN)                    :: mpic ! mpi comm, duplicate from the ISM VM
     TYPE(ESMF_mesh),INTENT(OUT)           :: ISM_dummyMesh
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
+    INTEGER,INTENT(IN)                    :: localPet
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
     LOGICAL                               :: verbose_coupling
@@ -32,7 +34,8 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    IF (verbose_coupling) THEN
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       PRINT*,""
        PRINT*,"******************************************************************************"
        PRINT*,"**********    ISM dummy wrapper.  Init phase 1 method.    ********************"
        PRINT*,"******************************************************************************"
@@ -59,12 +62,12 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! This dummy wrapper aims to create the dummy mesh and required variables 
   ! in the ESMF formats.  
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,localPet,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ImpFB
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
+    INTEGER,INTENT(IN)                    :: localPet
 
     LOGICAL                               :: verbose_coupling
 
@@ -74,7 +77,8 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    IF (verbose_coupling) THEN
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       PRINT*,""
        PRINT*,"******************************************************************************"
        PRINT*,"**********    ISM dummy wrapper.  Init phase 2 method.    ********************"
        PRINT*,"******************************************************************************"
@@ -88,11 +92,11 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Run(ISM_ImpFB,ISM_ExpFB,config,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Run(FISOC_config,localPet,ISM_ImpFB,ISM_ExpFB,rc)
 
     TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
-    TYPE(ESMF_config)      :: config
-
+    TYPE(ESMF_config)      :: FISOC_config
+    INTEGER,INTENT(IN)     :: localPet
     INTEGER,INTENT(OUT),OPTIONAL :: rc
 
     TYPE(ESMF_field)             :: OM_dBdt_l0, ISM_z_l0, ISM_z_l1
@@ -102,12 +106,13 @@ CONTAINS
     rc = ESMF_FAILURE
 
     ! query the FISOC config
-    CALL ESMF_ConfigGetAttribute(config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    IF (verbose_coupling) THEN
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       PRINT*,""
        PRINT*,"******************************************************************************"
        PRINT*,"*************       ISM dummy wrapper.  Run method.       ********************"
        PRINT*,"******************************************************************************"
@@ -127,7 +132,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    IF (verbose_coupling) THEN
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,"Lets just adjust depth coords according to basal melt rate from ocean."
        PRINT*,"Melt rates dont look quite right on the ISM mesh, needs checking..."
        PRINT*,OM_dBdt_l0_ptr
@@ -162,10 +167,11 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Finalize(FISOC_config,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Finalize(FISOC_config,localPet,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)    :: FISOC_config
     INTEGER,INTENT(OUT),OPTIONAL       :: rc
+    INTEGER,INTENT(IN)                 :: localPet
 
     LOGICAL                            :: verbose_coupling
 
@@ -176,7 +182,8 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    IF (verbose_coupling) THEN
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       PRINT*,""
        PRINT*,"******************************************************************************"
        PRINT*,"************    ISM dummy wrapper.  Finalise method.     *********************"
        PRINT*,"******************************************************************************"

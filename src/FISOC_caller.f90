@@ -27,23 +27,14 @@ PROGRAM FISOC_main
 
   ! A parent gridded component is used to support the hierarchical approach  
   ! of ESMF, but the actual grid and state are dummy properties.  The parent 
-  ! merely coordinates the child components (ice, ocean and processing)
+  ! merely coordinates the child components (ice, ocean and regridding)
   TYPE(ESMF_GridComp)     :: FISOC_parent 
   TYPE(ESMF_config)       :: FISOC_config
   TYPE(ESMF_state)        :: importstate, exportstate
 
-!------------------------------------------------------------------------------
 
-
-! ***some things ESMF offers:
-! logging (you don't need to create a log, ESMF will create a default log on initialize, 
-! but you can create further logs using ESMF if you want) 
-! regridding
-! clocks and alarms
-! helping to manage effective parallelization
-
-!------------------------------------------------------------------------------
 !*** what calendar? 360 day?
+
   ! initialize ESMF framework
   CALL ESMF_Initialize(defaultCalKind=ESMF_CALKIND_GREGORIAN, &
        defaultlogfilename="FISOC.Log", &
@@ -77,11 +68,10 @@ PROGRAM FISOC_main
        line=__LINE__, file=__FILE__, rc=rc)
   
 
-  !------------------------------------------------------------------------------
-
   ! Create the parent Gridded Component (though we don't use its grid, we just 
   ! use it for coordinating child components...)
-  FISOC_parent = ESMF_GridCompCreate(name="FISOC parent gridded component", config=FISOC_config, rc=rc)
+  FISOC_parent = ESMF_GridCompCreate(name="FISOC parent gridded component", config=FISOC_config, &
+       contextflag=ESMF_CONTEXT_PARENT_VM,rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)

@@ -59,10 +59,11 @@ CONTAINS
     TYPE(ESMF_mesh)            :: ISM_mesh
     TYPE(ESMF_fieldBundle)     :: ISM_ExpFB
     CHARACTER(len=ESMF_MAXSTR) :: ISM_meshFile
+    INTEGER                    :: mpic, mpic2, ierr, localPet
+    TYPE(ESMF_VM)              :: vm
 
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: ISM_ReqVarList(:),ISM_DerVarList(:)
     CHARACTER(len=ESMF_MAXSTR) :: label
-    INTEGER                    :: ii
 
     rc = ESMF_SUCCESS
 
@@ -71,20 +72,34 @@ CONTAINS
        line=__LINE__, file=__FILE__, rc=rc)
 
     ! extract a list of required ISM variables from the FISOC config object
-    CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, rc=rc)
+    CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, vm=vm, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+
+
+    CALL ESMF_VMGet(vm, mpiCommunicator=mpic, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ! The returned MPI communicator spans the same MPI processes that the VM
+    ! is defined on.
+
+    CALL MPI_Comm_dup(mpic, mpic2, ierr)
+    ! Duplicate the MPI communicator not to interfere with ESMF communications.
+    ! The duplicate MPI communicator can be used in any MPI call in the user
+    ! code. 
+
     label = 'FISOC_ISM_ReqVars:'
     CALL FISOC_getStringListFromConfig(FISOC_config, label, ISM_ReqVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     label = 'FISOC_ISM_DerVars:' ! also derived ISM variables
     CALL FISOC_getStringListFromConfig(FISOC_config, label, ISM_DerVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
     ! create empty field bundle
     ISM_ExpFB = ESMF_FieldBundleCreate(name='ISM export fields', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -92,7 +107,8 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! model-specific initialisation
-    CALL FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,FISOC_config,rc=rc)
+    CALL FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,&
+         FISOC_config,mpic2,localPet,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -139,10 +155,17 @@ CONTAINS
 
     TYPE(ESMF_config)      :: FISOC_config
     TYPE(ESMF_fieldbundle) :: ISM_ImpFB
+    INTEGER                :: localPet
+    TYPE(ESMF_VM)          :: vm
 
     rc = ESMF_FAILURE
 
-    CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, rc=rc)
+    CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, vm=vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -152,7 +175,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
-    CALL FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,rc=rc)
+    CALL FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,localPet,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -171,20 +194,26 @@ CONTAINS
     TYPE(ESMF_GridComp)    :: FISOC_ISM
     TYPE(ESMF_State)       :: ISM_ImpSt, ISM_ExpSt
     TYPE(ESMF_Clock)       :: FISOC_clock
-    INTEGER                :: petCount
     INTEGER, INTENT(OUT)   :: rc
     
     TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
     LOGICAL                :: verbose_coupling
     TYPE(ESMF_config)      :: FISOC_config
+    INTEGER                :: localPet
+    TYPE(ESMF_VM)          :: vm
 
     rc = ESMF_FAILURE
 
-    ! query the FISOC config
-    CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, rc=rc)
+    CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, vm=vm, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -202,7 +231,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     
-    CALL FISOC_ISM_Wrapper_Run(ISM_ImpFB,ISM_ExpFB,FISOC_config,rc=rc)
+    CALL FISOC_ISM_Wrapper_Run(FISOC_config,localPet,ISM_ImpFB,ISM_ExpFB,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
@@ -221,9 +250,10 @@ CONTAINS
     TYPE(ESMF_GridComp)  :: FISOC_ISM
     TYPE(ESMF_State)     :: ISM_ImpSt, ISM_ExpSt
     TYPE(ESMF_Clock)     :: FISOC_clock
-    INTEGER              :: petCount
     INTEGER, INTENT(OUT) :: rc
 
+    INTEGER                      :: localPet
+    TYPE(ESMF_VM)                :: vm
     TYPE(ESMF_config)            :: FISOC_config
     TYPE(ESMF_fieldbundle)       :: ISM_ImpFB, ISM_ExpFB
     INTEGER                      :: FieldCount,ii
@@ -236,7 +266,12 @@ CONTAINS
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
-    CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, rc=rc)
+    CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, vm=vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -315,7 +350,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    CALL FISOC_ISM_Wrapper_Finalize(FISOC_config,rc=rc)
+    CALL FISOC_ISM_Wrapper_Finalize(FISOC_config,localPet,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
