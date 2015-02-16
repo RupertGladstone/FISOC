@@ -28,19 +28,7 @@ ifneq ($(origin FISOC_ISM), environment)
 $(error Environment variable FISOC_ISM was not set.)
 endif
 
-ifeq ($(FISOC_ISM), Elmer)
- ifneq ($(origin ELMER_SO), environment)
-  $(error Environment variable ELMER_SO was not set.) # required for linking to Elmer
- endif
- ifeq ($(origin ELMER_HOME), environment)
-  ELMER_INCLUDE = -I$(ELMER_HOME)/share/elmersolver/include
- else
-  $(error Environment variable ELMER_HOME was not set.)
- endif
-else
- ELMER_INCLUDE = 
- ELMER_SO = 
-endif
+#  ELMER_INCLUDE = -I$(ELMER_HOME)/share/elmersolver/include
 
 include $(ESMFMKFILE)
 
@@ -48,11 +36,11 @@ include $(ESMFMKFILE)
 
 .SUFFIXES: .f90
 %.o : %.f90
-	$(ESMF_F90COMPILER) -c $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS) $(ELMER_INCLUDE) $(ESMF_F90COMPILEFREENOCPP) -cpp  -o $@  $<
+	$(ESMF_F90COMPILER) -c $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS) $(ESMF_F90COMPILEFREENOCPP)  $(FISOC_ISM_INC) -cpp  -o $@  $<
 
 ################################################################################
 
-FISOC_caller: $(SRCDIR)/FISOC_caller.o $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_OM.o  $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o $(SRCDIR)/FISOC_ISM.o $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o $(SRCDIR)/FISOC_coupler.o $(SRCDIR)/FISOC_utils.o $(ELMER_SO) 
+FISOC_caller: $(SRCDIR)/FISOC_caller.o $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_OM.o  $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o $(SRCDIR)/FISOC_ISM.o $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o $(SRCDIR)/FISOC_coupler.o $(SRCDIR)/FISOC_utils.o   $(FISOC_ISM_SO)
 	$(ESMF_F90LINKER) $(ESMF_F90LINKOPTS) $(ESMF_F90LINKPATHS) $(ESMF_F90LINKRPATHS) -o $@ $^ $(ESMF_F90ESMFLINKLIBS)  
 
 $(SRCDIR)/FISOC_caller.o:                   $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_caller.f90
@@ -60,7 +48,7 @@ $(SRCDIR)/FISOC_parent.o:                   $(SRCDIR)/FISOC_parent.f90 $(SRCDIR)
 $(SRCDIR)/FISOC_coupler.o:                  $(SRCDIR)/FISOC_coupler.f90
 $(SRCDIR)/FISOC_ISM.o:                      $(SRCDIR)/FISOC_ISM.f90 $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o $(SRCDIR)/FISOC_utils.o
 $(SRCDIR)/FISOC_OM.o:                       $(SRCDIR)/FISOC_OM.f90 $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o  $(SRCDIR)/FISOC_utils.o
-$(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o: $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).f90 $(SRCDIR)/FISOC_$(FISOC_ISM)_types.o  $(SRCDIR)/FISOC_utils.o
+$(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o: $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).f90 $(SRCDIR)/FISOC_$(FISOC_ISM)_types.o  $(SRCDIR)/FISOC_utils.o 
 $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o:   $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).f90  $(SRCDIR)/FISOC_utils.o
 $(SRCDIR)/FISOC_$(FISOC_ISM)_types.o:       $(SRCDIR)/FISOC_$(FISOC_ISM)_types.f90
 $(SRCDIR)/FISOC_utils.o:                    $(SRCDIR)/FISOC_utils.f90

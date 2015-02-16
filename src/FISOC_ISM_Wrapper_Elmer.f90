@@ -1,9 +1,9 @@
 
 MODULE FISOC_ISM_Wrapper
 
-  USE FISOC_Elmer_types
-  USE FISOC_utils
   USE ESMF
+  USE FISOC_utils
+  USE FISOC_Elmer_types
   USE ElmerSolver_mod
   USE MainUtils
 
@@ -11,22 +11,25 @@ MODULE FISOC_ISM_Wrapper
 
   PRIVATE
 
-  PUBLIC :: FISOC_ISM_Wrapper_Init,  FISOC_ISM_Wrapper_Run, FISOC_ISM_Wrapper_Finalize
+  PUBLIC :: FISOC_ISM_Wrapper_Init_Phase1,  FISOC_ISM_Wrapper_Init_Phase2,  &
+       FISOC_ISM_Wrapper_Run, FISOC_ISM_Wrapper_Finalize
 
-  ! Note that CurrentModel is shared through the Types module
+  ! Note that CurrentModel is shared through the Types module (via MainUtils)
 
 CONTAINS
 
   !--------------------------------------------------------------------------------------
   ! This initialisation wrapper aims to convert the Elmer mesh and required variables 
   ! to the ESMF formats.  It also performs simple sanity/consistency checks.
-  SUBROUTINE FISOC_ISM_Wrapper_Init(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,FISOC_config,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,&
+       FISOC_config,vm,rc)
 
     TYPE(ESMF_config),INTENT(IN)          :: FISOC_config
     CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: ISM_ReqVarList(:)
+    TYPE(ESMF_VM),INTENT(INOUT)           :: vm
 
-    TYPE(ESMF_mesh),INTENT(OUT)           :: ISM_mesh
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
+    TYPE(ESMF_mesh),INTENT(OUT)           :: ISM_mesh
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
     TYPE(Mesh_t)                          :: Elmer_Mesh
@@ -43,23 +46,51 @@ CONTAINS
 ! note: variables tobe input to Elmer (basal melt rate) should be defined (perhaps as exported vars) in the 
 ! sif.  These also to be checked for their presence against a list of required vars from ESMF
 
-    CALL ElmerSolver_init(Elmer_Mesh) ! Intended to return the mesh prior to extrusion 
+    rc = ESMF_FAILURE
 
-    CALL Elmer2ESMF_mesh(Elmer_mesh,ISM_mesh)
+    CALL Initialise_Elmer_ParEnv(vm,rc=rc)
+
+    CALL ElmerSolver_init(Elmer_Mesh,.TRUE.) 
+    ! It is intended that ElmerSolver_init should return the mesh prior to extrusion 
+
+    CALL Elmer2ESMF_mesh(Elmer_mesh,ISM_mesh,rc=rc)
 
     CALL FISOC_populateFieldBundle(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-  END SUBROUTINE FISOC_ISM_Wrapper_Init
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1
   
 
+
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Run(ISM_ImpFB,ISM_ExpFB,config,rc)
+  ! This dummy wrapper aims to create the dummy mesh and required variables 
+  ! in the ESMF formats.  
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,localPet,rc)
+
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ImpFB
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+    INTEGER,INTENT(IN)                    :: localPet
+
+    LOGICAL                               :: verbose_coupling
+
+    rc = ESMF_FAILURE
+
+    rc = ESMF_SUCCESS
+    
+  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2
+
+
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE FISOC_ISM_Wrapper_Run(FISOC_config,localPet,ISM_ImpFB,ISM_ExpFB,rc)
 
     TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
-    TYPE(ESMF_config)      :: config
+    TYPE(ESMF_config)      :: FISOC_config
+    INTEGER,INTENT(IN)     :: localPet
 
     INTEGER,INTENT(OUT),OPTIONAL :: rc
 
@@ -72,18 +103,27 @@ CONTAINS
 ! make sure to run only one timestep
 
 ! get hold of the elmer variables for receiving inputs, and convert them here from esmf to elmer type.
+
     CALL ElmerSolver_run()
 ! get hold of list of required variables from Elmer and convert them here from elmer to esmf type.
+
+    rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_ISM_Wrapper_Run
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Finalize()
+  SUBROUTINE FISOC_ISM_Wrapper_Finalize(FISOC_config,localPet,rc)
 
-  INTEGER                    :: rc
+    TYPE(ESMF_config),INTENT(INOUT)    :: FISOC_config
+    INTEGER,INTENT(OUT),OPTIONAL       :: rc
+    INTEGER,INTENT(IN)                 :: localPet
+
+    rc = ESMF_FAILURE
 
     CALL ElmerSolver_finalize()
+
+    rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_ISM_Wrapper_Finalize
 
@@ -95,9 +135,10 @@ CONTAINS
   ! Note: this subroutine expects to recieve a 2D Elmer mesh containing triangles and 
   ! quads.
   !
-  SUBROUTINE Elmer2ESMF_mesh(Elmer_mesh,ESMF_ElmerMesh)
+  SUBROUTINE Elmer2ESMF_mesh(Elmer_mesh,ESMF_ElmerMesh,rc)
     TYPE(ESMF_mesh),INTENT(INOUT)    :: ESMF_ElmerMesh
     TYPE(Mesh_t),INTENT(IN)          :: Elmer_Mesh
+    INTEGER,INTENT(OUT),OPTIONAL     :: rc
 
     INTEGER                          :: ii, nodeIndex
     CHARACTER(len=ESMF_MAXSTR)       :: subroutineName = "Elmer2ESMF_mesh"
@@ -109,7 +150,7 @@ CONTAINS
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
     INTEGER                          :: numNodes, numQuadElems, numTriElems, numTotElems
 
-    INTEGER                          :: rc
+    rc = ESMF_FAILURE
 
     msg = "Elmer to ESMF mesh format conversion"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
@@ -207,6 +248,8 @@ CONTAINS
     DEALLOCATE(nodeIds)
     DEALLOCATE(nodeCoords)
 
+    rc = ESMF_SUCCESS
+ 
   END SUBROUTINE Elmer2ESMF_mesh
 
 
@@ -286,6 +329,50 @@ CONTAINS
     RETURN
 
   END FUNCTION get_ESMF_elementType
+
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE Initialise_Elmer_ParEnv(vm,rc)
+
+    TYPE(ESMF_VM),INTENT(INOUT)      :: vm
+    INTEGER,INTENT(OUT),OPTIONAL     :: rc
+
+    INTEGER                          :: mpic, mpic_dup ! mpi comm, duplicate from the ISM VM
+    INTEGER                          :: localPet, petCount, peCount, ierr
+
+    rc = ESMF_FAILURE
+
+    CALL ESMF_VMGet(vm, mpiCommunicator=mpic, localPet=localPet, &
+         peCount=peCount,petCount=petCount,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ! The returned MPI communicator spans the same MPI processes that the VM
+    ! is defined on.
+
+    CALL MPI_Comm_dup(mpic, mpic_dup, ierr)
+    ! Duplicate the MPI communicator not to interfere with ESMF communications.
+    ! The duplicate MPI communicator can be used in any MPI call in the user
+    ! code. 
+
+    IF (peCount.NE.petCount) THEN
+       msg = "FATAL: expected peCount = petCount"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    ParEnv % MyPE = localPet
+    OutputPE = ParEnv % MyPe
+    ParEnv % PEs  = petCount
+    ParEnv % ActiveComm = MPI_COMM_WORLD ! or mpic_dup
+    Parenv % NumOfNeighbours = 0
+    ParEnv % Initialized = .TRUE.
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE Initialise_Elmer_ParEnv
+
 
 END MODULE FISOC_ISM_Wrapper
 

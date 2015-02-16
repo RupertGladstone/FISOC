@@ -74,20 +74,8 @@ CONTAINS
     ! extract a list of required ISM variables from the FISOC config object
     CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, vm=vm, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-
-
-    CALL ESMF_VMGet(vm, mpiCommunicator=mpic, localPet=localPet, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ! The returned MPI communicator spans the same MPI processes that the VM
-    ! is defined on.
-
-    CALL MPI_Comm_dup(mpic, mpic2, ierr)
-    ! Duplicate the MPI communicator not to interfere with ESMF communications.
-    ! The duplicate MPI communicator can be used in any MPI call in the user
-    ! code. 
 
     label = 'FISOC_ISM_ReqVars:'
     CALL FISOC_getStringListFromConfig(FISOC_config, label, ISM_ReqVarList,rc=rc)
@@ -108,7 +96,7 @@ CONTAINS
 
     ! model-specific initialisation
     CALL FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,&
-         FISOC_config,mpic2,localPet,rc=rc)
+         FISOC_config,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)

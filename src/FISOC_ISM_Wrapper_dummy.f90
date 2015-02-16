@@ -29,6 +29,8 @@ CONTAINS
 
     LOGICAL                               :: verbose_coupling
 
+    rc = ESMF_FAILURE
+
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -56,6 +58,8 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
+    rc = ESMF_SUCCESS
+
   END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1
   
 
@@ -71,6 +75,7 @@ CONTAINS
 
     LOGICAL                               :: verbose_coupling
 
+    rc = ESMF_FAILURE
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -88,6 +93,8 @@ CONTAINS
        PRINT*,""
     END IF
     
+    rc = ESMF_SUCCESS
+
   END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2
 
 

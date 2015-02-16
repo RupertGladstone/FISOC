@@ -134,7 +134,7 @@ CONTAINS
   END SUBROUTINE ElmerSolver
   
   !------------------------------------------------------------------------------
-  SUBROUTINE ElmerSolver_init(meshFootprint)
+  SUBROUTINE ElmerSolver_init(meshFootprint,ParEnvInitialised)
   
 #ifdef HAVE_TRILINOS
     INTERFACE
@@ -145,6 +145,7 @@ CONTAINS
 #endif
 
     TYPE(mesh_t),INTENT(INOUT),OPTIONAL :: meshFootprint
+    LOGICAL,INTENT(IN),OPTIONAL         :: ParEnvInitialised
 
     INTEGER :: ii, kk
 
@@ -155,9 +156,20 @@ CONTAINS
     CT0 = CPUTime()
     
     
-    ! If parallel execution requested, initialize parallel environment:
+    ! If parallel execution requested, initialize parallel environment, 
+    ! unless the calling program already initialised ParEnv.
     !------------------------------------------------------------------
-    ParallelEnv => ParallelInit()
+    IF (PRESENT(ParEnvInitialised)) THEN
+       IF (ParEnvInitialised) THEN
+          WRITE( Message, * ) 'ParEnv initialised by calling program'
+          CALL Info( 'ParCommInit', Message, Level=4 )
+          ParallelEnv => ParEnv
+       ELSE
+          ParallelEnv => ParallelInit()
+       END IF
+    ELSE
+       ParallelEnv => ParallelInit()
+    END IF
     OutputPE = ParEnv % MyPE
     
     IF ( FirstTime ) THEN
