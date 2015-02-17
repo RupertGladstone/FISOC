@@ -1,0 +1,360 @@
+
+\documentclass[12pt]{article}
+%\documentclass[12pt,twocolumn]{article}
+
+\usepackage{listings}
+\usepackage{color}
+\usepackage{hyperref}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{%frame=tb,
+  language=bash,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=3
+}
+
+\begin{document}
+
+\title{Framework for Ice Sheet - Ocean Coupled modelling (FISOC) Manual}
+\author{R. Gladstone (RupertGladstone1972@gmail.com) \and B. Galton-Fenzi}
+\date{Version 0.0, Feb 2015}
+\maketitle
+
+
+\section{Introduction}
+
+The ``Framework for Ice Sheet - Ocean model Coupling" (FISOC) has been written to enable Ice Sheet Models 
+(ISMs) and Ocean Models (OMs) to be run as a single executable to address the co-evolution of ice and ocean 
+properties.  it is primarily designed to deal with the situation of a floating ice shelf at the interface 
+between land ice and open ocean.
+
+In this context an ISM simulates (part of) a marine ice sheet, including both grounded and floating parts, 
+representing the dynamic evolution over time of the ice sheet.
+
+An OM simulates the sub-shelf cavity circulation under the floating part of the ice sheet, and optionally also 
+a wider ocean domain.
+
+FISOC is a set of code modules and driver built using the Earth System Modelling Framework (ESMF, 
+\url{https://www.earthsystemcog.org/projects/esmf/}). 
+Some knowledge of the ESMF is essentially in order to fully understand the FISOC code.  It should 
+be possible to run FISOC without knowledge of ESMF.
+
+A full description of the physical processes FISOC attempts to simulate are provided in (***
+ref GMD paper, not yet written).  
+This manual describes how to use FISOC with an ISM and OM for which it has been 
+developed (Section~\ref{sec:FISOC_SUG}) and also how to build additional ISM or OM components 
+into the FISOC framework (Section~\ref{sec:FISOC_SDG}).
+
+
+
+
+\section{Using FISOC with established components}
+\label{sec:FISOC_SUG}
+
+\subsection{Installing FISOC}
+
+FISOC can be obtained by emailing a request to the author.  It is maintained and developed in a 
+private GitHub repository.  We intend to make this public in 2016.
+
+FISOC has a simple build process.  The Makefile in the top level FISOC directory contains the 
+hard coded dependencies needed to build FISOC code.  The Makefile refers to certain 
+environment variables to determine paths and component choices (Section~\ref{sec:EnvVars}). 
+
+Having installed the pre-requisites (Section~\ref{sec:PreReq}), simply run at the command line, 
+in the top level FISOC directory:
+\begin{lstlisting}
+make install
+\end{lstlisting}
+
+
+\subsubsection{FISOC Environment Variables}
+\label{sec:EnvVars}
+
+Several environment variables may be used in the build process. 
+Some of these are mandatory. 
+These environment variables are not used at run time, only during 
+the compilation/installation of FISOC.
+
+\begin{flushleft}
+\textbf{FISOC\_INSTALL\_DIR}                       \\ 
+Optional.                                          \\
+Determines where FISOC\_caller will be installed. Defaults to \$HOME/bin. 
+The user should also ensure this location is in their \$PATH. \\
+\vspace{6pt}
+\textbf{FISOC\_OM}                                 \\ 
+Required. Possible values ``dummy'', ``ROMS''.     \\
+Determines which OM component will be used.        \\
+\vspace{6pt}
+\textbf{FISOC\_ISM}                                \\
+Required. Possible values ``dummy'', ``Elmer''.    \\
+Determines which ISM component will be used.       \\
+\vspace{6pt}
+\textbf{FISOC\_ISM\_INC}                           \\ 
+Optional.                                          \\
+Full path to ISM include files.                    \\
+\vspace{6pt}
+\textbf{FISOC\_ISM\_SO}                            \\
+Optional.                                          \\
+Full path to ISM shared object library.            \\
+\end{flushleft}
+
+\subsubsection{Pre-requisites}
+\label{sec:PreReq}
+
+FISOC has been tested with GNU compilers on Linux Mint using OpenMPI. 
+
+A Message Passing Interface (MPI) implementation, such as 
+OpenMPI (\url{http://www.open-mpi.org/}), is required. 
+
+The Network Common Data Form (NetCDF,  
+\url{http://www.unidata.ucar.edu/software/netcdf/}) 
+Fortran interface must be available 
+
+ESMF must be available (\url{https://www.earthsystemcog.org/projects/esmf/}).  
+ESMF should have been built with NetCDF and MPI.
+For example, environment variables like these may be used for the ESMF build
+(see also notes in Appendix~\ref{app:A}):
+\begin{lstlisting}
+export ESMF_NETCDF="split"
+export ESMF_NETCDF_INCLUDE="/usr/local/include/"
+export ESMF_COMM="openmpi"
+\end{lstlisting}
+
+
+Viable ISM and OM components must be available for any physically meaningful simulations
+(the build may be tested using ``dummy'' components).  
+See Sections~\ref{sec:Elmer} and \ref{sec:ROMS}.
+
+
+\subsection{Running FISOC}
+
+The FISOC executable is called FISOC\_caller, and should be located in your path after installation. 
+The installation is specific to the choice of component (you need to re-compile if you switch , for 
+example, from one ISM to another).  
+Beyond choice of component, all other run choices are made in the FISOC\_config.rc file
+(Section~\ref{sec:config}), 
+or through component specific initialisation.
+
+In the first instance a dummy coupler can be run be setting both environment variables FISOC\_ISM and 
+FISOC\_OM to ``dummy'' at compile time.  This can help to test the compilation, and was used during development, 
+but performs no meaningful science.  
+
+In verbose mode (Section~\ref{sec:config}) some run time information may be printed to the screen.  
+Independently of this, log files are always written, 
+with default filenames of ``PET\#.FISOC.Log'', where ``\#'' is a number from 0 upwards indicating the 
+``Persistent Execution Thread'' (PET). 
+These logs containing run time messages and errors can be helpful with trobleshooting.
+Note that FISOC appends to the logs rather than over-writing at run time, so you may wish to delete old logs 
+periodically. 
+
+Aside: PET is an ESMF abstraction designed to be general over differing parallel implementations. 
+In FISOC, there is always a 1:1 relationship between PETs and MPI processes 
+(Section~\ref{sec:FISOC_SDG}). 
+
+
+\subsubsection{FISOC configuration}
+\label{sec:config}
+
+The FISOC config file is named FISOC\_config.rc.  This is a resource file, as described by the 
+ESMF documentation.  It supports different types and also lists. 
+In principle, llists of mixed types are supported, though FISOC does not utilise this utility.
+
+FISOC\_config.rc contains code specific to the coupling.  Components may also use their 
+independent means for initialisation.
+
+Some of the FISOC config entries are required.
+This section describes all the valid standard entries in a FISOC config file as follows:
+
+\begin{flushleft}
+\textbf{label:}             [TYPE]   [Required?]                          \\
+Description                                                               \\
+\vspace{6pt}
+\vspace{6pt}
+\textbf{ISM\_meshFile:}      [STRING] [optional]                          \\
+The name of a netcdf file containing the ISM mesh in ESMF format.         \\
+\vspace{6pt}
+\textbf{ISM\_configFile:}    [STRING] [optional]                          \\
+The name of the ISM-specific config file.                                 \\
+\vspace{6pt}
+\textbf{FISOC\_ISM\_ReqVars:} [STRING] [required]                         \\
+List of variable names required to be provided by the ISM.                \\
+\vspace{6pt}
+\textbf{ISM\_ReqVars:}       [STRING] [optional]                          \\
+Corresponding exactly to the above, but model-specific in case of different naming conventions. \\
+\vspace{6pt}
+\textbf{FISOC\_ISM\_DerVars:} [STRING] [required]                         \\
+List of variables derived by FISOC from the ISM vars.                     \\ 
+To be calculated from ISM vars by hard coded routines in FISOC\_ISM.      \\
+\vspace{6pt}
+\textbf{OM\_configFile:}     [STRING] [optional]                          \\
+\vspace{6pt}
+\textbf{FISOC\_OM\_ReqVars:}  [STRING] [required]                         \\
+List of variable names required to be provided by the OM.                 \\
+\vspace{6pt}
+\textbf{OM\_ReqVars:}        [STRING] [optional]                          \\
+Corresponding exactly to the above, but model-specific in case of different naming conventions. \\
+\vspace{6pt}
+\textbf{FISOC\_OM\_DerVars:}  [STRING] [required]                         \\
+List of variables derived by FISOC from the OM vars.  
+To be calculated from ISM vars by hard coded routines in FISOC\_OM.       \\
+\vspace{6pt}
+\textbf{OM\_outputInterval:} [INTEGER][optional]                          \\
+FISOC collects OM output once every OM\_outputInterval OM timesteps. 
+Defaults to 1.  dt\_ratio/OM\_outputInterval must be integer.             \\
+\vspace{6pt}
+\textbf{OM\_dt\_sec:}         [INTEGER][required]                         \\
+OM timestep length in seconds.                                            \\
+\vspace{6pt}
+\textbf{dt\_ratio:}          [INTEGER][required]                          \\
+ISM/OM timestep ratio.                                                    \\
+\vspace{6pt}
+\textbf{start\_year:}        [INTEGER][required]                          \\
+Start year and month define the start time of the coupled simulation.     \\
+\vspace{6pt}
+\textbf{start\_month:}       [INTEGER][required]                          \\
+\vspace{6pt}
+\textbf{end\_year:}          [INTEGER][required]                          \\
+End year and month define the finish time of the coupled simulation.      \\
+\vspace{6pt}
+\textbf{end\_month:}         [INTEGER][required]                          \\
+\vspace{6pt}
+\textbf{verbose\_coupling:}  [LOGICAL][required]                          \\
+Print FISOC comments to screen (a log will be written independently of the settings of this value).\\
+\end{flushleft}
+
+\subsubsection{Timestepping}
+Asynchronous timestepping.
+***fill in this section we've implemented both tight coupling (ice and ocean both running 
+on the same timescale) and loose coupling (for longer time scales where the ocean is run 
+to steady state then the ice sheet continues until significant change has occurred in the cavity).
+
+\subsection{Elmer/Ice}
+\label{sec:Elmer}
+***ref or link Elmer/Ice
+
+FISOC needs to know where to find the relevant Elmer/Ice module files and shared object files.  
+This can be done at compile time through the  *** environment variables.  
+Finding the ElmerSolver.so shared object file at run time can be ensured through use of 
+%the $LD\_LIBRARY\_PATH environment variable. 
+
+For example (it is assumed \$ELMER\_HOME was set during Elmer installation):\\
+\begin{lstlisting}
+export FISOC_ISM="Elmer"
+export FISOC_ISM_INC="-I$ELMER_HOME/share/elmersolver/include"
+export FISOC_ISM_SO="$ELMER_HOME/lib/libelmersolver.so"      
+export LD_LIBRARY_PATH="$ELMER_HOME/lib/:$LD_LIBRARY_PATH"   
+\end{lstlisting}
+\label{sec:ROMS}
+
+
+\subsection{ROMS}
+
+NYI
+
+\section{Adapting new components to run with  FISOC}
+\label{sec:FISOC_SDG}
+
+
+***configuration:
+The configuration file is compatible with ESMF config methods.  
+An ESMF\_config object is created and ESMF methods can be used to access config info.
+There are some parameters that are derived from config parameters.  
+The FISOC\_utils module provides subroutines (***names of these subroutines in table?) 
+for obtaining derived config parameters.
+These subroutines can be viewed informally as additional methods to complement the ESMF config access methods. 
+Note that the hard-coded calculations to provide derived config parameters cause a loss of 
+efficiency (except possibly in the case of intelligent optimisation from compilers) but these 
+are very cheap operations and this does not have a measurable impact on the overall 
+computational cost of the FISOC code.
+*** make any additional config information to the model specific wrapper without needing further coding.
+
+\subsection{ISM wrapper}
+
+\subsection{OM wrapper}
+
+\section{Future developments}
+
+\appendix
+
+\section{Pre-requisite installation notes}
+\label{app:A}
+The following commands worked to install NetCDF and ESMF on a Linux Mint system in Feb 2015.
+Some pre-requisites for netcdf were also installed.
+
+\begin{lstlisting}
+cd /somewhere/to/download/and/compile/source/code
+
+sudo apt-get install m4
+
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4/
+                                                        zlib-1.2.8.tar.gz
+tar -xzf zlib-1.2.8.tar.gz 
+cd zlib-1.2.8
+ ./configure --prefix=/usr/local/
+ make check
+ sudo -E make install
+cd ..
+
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4/
+                                                       hdf5-1.8.13.tar.gz	
+tar -xzf hdf5-1.8.13.tar.gz 
+cd hdf5-1.8.13
+ # Note the O0 flag in the next line.  The default is O3, which is
+ # strong optimisation.  This can result in failed checks on some
+ #  systems.
+ CFLAGS=-O0 ./configure --prefix=/usr/local/ --with-zlib=/usr/local  --enable-fortran 
+ make check
+ sudo -E make install
+cd ..
+
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.3.3.tar.gz
+tar -xzf netcdf-4.3.3.tar.gz 
+cd netcdf-4.3.3/
+ CPPFLAGS="-I/usr/local/include -I/usr/local/hdf5/include" LDFLAGS="-L/usr/local/hdf5/lib -L/usr/local/lib" ./configure --prefix=/usr/local 
+ CPPFLAGS=-I/usr/local/include LDFLAGS=-L/usr/local/lib ./configure --prefix=/usr/local 
+ make check
+ sudo -E make install
+cd ..
+
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/
+                                              netcdf-fortran-4.4.2.tar.gz
+tar -xzf netcdf-fortran-4.4.2.tar.gz 
+cd netcdf-fortran-4.4.2
+ LD_LIBRARY_PATH=/usr/local/lib/ CPPFLAGS="-I/usr/local/include  -I/usr/local/hdf5/include -DUSE_NETCDF4" LDFLAGS="-L/usr/local/lib -L/usr/local/hdf5/lib" ./configure  --prefix=/usr/local
+ make check
+ sudo -E make install
+cd ..
+
+export ESMF_DIR="/top/level/directory/for/esmf/"
+export ESMF_NETCDF="split"
+export ESMF_NETCDF_INCLUDE="/usr/local/include/"
+export ESMF_COMM="openmpi"
+export ESMFMKFILE="$ESMF_DIR/DEFAULTINSTALLDIR/lib/libO/
+                             Linux.gfortran.64.openmpi.default/esmf.mk"
+                                                                                                              
+wget downloads.sourceforge.net/project/esmf/ESMF_6_3_0r/
+                                 ESMF_6_3_0rp1/esmf_6_3_0rp1_src.tar.gz
+                                                                                                              
+tar -xf esmf_6_3_0rp1_src.tar.gz
+cd esmf 
+ make check
+ sudo -E make install
+cd ..
+
+\end{lstlisting}
+
+\end{document}
