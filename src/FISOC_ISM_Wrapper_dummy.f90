@@ -17,21 +17,26 @@ CONTAINS
   ! This dummy wrapper aims to create the dummy mesh and required variables 
   ! in the ESMF formats.  
   SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_dummyMesh,&
-       FISOC_config,mpic,localPet,rc)
+       FISOC_config,vm,rc)
 
-    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: ISM_ReqVarList(:)
-    INTEGER,INTENT(IN)                    :: mpic ! mpi comm, duplicate from the ISM VM
-    TYPE(ESMF_mesh),INTENT(OUT)           :: ISM_dummyMesh
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    TYPE(ESMF_VM),INTENT(INOUT)           :: vm
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
-    INTEGER,INTENT(IN)                    :: localPet
+    TYPE(ESMF_mesh),INTENT(OUT)           :: ISM_dummyMesh
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
+    INTEGER                               :: localPet
     LOGICAL                               :: verbose_coupling
 
     rc = ESMF_FAILURE
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
