@@ -16,11 +16,11 @@ print "\ncreating DEM..."
 
 numElements_fl = 10000
 
-ny   = 11
+ny   = 6
 #ylim =  20000. # in metres
 ylim = 1.0 # for creating unit height mesh for use with structured mesh mapper
 
-nx   = 2000
+nx   = 100
 
 squish = 1.
 
@@ -337,15 +337,15 @@ if ret == 0.:
 else:
     sys.exit("ElmerGrid appeared to fail, see ElmerGrid.log\n")
 
-# create 3D mesh (extrude 2D mesh using DEM)
-print "\ncreating 3D mesh..."
-cmd = "ExtrudeMesh "+gridName2D+" "+gridName3D+" "+str(nz)+" 10. 1 0 0 0 1 "+DEM_dir+" 1000. 1.5 -999999. > ExtrudeMesh.log"
-print "\nstarting ExtrudeMesh with following command :\n",cmd
-ret = os.system(cmd)
-if ret == 0.:
-    print "ExtrudeMesh complete, see ExtrudeMesh.log"
-else:
-    sys.exit("ExtrudeMesh appeared to fail, see ExtrudeMesh.log")
+## create 3D mesh (extrude 2D mesh using DEM)
+#print "\ncreating 3D mesh..."
+#cmd = "ExtrudeMesh "+gridName2D+" "+gridName3D+" "+str(nz)+" 10. 1 0 0 0 1 "+DEM_dir+" 1000. 1.5 -999999. > ExtrudeMesh.log"
+#print "\nstarting ExtrudeMesh with following command :\n",cmd
+#ret = os.system(cmd)
+#if ret == 0.:
+#    print "ExtrudeMesh complete, see ExtrudeMesh.log"
+#else:
+#    sys.exit("ExtrudeMesh appeared to fail, see ExtrudeMesh.log")
 
 # create 2D flowline mesh (extrude 1D flowline mesh using DEM)
 #print "\ncreating 2D flowline mesh..."
