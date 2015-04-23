@@ -14,21 +14,23 @@ ifneq ($(origin ESMFMKFILE), environment)
 $(error Environment variable ESMFMKFILE was not set.)
 endif
 
-ifneq ($(origin HOME), environment)
-$(error Environment variable HOME was not set.)
-endif
-
-# check for presence of required FISOC OM env vars
 ifneq ($(origin FISOC_OM), environment)
 $(error Environment variable FISOC_OM was not set.)
 endif
 
-# check for presence of required FISOC ISM env vars
 ifneq ($(origin FISOC_ISM), environment)
 $(error Environment variable FISOC_ISM was not set.)
 endif
 
-#  ELMER_INCLUDE = -I$(ELMER_HOME)/share/elmersolver/include
+ifneq ($(origin FISOC_INSTALL_DIR), environment)
+ ifneq ($(origin HOME), environment)
+  $(error Environment variables neither HOME nor FISOC_INSTALL_DIR was set.)
+ else
+  INSTALL_DIR = $(HOME)/bin
+ endif
+else
+ INSTALL_DIR = $(FISOC_INSTALL_DIR)
+endif
 
 include $(ESMFMKFILE)
 
@@ -36,7 +38,7 @@ include $(ESMFMKFILE)
 
 .SUFFIXES: .f90
 %.o : %.f90
-	$(ESMF_F90COMPILER) -c $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS) $(ESMF_F90COMPILEFREENOCPP)  $(FISOC_ISM_INC) -cpp  -o $@  $<
+	$(ESMF_F90COMPILER) -c $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS) $(ESMF_F90COMPILEFREENOCPP) $(FISOC_ISM_INC)  -cpp  -o $@  $<
 
 ################################################################################
 
@@ -57,7 +59,7 @@ $(SRCDIR)/FISOC_utils.o:                    $(SRCDIR)/FISOC_utils.f90
 ################################################################################
 
 install: FISOC_caller
-	cp FISOC_caller $(HOME)/bin
+	cp FISOC_caller $(INSTALL_DIR)
 
 .PHONY: clean
 

@@ -316,6 +316,8 @@ cd hdf5-1.8.13
  # Note the O0 flag in the next line.  The default is O3, which is
  # strong optimisation.  This can result in failed checks on some
  #  systems.
+ CC=mpicc FC=mpif90 ./configure  --prefix=/usr/local/ --with-zlib=/usr/local  --enable-fortran --enable-parallel
+
  CFLAGS=-O0 ./configure --prefix=/usr/local/ --with-zlib=/usr/local  --enable-fortran 
  make check
  sudo -E make install
@@ -335,13 +337,15 @@ wget ftp://ftp.unidata.ucar.edu/pub/netcdf/
 tar -xzf netcdf-fortran-4.4.2.tar.gz 
 cd netcdf-fortran-4.4.2
  LD_LIBRARY_PATH=/usr/local/lib/ CPPFLAGS="-I/usr/local/include  -I/usr/local/hdf5/include -DUSE_NETCDF4" LDFLAGS="-L/usr/local/lib -L/usr/local/hdf5/lib" ./configure  --prefix=/usr/local
+ LD_LIBRARY_PATH=/usr/local/lib/ CPPFLAGS="-I/usr/local/include -DUSE_NETCDF4" LDFLAGS="-L/usr/local/lib" ./configure  --prefix=/usr/local
  make check
  sudo -E make install
 cd ..
 
 export ESMF_DIR="/top/level/directory/for/esmf/"
 export ESMF_NETCDF="split"
-export ESMF_NETCDF_INCLUDE="/usr/local/include/"
+export ESMF_NETCDF_INCLUDE="/usr/local/include"
+export ESMF_NETCDF_LIBPATH="/usr/local/lib"
 export ESMF_COMM="openmpi"
 export ESMFMKFILE="$ESMF_DIR/DEFAULTINSTALLDIR/lib/libO/
                              Linux.gfortran.64.openmpi.default/esmf.mk"
