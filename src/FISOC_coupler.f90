@@ -1,4 +1,4 @@
-MODULE FISOC_coupler
+MODULE FISOC_coupler_MOD
   
   USE ESMF
     
@@ -739,4 +739,4 @@ CONTAINS
 
   END FUNCTION  dummyCreateGrid
 
-END MODULE FISOC_coupler
+END MODULE FISOC_coupler_MOD

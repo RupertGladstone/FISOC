@@ -1,12 +1,12 @@
 
-MODULE  FISOC_parent_mod
+MODULE  FISOC_parent_MOD
   
   USE ESMF
 
-  USE FISOC_ISM, ONLY : FISOC_ISM_register
-  USE FISOC_coupler, ONLY : FISOC_coupler_register
-  USE FISOC_OM, ONLY : FISOC_OM_register
-  USE FISOC_utils
+  USE FISOC_ISM_MOD, ONLY : FISOC_ISM_register
+  USE FISOC_coupler_MOD, ONLY : FISOC_coupler_register
+  USE FISOC_OM_MOD, ONLY : FISOC_OM_register
+  USE FISOC_utils_MOD
   
   IMPLICIT NONE
   
@@ -573,4 +573,4 @@ CONTAINS
     
   END SUBROUTINE FISOC_finalize
 
-END MODULE FISOC_parent_mod
+END MODULE FISOC_parent_MOD

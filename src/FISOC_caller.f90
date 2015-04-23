@@ -2,8 +2,8 @@
 PROGRAM FISOC_main
 
   USE ESMF
-  USE FISOC_utils
-  USE FISOC_parent_mod, ONLY : FISOC_parent_register
+  USE FISOC_utils_MOD
+  USE FISOC_parent_MOD, ONLY : FISOC_parent_register
 
   IMPLICIT NONE
 

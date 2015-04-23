@@ -1,5 +1,5 @@
 
-MODULE FISOC_utils
+MODULE FISOC_utils_MOD
 
   USE ESMF
 
@@ -535,4 +535,4 @@ CONTAINS
 
   END SUBROUTINE FISOC_getStringListFromConfig
 
-END MODULE FISOC_utils
+END MODULE FISOC_utils_MOD

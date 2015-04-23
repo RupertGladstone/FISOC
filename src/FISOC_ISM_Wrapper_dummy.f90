@@ -2,7 +2,7 @@
 MODULE FISOC_ISM_Wrapper
 
   USE ESMF
-  USE FISOC_utils
+  USE FISOC_utils_MOD
 
   IMPLICIT NONE
 

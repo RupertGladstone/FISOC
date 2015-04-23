@@ -2,7 +2,7 @@
 MODULE FISOC_ISM_Wrapper
 
   USE ESMF
-  USE FISOC_utils
+  USE FISOC_utils_MOD
   USE FISOC_Elmer_types
   USE ElmerSolver_mod
   USE MainUtils
