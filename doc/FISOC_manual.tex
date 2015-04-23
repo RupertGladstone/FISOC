@@ -30,8 +30,8 @@
 \begin{document}
 
 \title{Framework for Ice Sheet - Ocean Coupled modelling (FISOC) Manual}
-\author{R. Gladstone (RupertGladstone1972@gmail.com) \and B. Galton-Fenzi}
-\date{Version 0.0, Feb 2015}
+\author{Rupert Gladstone (RupertGladstone1972@gmail.com) \and Ben Galton-Fenzi}
+\date{Version 0.0, April 2015}
 \maketitle
 
 
@@ -86,6 +86,8 @@ make install
 
 Several environment variables may be used in the build process. 
 Some of these are mandatory. 
+Variables listed as optional here may be mandatory for configuratons other than 
+``dummy''.
 These environment variables are not used at run time, only during 
 the compilation/installation of FISOC.
 
@@ -103,14 +105,20 @@ Determines which OM component will be used.        \\
 Required. Possible values ``dummy'', ``Elmer''.    \\
 Determines which ISM component will be used.       \\
 \vspace{6pt}
-\textbf{FISOC\_ISM\_INC}                           \\ 
+\textbf{FISOC\_ISM\_INCLUDE}                       \\ 
 Optional.                                          \\
-Full path to ISM include files.                    \\
+Specifies the path where the ISM header files are located.\\
 \vspace{6pt}
-\textbf{FISOC\_ISM\_SO}                            \\
+\textbf{FISOC\_ISM\_LIBPATH}                       \\
 Optional.                                          \\
-Full path to ISM shared object library.            \\
+Specifies the path where the ISM library files are located.\\
+\vspace{6pt}
+\textbf{FISOC\_ISM\_LIBS}                          \\
+Optional.                                          \\
+Specifies the linker directives needed to link the ISM library to FISOC. \\
 \end{flushleft}
+
+
 
 \subsubsection{Pre-requisites}
 \label{sec:PreReq}
@@ -125,15 +133,15 @@ The Network Common Data Form (NetCDF,
 Fortran interface must be available 
 
 ESMF must be available (\url{https://www.earthsystemcog.org/projects/esmf/}).  
-ESMF should have been built with NetCDF and MPI.
-For example, environment variables like these may be used for the ESMF build
-(see also notes in Appendix~\ref{app:A}):
-\begin{lstlisting}
-export ESMF_NETCDF="split"
-export ESMF_NETCDF_INCLUDE="/usr/local/include/"
-export ESMF_COMM="openmpi"
-\end{lstlisting}
+ESMF should have been built with NetCDF and MPI 
+(see also notes in Appendix~\ref{app:A}).
 
+%For example, environment variables like these may be used for the ESMF build
+%\begin{lstlisting}
+%export ESMF_NETCDF="split"
+%export ESMF_NETCDF_INCLUDE="/usr/local/include/"
+%export ESMF_COMM="openmpi"
+%\end{lstlisting}
 
 Viable ISM and OM components must be available for any physically meaningful simulations
 (the build may be tested using ``dummy'' components).  
@@ -246,22 +254,27 @@ to steady state then the ice sheet continues until significant change has occurr
 \label{sec:Elmer}
 ***ref or link Elmer/Ice
 
-FISOC needs to know where to find the relevant Elmer/Ice module files and shared object files.  
-This can be done at compile time through the  *** environment variables.  
-Finding the ElmerSolver.so shared object file at run time can be ensured through use of 
-%the $LD\_LIBRARY\_PATH environment variable. 
+FISOC needs to know where to find the relevant Elmer/Ice libraries.  
+This can be done at FISOC compile time through the 
+\$FISOC\_ISM
+environment variables.  
 
-For example (it is assumed \$ELMER\_HOME was set during Elmer installation):\\
+For dynamic linked libraries, shared object files may be needed at run time.  
+This can be ensured through use of 
+the \$ LD\_LIBRARY\_PATH environment variable. 
+
+For example (it is assumed \$ELMER\_HOME was set during Elmer installation):
 \begin{lstlisting}
 export FISOC_ISM="Elmer"
-export FISOC_ISM_INC="-I$ELMER_HOME/share/elmersolver/include"
-export FISOC_ISM_SO="$ELMER_HOME/lib/libelmersolver.so"      
-export LD_LIBRARY_PATH="$ELMER_HOME/lib/:$LD_LIBRARY_PATH"   
+export FISOC_ISM_INCLUDE="$ELMER_HOME/share/elmersolver/include"
+export FISOC_ISM_LIBPATH="$ELMER_HOME/lib/"
+export FISOC_ISM_LIBS="-lelmersolver"
+export LD_LIBRARY_PATH="$FISOC_ISM_LIBPATH/:$LD_LIBRARY_PATH"
 \end{lstlisting}
-\label{sec:ROMS}
 
 
 \subsection{ROMS}
+\label{sec:ROMS}
 
 NYI
 
