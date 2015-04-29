@@ -101,6 +101,18 @@ The user should also ensure this location is in their \$PATH. \\
 Required. Possible values ``dummy'', ``ROMS''.     \\
 Determines which OM component will be used.        \\
 \vspace{6pt}
+\textbf{FISOC\_OM\_INCLUDE}                       \\ 
+Optional.                                          \\
+Specifies the path where the OM header files are located.\\
+\vspace{6pt}
+\textbf{FISOC\_OM\_LIBPATH}                       \\
+Optional.                                          \\
+Specifies the path where the OM library files are located.\\
+\vspace{6pt}
+\textbf{FISOC\_OM\_LIBS}                          \\
+Optional.                                          \\
+Specifies the linker directives needed to link the OM library to FISOC. \\
+\vspace{6pt}
 \textbf{FISOC\_ISM}                                \\
 Required. Possible values ``dummy'', ``Elmer''.    \\
 Determines which ISM component will be used.       \\
@@ -261,7 +273,7 @@ environment variables.
 
 For dynamic linked libraries, shared object files may be needed at run time.  
 This can be ensured through use of 
-the \$ LD\_LIBRARY\_PATH environment variable. 
+the \$LD\_LIBRARY\_PATH environment variable. 
 
 For example (it is assumed \$ELMER\_HOME was set during Elmer installation):
 \begin{lstlisting}
@@ -276,7 +288,29 @@ export LD_LIBRARY_PATH="$FISOC_ISM_LIBPATH/:$LD_LIBRARY_PATH"
 \subsection{ROMS}
 \label{sec:ROMS}
 
-NYI
+FISOC has been developed and tested with an ice shelf enabled version of ROMS. 
+This is branched from the Rutgers ROMS repository and is publicly available 
+through github: \\
+https://github.com/bkgf/romsIceShelf
+
+When compiling ROMS for use with FISOC, It is essential to activate the option 
+to compile the ROMS shared library, which 
+is done by setting the environment variable \$ROMS\_MAKE\_SHAREDLIB to any value. 
+The shared library will be installed in the location given by the 
+ \$LIBDIR environment variable. 
+By default ROMS will install the module files in the directory given by 
+ \$SCRATCH\_DIR.  
+
+Similarly to the ISM options, FISOC uses the variables \$FISOC\_OM\_LIBPATH and
+ \$FISOC\_OM\_LIBS to locate the shared library.
+FISOC uses the  \$FISOC\_OM\_INCLUDE variable to locate the module files, 
+which are needed during compilation.
+
+FISOC needs to access the shared library at run time.  One way of ensuring this 
+is to set the \$ LD\_LIBRARY\_PATH variable, e.g.:
+\begin{lstlisting}
+export LD_LIBRARY_PATH="$FISOC_OM_LIBPATH/:$LD_LIBRARY_PATH"
+\end{lstlisting}
 
 \section{Adapting new components to run with  FISOC}
 \label{sec:FISOC_SDG}

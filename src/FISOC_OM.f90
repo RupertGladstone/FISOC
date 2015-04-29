@@ -84,11 +84,7 @@ CONTAINS
     ! The returned MPI communicator spans the same MPI processes that the VM
     ! is defined on.
 
-mpic2=-999
-!commented out the next call to avoid errors when compiling in serial.  When we put 
-!this back in we'll wrap it in preprocessor statements so it is only 
-!compiled for parallel simulations.
-!    CALL MPI_Comm_dup(mpic, mpic2, ierr)
+    CALL MPI_Comm_dup(mpic, mpic2, ierr)
     ! Duplicate the MPI communicator not to interfere with ESMF communications.
     ! The duplicate MPI communicator can be used in any MPI call in the user
     ! code. 
