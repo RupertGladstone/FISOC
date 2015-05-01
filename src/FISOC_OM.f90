@@ -263,18 +263,18 @@ CONTAINS
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
        END IF
        
-       print*,"*** write some outputs ***"
-       print*,"NETCDF ",ESMF_IO_NETCDF_PRESENT 
-       print*,"parallel NETCDF ",ESMF_IO_PNETCDF_PRESENT 
-       CALL ESMF_ClockGet(FISOC_clock, advanceCount=advanceCount, rc=rc)
-       IF (ESMF_IO_NETCDF_PRESENT) THEN
-          CALL  ESMF_FieldBundleWrite(OM_ExpFB, "test.nc", overwrite=.TRUE., & 
-               status=ESMF_FILESTATUS_UNKNOWN, timeslice=1, &
-               iofmt=ESMF_IOFMT_NETCDF, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-                  CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-       END IF
+!       print*,"*** write some outputs ***"
+!       print*,"NETCDF ",ESMF_IO_NETCDF_PRESENT 
+!       print*,"parallel NETCDF ",ESMF_IO_PNETCDF_PRESENT 
+!       CALL ESMF_ClockGet(FISOC_clock, advanceCount=advanceCount, rc=rc)
+!       IF (ESMF_IO_NETCDF_PRESENT) THEN
+!          CALL  ESMF_FieldBundleWrite(OM_ExpFB, "test.nc", overwrite=.TRUE., & 
+!               status=ESMF_FILESTATUS_UNKNOWN, timeslice=1, &
+!               iofmt=ESMF_IOFMT_NETCDF, rc=rc)
+!          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!               line=__LINE__, file=__FILE__)) &
+!                  CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+!       END IF
 
     ELSE
        

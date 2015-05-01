@@ -67,8 +67,6 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  ! This dummy wrapper aims to create the dummy mesh and required variables 
-  ! in the ESMF formats.  
   SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,localPet,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
@@ -372,7 +370,6 @@ CONTAINS
     rc = ESMF_SUCCESS
 
   END SUBROUTINE Initialise_Elmer_ParEnv
-
-
+  
 END MODULE FISOC_ISM_Wrapper
 

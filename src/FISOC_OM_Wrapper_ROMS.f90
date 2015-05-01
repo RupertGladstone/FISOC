@@ -40,8 +40,6 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-print*,OM_configFile
-
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
        PRINT*,"******************************************************************************"
@@ -54,15 +52,22 @@ print*,OM_configFile
        PRINT*,""
     END IF
 
-print *, mpic, '*****'
     CALL ROMS_initialize(first,mpic,OM_configFile)
 
-! OM_Grid
-
-!    CALL FISOC_populateFieldBundle(OM_ReqVarList,OM_ExpFB,OM_grid,rc=rc)
+!    CALL ESMF_VMBarrier(vm, rc=rc)
 !    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
 !         line=__LINE__, file=__FILE__)) &
 !         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL OM_createGrid(OM_grid, localPet, verbose_coupling, rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL FISOC_populateFieldBundle(OM_ReqVarList,OM_ExpFB,OM_grid,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
 ! field bundle populated but not initialised to anything sensible
     
@@ -252,5 +257,369 @@ print *, mpic, '*****'
 
   END SUBROUTINE FISOC_OM_Wrapper_Finalize
 
+  subroutine OM_createGrid(OM_grid, localPet, verbose_coupling, rc)
+    
+    use mod_grid , only : GRID
+    use mod_param, only : NtileI, NtileJ, BOUNDS, Lm, Mm, Ngrids
+    
+    implicit none
+    
+    type(ESMF_grid), intent(inout) :: OM_grid
+    integer, intent(in)            :: localPet 
+    logical, intent(in)            :: verbose_coupling
+    integer, intent(out)           :: rc
+    
+    integer                        :: i2, j2, ii, jj, ng, nr, tile, localDECount
+    integer                        :: IstrR, IendR, JstrR, JendR
+    integer                        :: IstrU, IendU, JstrU, JendU     
+    integer                        :: IstrV, IendV, JstrV, JendV
+    integer                        :: LBi, UBi, LBj, UBj
+    integer                        :: staggerEdgeLWidth(2)
+    integer                        :: staggerEdgeUWidth(2)
+    integer, allocatable           :: deBlockList(:,:,:)
+    real(ESMF_KIND_R8), pointer    :: ptrX(:,:), ptrY(:,:), ptrA(:,:)
+    integer(ESMF_KIND_I4), pointer :: ptrM(:,:)
+    character(ESMF_MAXSTR)         :: name, msgString
+    
+    type(ESMF_Array)               :: arrX, arrY, arrM, arrA
+    type(ESMF_StaggerLoc)          :: staggerLoc
+    type(ESMF_DistGrid)            :: distGrid
+    
+    !-----------------------------------------------------------------------
+    !     Staggered grid point indices
+    !     d --------- d   d --- v --- d  
+    !     |           |   |           |
+    !     |     c     |   u     c     u
+    !     |           |   |           |
+    !     d --------- d   d --- v --- d     
+    !     Arakawa - B     Arakawa - C
+    !     RegCM           ROMS (c = rho, d = psi)
+    !-----------------------------------------------------------------------
+    !
+    character(len=6) :: GRIDDES(0:4) = &
+         (/'N/A   ','CROSS ','DOT   ','U     ','V     '/)
+    integer, parameter :: Inan    = 0
+    integer, parameter :: Icross  = 1
+    integer, parameter :: Idot    = 2
+    integer, parameter :: Iupoint = 3
+    integer, parameter :: Ivpoint = 4
+    
+    rc = ESMF_FAILURE
+    
+    if (Ngrids > 1) then
+       msg = 'number of nested grid is greater than 1.'//        &
+            'Coupling only interacts with outermost one!'
+       call ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       ng = 1
+    else
+       ng = Ngrids
+    end if
+    
+    !-----------------------------------------------------------------------
+    !     Get limits of the grid arrays (based on PET and nest level)
+    !-----------------------------------------------------------------------
+    
+    IstrR = BOUNDS(ng)%IstrR(localPet)
+    IendR = BOUNDS(ng)%IendR(localPet)
+    JstrR = BOUNDS(ng)%JstrR(localPet)
+    JendR = BOUNDS(ng)%JendR(localPet)
+    !
+    IstrU = BOUNDS(ng)%Istr(localPet)
+    IendU = BOUNDS(ng)%IendR(localPet)
+    JstrU = BOUNDS(ng)%JstrR(localPet)
+    JendU = BOUNDS(ng)%JendR(localPet)
+    !
+    IstrV = BOUNDS(ng)%IstrR(localPet)
+    IendV = BOUNDS(ng)%IendR(localPet)
+    JstrV = BOUNDS(ng)%Jstr(localPet)
+    JendV = BOUNDS(ng)%JendR(localPet)
+    !
+    LBi = BOUNDS(ng)%LBi(localPet)
+    UBi = BOUNDS(ng)%UBi(localPet)
+    LBj = BOUNDS(ng)%LBj(localPet)
+    UBj = BOUNDS(ng)%UBj(localPet)
+    !
+    if (.not.allocated(deBlockList)) then
+       allocate(deBlockList(2,2,NtileI(ng)*NtileJ(ng)))
+    end if
+    do tile=0,NtileI(ng)*NtileJ(ng)-1
+       deBlockList(1,1,tile+1)=BOUNDS(ng)%Istr(tile)
+       deBlockList(1,2,tile+1)=BOUNDS(ng)%Iend(tile)
+       deBlockList(2,1,tile+1)=BOUNDS(ng)%Jstr(tile)
+       deBlockList(2,2,tile+1)=BOUNDS(ng)%Jend(tile)
+    end do
+    
+    !-----------------------------------------------------------------------
+    !     Create ESMF DistGrid based on ROMS model domain decomposition
+    !-----------------------------------------------------------------------
+    distGrid = ESMF_DistGridCreate(minIndex=(/ 1, 1 /),               &
+         maxIndex=(/ Lm(ng), Mm(ng) /),     &
+         deBlockList=deBlockList,           &
+         rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) return
+    
+    if (allocated(deBlockList)) deallocate(deBlockList) 
+    
+    
+    !-----------------------------------------------------------------------
+    !     Set staggering type 
+    !-----------------------------------------------------------------------
+    staggerLoop: do ii = 1, 4 
+       if (ii == Iupoint) then
+          staggerLoc = ESMF_STAGGERLOC_EDGE1
+          staggerEdgeLWidth = (/0,1/)
+          staggerEdgeUWidth = (/1,1/)
+       else if (ii == Ivpoint) then
+          staggerLoc = ESMF_STAGGERLOC_EDGE2
+          staggerEdgeLWidth = (/1,0/)
+          staggerEdgeUWidth = (/1,1/)
+       else if (ii == Icross) then
+          staggerLoc = ESMF_STAGGERLOC_CENTER
+          staggerEdgeLWidth = (/1,1/)
+          staggerEdgeUWidth = (/1,1/)
+       else if (ii == Idot) then
+          staggerLoc = ESMF_STAGGERLOC_CORNER
+          staggerEdgeLWidth = (/0,0/)
+          staggerEdgeUWidth = (/1,1/)
+       end if
+       
+       !-----------------------------------------------------------------------
+       !     Create ESMF Grid
+       !-----------------------------------------------------------------------
+       if (ii == 1) then
+          OM_grid = ESMF_GridCreate(distgrid=distGrid,  &
+               gridEdgeLWidth=(/1,1/),                              &
+               gridEdgeUWidth=(/1,1/),                              &
+               indexflag=ESMF_INDEX_GLOBAL,                         &
+               name="OM_grid",                                      &
+               rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,  &
+               line=__LINE__, file=__FILE__))                             &
+               call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       end if
+       
+       !-----------------------------------------------------------------------
+       !     Allocate coordinates 
+       !-----------------------------------------------------------------------
+       call ESMF_GridAddCoord(OM_grid,            &
+            staggerLoc=staggerLoc,                &
+            staggerEdgeLWidth=staggerEdgeLWidth,  &
+            staggerEdgeUWidth=staggerEdgeUWidth,  &
+            rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+            line=__LINE__, file=__FILE__)) return
+       
+       !-----------------------------------------------------------------------
+       !     Allocate items for masking
+       !-----------------------------------------------------------------------
+       call ESMF_GridAddItem(OM_grid,       &
+            staggerLoc=staggerLoc,          &
+            itemflag=ESMF_GRIDITEM_MASK,    &
+            rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+            line=__LINE__, file=__FILE__)) return
+       
+       !-----------------------------------------------------------------------
+       !     Allocate items for grid area 
+       !-----------------------------------------------------------------------
+       call ESMF_GridAddItem(OM_grid,       &
+            staggerLoc=staggerLoc,          &
+            itemflag=ESMF_GRIDITEM_AREA,    &
+            rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+            line=__LINE__, file=__FILE__)) return
+       
+       !-----------------------------------------------------------------------
+       !     Get number of local DEs
+       !-----------------------------------------------------------------------
+       call ESMF_GridGet(OM_grid,              &
+            localDECount=localDECount,         &
+            rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+            line=__LINE__, file=__FILE__)) return
+       
+       !-----------------------------------------------------------------------
+       !     Get pointers and set coordinates for the grid 
+       !-----------------------------------------------------------------------
+       do jj = 0, localDECount-1
+          call ESMF_GridGetCoord(OM_grid,                 &
+               localDE=jj,                                &
+               staggerLoc=staggerLoc,                     &
+               coordDim=1,                                &
+               farrayPtr=ptrX,                            &
+               rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+               line=__LINE__, file=__FILE__)) return
+          !
+          call ESMF_GridGetCoord(OM_grid,                 &
+               localDE=jj,                                &
+               staggerLoc=staggerLoc,                     &
+               coordDim=2,                                &
+               farrayPtr=ptrY,                            &
+               rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+               line=__LINE__, file=__FILE__)) return
+          !
+          call ESMF_GridGetItem (OM_grid,                 &
+               localDE=jj,                                &
+               staggerLoc=staggerLoc,                     &
+               itemflag=ESMF_GRIDITEM_MASK,               &
+               farrayPtr=ptrM,                            &
+               rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+               line=__LINE__, file=__FILE__)) return
+          !
+          call ESMF_GridGetItem (OM_grid,                 &
+               localDE=jj,                                &
+               staggerLoc=staggerLoc,                     &
+               itemflag=ESMF_GRIDITEM_AREA,               &
+               farrayPtr=ptrA,                            &
+               rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+               line=__LINE__, file=__FILE__)) return
+          !
+          !-----------------------------------------------------------------------
+          !     Debug: write size of pointers    
+          !-----------------------------------------------------------------------
+          !
+          name = GRIDDES(ii)
+          !
+          if (verbose_coupling) then
+             write(*,30) localPet, jj, adjustl("PTR/OCN/GRD/"//name), &
+                  lbound(ptrX, dim=1), ubound(ptrX, dim=1),           &
+                  lbound(ptrX, dim=2), ubound(ptrX, dim=2)
+          end if
+          !
+          !-----------------------------------------------------------------------
+          !     Fill the pointers    
+          !-----------------------------------------------------------------------
+          !
+          if (ii == Idot) then
+             if (verbose_coupling) then
+                write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
+                     lbound(GRID(ng)%lonp, dim=1), ubound(GRID(ng)%lonp, dim=1),     &
+                     lbound(GRID(ng)%lonp, dim=2), ubound(GRID(ng)%lonp, dim=2)
+             end if
+             !
+             do j2 = JstrV, JendR
+                do i2 = IstrU, IendR
+                   ptrX(i2,j2) = GRID(ng)%lonp(i2,j2)
+                   ptrY(i2,j2) = GRID(ng)%latp(i2,j2)
+                   ptrM(i2,j2) = int(GRID(ng)%pmask(i2,j2))
+                   ptrA(i2,j2) = GRID(ng)%om_p(i2,j2)*GRID(ng)%on_p(i2,j2)
+                end do
+             end do
+          else if (ii == Icross) then
+             if (verbose_coupling) then
+                write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
+                     lbound(GRID(ng)%lonr, dim=1), ubound(GRID(ng)%lonr, dim=1),     &
+                     lbound(GRID(ng)%lonr, dim=2), ubound(GRID(ng)%lonr, dim=2)
+             end if
+             !
+             do j2 = JstrR, JendR
+                do i2 = IstrR, IendR
+                   ptrX(i2,j2) = GRID(ng)%lonr(i2,j2)
+                   ptrY(i2,j2) = GRID(ng)%latr(i2,j2)
+                   ptrM(i2,j2) = int(GRID(ng)%rmask(i2,j2))
+                   ptrA(i2,j2) = GRID(ng)%om_r(i2,j2)*GRID(ng)%on_r(i2,j2)
+                end do
+             end do
+          else if (ii == Iupoint) then
+             if (verbose_coupling) then
+                write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
+                     lbound(GRID(ng)%lonu, dim=1), ubound(GRID(ng)%lonu, dim=1),     &
+                     lbound(GRID(ng)%lonu, dim=2), ubound(GRID(ng)%lonu, dim=2)
+             end if
+             !
+             do j2 = JstrU, JendU
+                do i2 = IstrU, IendU
+                   ptrX(i2,j2) = GRID(ng)%lonu(i2,j2)
+                   ptrY(i2,j2) = GRID(ng)%latu(i2,j2)
+                   ptrM(i2,j2) = int(GRID(ng)%umask(i2,j2))
+                   ptrA(i2,j2) = GRID(ng)%om_u(i2,j2)*GRID(ng)%on_u(i2,j2)
+                end do
+             end do
+          else if (ii == Ivpoint) then
+             if (verbose_coupling) then
+                write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
+                     lbound(GRID(ng)%lonv, dim=1), ubound(GRID(ng)%lonv, dim=1),     &
+                     lbound(GRID(ng)%lonv, dim=2), ubound(GRID(ng)%lonv, dim=2)
+             end if
+             !
+             do j2 = JstrV, JendV
+                do i2 = IstrV, IendV
+                   ptrX(i2,j2) = GRID(ng)%lonv(i2,j2)
+                   ptrY(i2,j2) = GRID(ng)%latv(i2,j2)
+                   ptrM(i2,j2) = int(GRID(ng)%vmask(i2,j2))
+                   ptrA(i2,j2) = GRID(ng)%om_v(i2,j2)*GRID(ng)%on_v(i2,j2)
+                end do
+             end do
+          end if
+          !
+          !-----------------------------------------------------------------------
+          !     Create temporary arrays.
+          !-----------------------------------------------------------------------
+          !
+          if (ii == Icross) then
+             arrX = ESMF_ArrayCreate(distGrid, ptrX,                         &
+                  indexflag=ESMF_INDEX_DELOCAL, rc=rc) 
+             if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,  &
+                  line=__LINE__, file=__FILE__)) return
+             !
+             arrY = ESMF_ArrayCreate(distGrid, ptrY,                         &
+                  indexflag=ESMF_INDEX_DELOCAL, rc=rc) 
+             if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,  &
+                  line=__LINE__, file=__FILE__)) return
+             !
+             arrM = ESMF_ArrayCreate(distGrid, ptrM,                         &
+                  indexflag=ESMF_INDEX_DELOCAL, rc=rc) 
+             if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,  &
+                  line=__LINE__, file=__FILE__)) return
+             !
+             arrA = ESMF_ArrayCreate(distGrid, ptrA,                         &
+                  indexflag=ESMF_INDEX_DELOCAL, rc=rc) 
+             if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,  &
+                  line=__LINE__, file=__FILE__)) return
+          end if
+          !
+          !-----------------------------------------------------------------------
+          !     Nullify pointers 
+          !-----------------------------------------------------------------------
+          !
+          if (associated(ptrX)) then
+             nullify(ptrX)
+          end if
+          if (associated(ptrY)) then
+             nullify(ptrY)
+          end if
+          if (associated(ptrM)) then
+             nullify(ptrM)
+          end if
+          if (associated(ptrA)) then
+             nullify(ptrA)
+          end if
+       end do
+
+       !-----------------------------------------------------------------------
+       !     Debug: write out component grid in VTK format 
+       !-----------------------------------------------------------------------
+       !
+       if (verbose_coupling) then
+          call ESMF_GridWriteVTK(OM_grid,                     &
+               filename="ocean_"//                            &
+               trim(GRIDDES(ii))//                            &
+               "point",                                       &
+               staggerLoc=staggerLoc,                         &
+               rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+               line=__LINE__, file=__FILE__)) return
+       end if
+    end do staggerLoop
+    
+30  format(" PET(",I3.3,") - DE(",I2.2,") - ", A20, " : ", 4I8)
+    !
+  end subroutine OM_createGrid
 
 END MODULE FISOC_OM_Wrapper
