@@ -17,6 +17,7 @@ MODULE FISOC_utils_MOD
 
   INTERFACE FISOC_ConfigDerivedAttribute
       MODULE PROCEDURE FISOC_ConfigDerivedAttributeInteger
+      MODULE PROCEDURE FISOC_ConfigDerivedAttributeStaggerLocArray
   END INTERFACE 
 
   CHARACTER(len=ESMF_MAXSTR) :: msg
@@ -388,11 +389,91 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_populateFieldBundleOn2dGrid(fieldNames,fieldBundle,grid,init_value,rc)
+  SUBROUTINE FISOC_ConfigDerivedAttributeStaggerLocArray(FISOC_config, derivedAttribute, label, rc)
+    
+    CHARACTER(len=*),INTENT(IN)           :: label
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    TYPE(ESMF_staggerLoc),INTENT(INOUT)   :: derivedAttribute(:)
+    INTEGER,OPTIONAL,INTENT(OUT)          :: rc
+    
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: attribute_stringList(:)
+    INTEGER                               :: OM_dt_sec, dt_ratio, OM_outputInterval
 
-    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: fieldNames(:)
-    TYPE(ESMF_grid),INTENT(IN)            :: grid
-    REAL(ESMF_KIND_R8),INTENT(IN),OPTIONAL:: init_value
+    rc = ESMF_FAILURE
+
+    SELECT CASE(label)
+
+    CASE('OM_ReqVars_stagger:')
+       CALL FISOC_getStringListFromConfig(FISOC_config, label, attribute_stringList,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       CALL FISOC_OM_staggerCodes(derivedAttribute,attribute_stringList,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CASE DEFAULT
+       msg = 'ERROR: unrecognised derived config attribute label '
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END SELECT
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_ConfigDerivedAttributeStaggerLocArray
+
+
+  !--------------------------------------------------------------------------------------
+  ! convert a list of strings describning stagger location to ESMF stagger location 
+  ! integer codes (for use in ESMF operations such as creating fields on a grid).
+  SUBROUTINE FISOC_OM_staggerCodes(staggerLoc,staggerChar,rc)
+    
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE,INTENT(IN) :: staggerChar(:)
+    TYPE(ESMF_staggerLoc),INTENT(OUT)                 :: staggerLoc(:)
+    INTEGER,INTENT(OUT),OPTIONAL                      :: rc
+
+    INTEGER                                           :: ii
+
+    rc = ESMF_FAILURE
+    
+    IF (size(staggerLoc) .ne. size(staggerChar)) THEN
+       msg = 'ERROR: stagger lists must be same length'
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+       
+    DO ii = 1,size(staggerLoc)
+       SELECT CASE(staggerChar(ii))
+       CASE("EDGE1")
+          staggerLoc(ii) = ESMF_STAGGERLOC_EDGE1
+       CASE("EDGE2")
+          staggerLoc(ii) = ESMF_STAGGERLOC_EDGE2
+       CASE("CENTER")
+          staggerLoc(ii) = ESMF_STAGGERLOC_CENTER
+       CASE("CORNER")
+          staggerLoc(ii) = ESMF_STAGGERLOC_CORNER
+       CASE DEFAULT
+          msg = 'ERROR: unrecognised staggerLoc string '
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END SELECT
+    END DO
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_OM_staggerCodes
+
+
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE FISOC_populateFieldBundleOn2dGrid(fieldNames,fieldBundle,grid,init_value,fieldStagger,rc)
+
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN)    :: fieldNames(:)
+    TYPE(ESMF_grid),INTENT(IN)               :: grid
+    REAL(ESMF_KIND_R8),INTENT(IN),OPTIONAL   :: init_value
+    TYPE(ESMF_staggerLoc),INTENT(IN),OPTIONAL:: fieldStagger(:)
 
     TYPE(ESMF_fieldbundle),INTENT(INOUT)  :: fieldBundle
     INTEGER,INTENT(OUT),OPTIONAL          :: rc

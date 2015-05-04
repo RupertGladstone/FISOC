@@ -315,19 +315,51 @@ export LD_LIBRARY_PATH="$FISOC_OM_LIBPATH/:$LD_LIBRARY_PATH"
 \section{Adapting new components to run with  FISOC}
 \label{sec:FISOC_SDG}
 
+Any new OM or ISM component to be used with FISOC must first be ESMF compliant.  This basically 
+means that it should have an initialise, run and finalise routine. 
 
-***configuration:
-The configuration file is compatible with ESMF config methods.  
-An ESMF\_config object is created and ESMF methods can be used to access config info.
-There are some parameters that are derived from config parameters.  
-The FISOC\_utils module provides subroutines (***names of these subroutines in table?) 
+FISOC is designed such that the only code developments for new components should be made to the 
+model-specific wrappers: FISOC\_OM\_Wrapper\_XXX.f90 and FISOC\_ISM\_Wrapper\_XXX.f90, where 
+XXX should be replaced by the component's name.
+
+If it is found that changes to other aspects of the FISOC code are required, this should be 
+implemented in collaboration with the FISOC lead developers.
+
+If you wish to submit your new model-specific wrapper to the FISOC repository, please contact 
+the FISOC lead developers.
+
+
+\subsection{Coding practices}
+
+New code should ideally be in Fortran 90 modules.  
+All moules should contain the ``implicit none'' statement at the top (immediately after any 
+``USE'' statements).  This property will be inherited by all procedures in the module.
+
+Modules should ideally have the private attribute, with only required procedures being 
+made public. 
+
+New model-specific wrapper modules should ensure that the initialise, run and finalise 
+subroutines are public. 
+When writing new wrapper modules, the existing wrapper modules may be used as a template, 
+providing examples of the required interfaces.
+
+
+\subsection{Configuration options}
+
+The configuration file must be called ``FISOC_config.rc'' and is compatible with ESMF 
+config methods.  
+An ESMF\_config object is automatically created from this file.
+
+There may be some parameters that are derived from config parameters.  
+The FISOC\_utils module provides subroutines under the 
+FISOC\_ConfigDerivedAttribute interface 
 for obtaining derived config parameters.
 These subroutines can be viewed informally as additional methods to complement the ESMF config access methods. 
-Note that the hard-coded calculations to provide derived config parameters cause a loss of 
-efficiency (except possibly in the case of intelligent optimisation from compilers) but these 
-are very cheap operations and this does not have a measurable impact on the overall 
-computational cost of the FISOC code.
-*** make any additional config information to the model specific wrapper without needing further coding.
+
+An advantage of the way the config object is used is that new config arguments can be added and 
+used in the coupling without requiring developments to any code other than the new wrapper. 
+The config object can be passed to the wrapper and accessed directly. 
+
 
 \subsection{ISM wrapper}
 

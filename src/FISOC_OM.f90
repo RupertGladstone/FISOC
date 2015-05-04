@@ -71,31 +71,28 @@ CONTAINS
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
-    ! extract a list of required ocean variables from the FISOC config object
+    ! get information from the OM gridded component.  vm is virtual machine.
     CALL ESMF_GridCompGet(FISOC_OM, config=FISOC_config, vm=vm, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    !-------------------------------------------------------------------------------
+    ! Get the parallel context, specifically the mpi communicator, for the OM to 
+    ! use.
+    ! The returned MPI communicator spans the same MPI processes that the VM
+    ! is defined on.
     CALL ESMF_VMGet(vm, localPet=localPet, mpiCommunicator=mpic, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ! The returned MPI communicator spans the same MPI processes that the VM
-    ! is defined on.
-
-    CALL MPI_Comm_dup(mpic, mpic2, ierr)
     ! Duplicate the MPI communicator not to interfere with ESMF communications.
     ! The duplicate MPI communicator can be used in any MPI call in the user
     ! code. 
+    CALL MPI_Comm_dup(mpic, mpic2, ierr)
 
-    label = 'FISOC_OM_ReqVars:'
-    CALL FISOC_getStringListFromConfig(FISOC_config, label, OM_ReqVarList,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    ! create empty field bundle
+    ! create empty field bundle to be populated my model-specific code.
     OM_ExpFB = ESMF_FieldBundleCreate(name='OM export fields', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -107,7 +104,7 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! model-specific initialisation
-    CALL FISOC_OM_Wrapper_Init_Phase1(OM_ReqVarList,OM_ExpFB,OM_grid,FISOC_config,mpic2,localPet,rc=rc)
+    CALL FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_grid,FISOC_config,mpic2,localPet,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)

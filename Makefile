@@ -50,11 +50,12 @@ $(SRCDIR)/FISOC_parent.o:                   $(SRCDIR)/FISOC_parent.f90 $(SRCDIR)
 $(SRCDIR)/FISOC_coupler.o:                  $(SRCDIR)/FISOC_coupler.f90
 $(SRCDIR)/FISOC_ISM.o:                      $(SRCDIR)/FISOC_ISM.f90 $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o $(SRCDIR)/FISOC_utils.o
 $(SRCDIR)/FISOC_OM.o:                       $(SRCDIR)/FISOC_OM.f90 $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o  $(SRCDIR)/FISOC_utils.o
-$(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o: $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).f90 $(SRCDIR)/FISOC_$(FISOC_ISM)_types.o  $(SRCDIR)/FISOC_utils.o 
-$(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o:   $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).f90  $(SRCDIR)/FISOC_utils.o
-$(SRCDIR)/FISOC_$(FISOC_ISM)_types.o:       $(SRCDIR)/FISOC_$(FISOC_ISM)_types.f90
+$(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o: $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).f90 $(SRCDIR)/FISOC_types.o $(SRCDIR)/FISOC_utils.o 
+$(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o:   $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).f90 $(SRCDIR)/FISOC_types.o $(SRCDIR)/FISOC_utils.o
+$(SRCDIR)/FISOC_types.o:                    $(SRCDIR)/FISOC_types.f90
 $(SRCDIR)/FISOC_utils.o:                    $(SRCDIR)/FISOC_utils.f90
 
+#TODO: make FISOC shared libs
 
 ################################################################################
 

@@ -1,8 +1,14 @@
 
+!
+! This is the ocean model spcific code for FISOC.  The main purpose is to transfer information 
+! between ESMF structures and the OM's internal structures.
+!
+
 MODULE FISOC_OM_Wrapper
 
   USE ESMF
   USE FISOC_utils_MOD
+  USE FISOC_types_MOD
   USE ocean_control_mod
 
   IMPLICIT NONE
@@ -12,19 +18,42 @@ MODULE FISOC_OM_Wrapper
   PUBLIC :: FISOC_OM_Wrapper_Init_Phase1,  FISOC_OM_Wrapper_Init_Phase2,  &
        FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize
 
+  !-----------------------------------------------------------------------
+  !     Staggered grid point indices
+  !     d --------- d   d --- v --- d  
+  !     |           |   |           |
+  !     |     c     |   u     c     u
+  !     |           |   |           |
+  !     d --------- d   d --- v --- d     
+  !     Arakawa - B     Arakawa - C
+  !     RegCM           ROMS (c = rho, d = psi)
+  !-----------------------------------------------------------------------
+  !
+  character(len=6)   :: GRIDDES(0:4) = &
+       (/'N/A   ','CROSS ','DOT   ','U     ','V     '/)
+  integer, parameter :: Inan    = 0
+  integer, parameter :: Icross  = 1
+  integer, parameter :: Idot    = 2
+  integer, parameter :: Iupoint = 3
+  integer, parameter :: Ivpoint = 4
+  
 CONTAINS
-
+  
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ReqVarList,OM_ExpFB,OM_grid,FISOC_config,mpic,localPet,rc)
+  ! The first phase of initialisation is mainly to initialise the ocean model, and access 
+  ! grid and variable initial information.
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_grid,FISOC_config,mpic,localPet,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: OM_ReqVarList(:)
     INTEGER,INTENT(IN)                    :: mpic ! mpi comm, duplicate from the OM VM
     INTEGER,INTENT(IN)                    :: localPet ! local persistent execution thread (1:1 relationship to process)
     TYPE(ESMF_grid),INTENT(OUT)           :: OM_grid
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ExpFB
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
+    CHARACTER(len=ESMF_MAXSTR)            :: label
+    TYPE(ESMF_staggerLoc),ALLOCATABLE     :: OM_ReqVars_stagger(:)
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: OM_ReqVarList(:),FISOC_OM_ReqVarList(:)
     CHARACTER(len=ESMF_MAXSTR)            :: OM_configFile
     LOGICAL                               :: verbose_coupling, first
 
@@ -40,36 +69,39 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"**********       OM wrapper.  Init phase 1 method.       *********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
-       PRINT*,"Here we need to get the OM grid information into the ESMF_grid type. "
-       PRINT*,"We also need to create and initialise the required variables using the "
-       PRINT*,"ESMF_field type and put them into an ESMF_fieldBundle type."
-       PRINT*,""
-    END IF
 
     CALL ROMS_initialize(first,mpic,OM_configFile)
 
-!    CALL ESMF_VMBarrier(vm, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    ! extract a list of required ocean variables from the configuration object
+    label = 'FISOC_OM_ReqVars:' ! the FISOC names for the vars
+    CALL FISOC_getStringListFromConfig(FISOC_config, label, FISOC_OM_ReqVarList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    label = 'OM_ReqVars:' ! the OM names for the vars
+    CALL FISOC_getStringListFromConfig(FISOC_config, label, OM_ReqVarList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    label = 'OM_ReqVars_stagger:' ! the OM names for stagger locations corresponding to the vars
+    ALLOCATE(OM_ReqVars_stagger(SIZE(OM_ReqVarList)))
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_ReqVars_stagger, label, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! ESMF grid creation accesses OM grid information from ROMS modules
     CALL OM_createGrid(OM_grid, localPet, verbose_coupling, rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL FISOC_populateFieldBundle(OM_ReqVarList,OM_ExpFB,OM_grid,rc=rc)
+    CALL FISOC_populateFieldBundle(FISOC_OM_ReqVarList,OM_ExpFB,OM_grid,init_value=FISOC_missingData,fieldStagger=OM_ReqVars_stagger,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-! field bundle populated but not initialised to anything sensible
     
   END SUBROUTINE FISOC_OM_Wrapper_Init_Phase1
 
@@ -284,26 +316,7 @@ CONTAINS
     type(ESMF_Array)               :: arrX, arrY, arrM, arrA
     type(ESMF_StaggerLoc)          :: staggerLoc
     type(ESMF_DistGrid)            :: distGrid
-    
-    !-----------------------------------------------------------------------
-    !     Staggered grid point indices
-    !     d --------- d   d --- v --- d  
-    !     |           |   |           |
-    !     |     c     |   u     c     u
-    !     |           |   |           |
-    !     d --------- d   d --- v --- d     
-    !     Arakawa - B     Arakawa - C
-    !     RegCM           ROMS (c = rho, d = psi)
-    !-----------------------------------------------------------------------
-    !
-    character(len=6) :: GRIDDES(0:4) = &
-         (/'N/A   ','CROSS ','DOT   ','U     ','V     '/)
-    integer, parameter :: Inan    = 0
-    integer, parameter :: Icross  = 1
-    integer, parameter :: Idot    = 2
-    integer, parameter :: Iupoint = 3
-    integer, parameter :: Ivpoint = 4
-    
+        
     rc = ESMF_FAILURE
     
     if (Ngrids > 1) then
@@ -621,5 +634,18 @@ CONTAINS
 30  format(" PET(",I3.3,") - DE(",I2.2,") - ", A20, " : ", 4I8)
     !
   end subroutine OM_createGrid
+
+!       ! initialise field data to MISSING_DATA
+!       do jj = 0, localDECount-1
+!          !-----------------------------------------------------------------------
+!          !     Get pointer to data array from field 
+!          !-----------------------------------------------------------------------
+!          call ESMF_FieldGet(field, localDe=jj, farrayPtr=ptr2d, rc=rc)
+!          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+!               line=__LINE__, file=__FILE__)) return
+!          ptr2d = MISSING_R8
+!          if (associated(ptr2d)) then
+!             nullify(ptr2d)
+!          end if
 
 END MODULE FISOC_OM_Wrapper
