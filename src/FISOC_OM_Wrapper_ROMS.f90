@@ -45,8 +45,8 @@ CONTAINS
   SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_grid,FISOC_config,mpic,localPet,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    INTEGER,INTENT(IN)                    :: mpic ! mpi comm, duplicate from the OM VM
-    INTEGER,INTENT(IN)                    :: localPet ! local persistent execution thread (1:1 relationship to process)
+    INTEGER,INTENT(IN),OPTIONAL           :: mpic ! mpi comm, duplicate from the OM VM
+    INTEGER,INTENT(IN),OPTIONAL           :: localPet ! local persistent execution thread (1:1 relationship to process)
     TYPE(ESMF_grid),INTENT(OUT)           :: OM_grid
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ExpFB
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
@@ -69,10 +69,16 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-
-    CALL ROMS_initialize(first,mpic,OM_configFile)
-
-
+    IF (PRESENT(mpic)) THEN
+       CALL ROMS_initialize(first,mpic,OM_configFile)
+    ELSE
+       msg = "ERROR: not currently configured for serial ROMS simulations"
+       ! TODO: check whether ROMS needs a dummy mpic in serial configuration
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    
     ! extract a list of required ocean variables from the configuration object
     label = 'FISOC_OM_ReqVars:' ! the FISOC names for the vars
     CALL FISOC_getStringListFromConfig(FISOC_config, label, FISOC_OM_ReqVarList,rc=rc)

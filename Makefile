@@ -11,15 +11,27 @@ FFLAGS =
 
 # check for presence of required env vars
 ifneq ($(origin ESMFMKFILE), environment)
-$(error Environment variable ESMFMKFILE was not set.)
+ $(error Environment variable ESMFMKFILE was not set.)
 endif
 
 ifneq ($(origin FISOC_OM), environment)
-$(error Environment variable FISOC_OM was not set.)
+ $(error Environment variable FISOC_OM was not set.)
 endif
 
 ifneq ($(origin FISOC_ISM), environment)
-$(error Environment variable FISOC_ISM was not set.)
+ $(error Environment variable FISOC_ISM was not set.)
+endif
+
+# if env var FISOC_MPI exists and is set to "yes" then ...
+# TODO: perhaps find something in esmfmkfile that can avoid the need to use this
+ifeq ($(origin FISOC_MPI), environment)
+ ifeq "$(FISOC_MPI)" "yes"
+  FISOC_MPI_SYMBOL = -D FISOC_MPI
+ else
+  FISOC_MPI_SYMBOL = 
+ endif
+else
+ FISOC_MPI_SYMBOL = 
 endif
 
 ifneq ($(origin FISOC_INSTALL_DIR), environment)
@@ -38,7 +50,7 @@ include $(ESMFMKFILE)
 
 .SUFFIXES: .f90
 %.o : %.f90
-	$(ESMF_F90COMPILER) -c $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS) $(ESMF_F90COMPILEFREENOCPP) -I$(FISOC_ISM_INCLUDE)  -I$(FISOC_OM_INCLUDE)  -cpp  -o $@  $<
+	$(ESMF_F90COMPILER) $(FISOC_MPI_SYMBOL) -c $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS) $(ESMF_F90COMPILEFREENOCPP) -I$(FISOC_ISM_INCLUDE)  -I$(FISOC_OM_INCLUDE)  -cpp  -o $@  $<
 
 ################################################################################
 

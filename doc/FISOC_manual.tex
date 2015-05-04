@@ -80,6 +80,8 @@ in the top level FISOC directory:
 make install
 \end{lstlisting}
 
+TODO: note on parallelism, tested with mpich and or openmpi?
+FISOC\_MPI flag, also flags inherited from esmfmkfile.
 
 \subsubsection{FISOC Environment Variables}
 \label{sec:EnvVars}
@@ -96,6 +98,11 @@ the compilation/installation of FISOC.
 Optional.                                          \\
 Determines where FISOC\_caller will be installed. Defaults to \$HOME/bin. 
 The user should also ensure this location is in their \$PATH. \\
+\vspace{6pt}
+\textbf{FISOC\_MPI}                                \\ 
+Optional. Possible value ``yes''.                  \\
+Sets preprocessor flag to tell FISOC whether this is a parallel compilation.
+Defaults to serial.                                \\
 \vspace{6pt}
 \textbf{FISOC\_OM}                                 \\ 
 Required. Possible values ``dummy'', ``ROMS''.     \\
@@ -200,59 +207,62 @@ Some of the FISOC config entries are required.
 This section describes all the valid standard entries in a FISOC config file as follows:
 
 \begin{flushleft}
-\textbf{label:}             [TYPE]   [Required?]                          \\
-Description                                                               \\
+\textbf{label:}               [TYPE]   [Required?]                         \\
+Description                                                                \\
 \vspace{6pt}
 \vspace{6pt}
-\textbf{ISM\_meshFile:}      [STRING] [optional]                          \\
-The name of a netcdf file containing the ISM mesh in ESMF format.         \\
+\textbf{ISM\_meshFile:}       [STRING] [optional]                          \\
+The name of a netcdf file containing the ISM mesh in ESMF format.          \\
 \vspace{6pt}
-\textbf{ISM\_configFile:}    [STRING] [optional]                          \\
-The name of the ISM-specific config file.                                 \\
+\textbf{ISM\_configFile:}     [STRING] [optional]                          \\
+The name of the ISM-specific config file.                                  \\
 \vspace{6pt}
-\textbf{FISOC\_ISM\_ReqVars:} [STRING] [required]                         \\
-List of variable names required to be provided by the ISM.                \\
+\textbf{FISOC\_ISM\_ReqVars:} [STRING] [required]                          \\
+List of variable names required to be provided by the ISM.                 \\
 \vspace{6pt}
-\textbf{ISM\_ReqVars:}       [STRING] [optional]                          \\
+\textbf{ISM\_ReqVars:}        [STRING] [optional]                          \\
 Corresponding exactly to the above, but model-specific in case of different naming conventions. \\
 \vspace{6pt}
-\textbf{FISOC\_ISM\_DerVars:} [STRING] [required]                         \\
-List of variables derived by FISOC from the ISM vars.                     \\ 
-To be calculated from ISM vars by hard coded routines in FISOC\_ISM.      \\
+\textbf{FISOC\_ISM\_DerVars:} [STRING] [required]                          \\
+List of variables derived by FISOC from the ISM vars.                      \\ 
+To be calculated from ISM vars by hard coded routines in FISOC\_ISM.       \\
 \vspace{6pt}
-\textbf{OM\_configFile:}     [STRING] [optional]                          \\
+\textbf{OM\_configFile:}      [STRING] [optional]                          \\
 \vspace{6pt}
-\textbf{FISOC\_OM\_ReqVars:}  [STRING] [required]                         \\
-List of variable names required to be provided by the OM.                 \\
+\textbf{FISOC\_OM\_ReqVars:}  [STRING] [required]                          \\
+List of variable names required to be provided by the OM.                  \\
 \vspace{6pt}
-\textbf{OM\_ReqVars:}        [STRING] [optional]                          \\
+\textbf{OM\_ReqVars:}         [STRING] [optional]                          \\
 Corresponding exactly to the above, but model-specific in case of different naming conventions. \\
 \vspace{6pt}
-\textbf{FISOC\_OM\_DerVars:}  [STRING] [required]                         \\
+\textbf{OM\_ReqVars\_stagger:} [STRING] [optional]                         \\
+Corresponding exactly to the above, descriptions of the grid stagger for each var. \\
+\vspace{6pt}
+\textbf{FISOC\_OM\_DerVars:}  [STRING] [required]                          \\
 List of variables derived by FISOC from the OM vars.  
-To be calculated from ISM vars by hard coded routines in FISOC\_OM.       \\
+To be calculated from ISM vars by hard coded routines in FISOC\_OM.        \\
 \vspace{6pt}
-\textbf{OM\_outputInterval:} [INTEGER][optional]                          \\
+\textbf{OM\_outputInterval:} [INTEGER][optional]                           \\
 FISOC collects OM output once every OM\_outputInterval OM timesteps. 
-Defaults to 1.  dt\_ratio/OM\_outputInterval must be integer.             \\
+Defaults to 1.  dt\_ratio/OM\_outputInterval must be integer.              \\
 \vspace{6pt}
-\textbf{OM\_dt\_sec:}         [INTEGER][required]                         \\
-OM timestep length in seconds.                                            \\
+\textbf{OM\_dt\_sec:}         [INTEGER][required]                          \\
+OM timestep length in seconds.                                             \\
 \vspace{6pt}
-\textbf{dt\_ratio:}          [INTEGER][required]                          \\
-ISM/OM timestep ratio.                                                    \\
+\textbf{dt\_ratio:}          [INTEGER][required]                           \\
+ISM/OM timestep ratio.                                                     \\
 \vspace{6pt}
-\textbf{start\_year:}        [INTEGER][required]                          \\
-Start year and month define the start time of the coupled simulation.     \\
+\textbf{start\_year:}        [INTEGER][required]                           \\
+Start year and month define the start time of the coupled simulation.      \\
 \vspace{6pt}
-\textbf{start\_month:}       [INTEGER][required]                          \\
+\textbf{start\_month:}       [INTEGER][required]                           \\
 \vspace{6pt}
-\textbf{end\_year:}          [INTEGER][required]                          \\
-End year and month define the finish time of the coupled simulation.      \\
+\textbf{end\_year:}          [INTEGER][required]                           \\
+End year and month define the finish time of the coupled simulation.       \\
 \vspace{6pt}
-\textbf{end\_month:}         [INTEGER][required]                          \\
+\textbf{end\_month:}         [INTEGER][required]                           \\
 \vspace{6pt}
-\textbf{verbose\_coupling:}  [LOGICAL][required]                          \\
+\textbf{verbose\_coupling:}  [LOGICAL][required]                           \\
 Print FISOC comments to screen (a log will be written independently of the settings of this value).\\
 \end{flushleft}
 
@@ -346,7 +356,7 @@ providing examples of the required interfaces.
 
 \subsection{Configuration options}
 
-The configuration file must be called ``FISOC_config.rc'' and is compatible with ESMF 
+The configuration file must be called ``FISOC\_config.rc'' and is compatible with ESMF 
 config methods.  
 An ESMF\_config object is automatically created from this file.
 

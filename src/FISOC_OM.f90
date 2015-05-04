@@ -89,8 +89,11 @@ CONTAINS
     ! Duplicate the MPI communicator not to interfere with ESMF communications.
     ! The duplicate MPI communicator can be used in any MPI call in the user
     ! code. 
+#ifdef FISOC_MPI
     CALL MPI_Comm_dup(mpic, mpic2, ierr)
-
+#else
+    mpic2 = -999
+#endif
     
     ! create empty field bundle to be populated my model-specific code.
     OM_ExpFB = ESMF_FieldBundleCreate(name='OM export fields', rc=rc)
@@ -104,10 +107,17 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! model-specific initialisation
+#ifdef FISOC_MPI
     CALL FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_grid,FISOC_config,mpic2,localPet,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+#else
+    CALL FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_grid,FISOC_config,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+#endif
 
     CALL FISOC_initCumulatorFB(OM_ExpFB,OM_ExpFBcum,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
