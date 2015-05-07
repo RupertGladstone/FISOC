@@ -107,7 +107,6 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
     
   END SUBROUTINE FISOC_OM_Wrapper_Init_Phase1
 
@@ -187,7 +186,7 @@ CONTAINS
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)
 
     rc = ESMF_FAILURE
-
+    
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -247,7 +246,15 @@ CONTAINS
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
+
+
     IF (PRESENT(OM_ExpFB)) THEN
+       CALL  ESMF_FieldBundleWrite(OM_ExpFB, "test.nc", status=ESMF_FILESTATUS_REPLACE,&
+            iofmt=ESMF_IOFMT_NETCDF, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+       
        ! Lets get a pointer to the basal melt rate.  This we get from the OM export field bundle, which 
        ! contains the OM variables to be exported to the ISM.
        CALL ESMF_FieldBundleGet(OM_ExpFB, fieldName="OM_dBdt_l0", field=OM_dBdt_l0, rc=rc)
@@ -258,8 +265,11 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
     
+!    OM_dBdt_l0_ptr = 12345.6
+!       NULLIFY(OM_dBdt_l0_ptr)
+    END IF
+
     rc = ESMF_SUCCESS
     
   END SUBROUTINE FISOC_OM_Wrapper_Run

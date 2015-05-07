@@ -478,7 +478,7 @@ CONTAINS
     TYPE(ESMF_fieldbundle),INTENT(INOUT)  :: fieldBundle
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
-    INTEGER                               :: ii
+    INTEGER                               :: ii, jj, localDECount
     REAL(ESMF_KIND_R8)                    :: initial_value
     TYPE(ESMF_field)                      :: field
     REAL(ESMF_KIND_R8),POINTER            :: field_ptr(:,:) 
@@ -493,23 +493,31 @@ CONTAINS
        initial_value = 0.0
     END IF
 
+    CALL ESMF_GridGet(grid, localDECount=localDECount, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     DO ii=1,SIZE(fieldNames)
        field = ESMF_FieldCreate(grid, typekind=ESMF_TYPEKIND_R8, name=TRIM(fieldNames(ii)), rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       CALL ESMF_FieldGet(field=field, localDe=0, farrayPtr=field_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       field_ptr(:,:) = initial_value       
+       DO jj = 0, localDECount-1
+          CALL ESMF_FieldGet(field=field, localDe=jj, farrayPtr=field_ptr, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!          field_ptr(:,:) = initial_value
+          field_ptr      = initial_value
+          !      if (associated(ptr2d)) then
+          NULLIFY(field_ptr)
+       END DO
        CALL ESMF_FieldBundleAdd(fieldBundle, (/field/), rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END DO
-
-    NULLIFY(field_ptr)
 
     rc = ESMF_SUCCESS
     

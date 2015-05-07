@@ -227,7 +227,9 @@ Corresponding exactly to the above, but model-specific in case of different nami
 List of variables derived by FISOC from the ISM vars.                      \\ 
 To be calculated from ISM vars by hard coded routines in FISOC\_ISM.       \\
 \vspace{6pt}
+
 \textbf{OM\_configFile:}      [STRING] [optional]                          \\
+The name of the ISM-specific config file.                                  \\
 \vspace{6pt}
 \textbf{FISOC\_OM\_ReqVars:}  [STRING] [required]                          \\
 List of variable names required to be provided by the OM.                  \\
@@ -242,6 +244,12 @@ Corresponding exactly to the above, descriptions of the grid stagger for each va
 List of variables derived by FISOC from the OM vars.  
 To be calculated from ISM vars by hard coded routines in FISOC\_OM.        \\
 \vspace{6pt}
+\textbf{OM\_writeNetcdf:}   [LOGICAL] [optional]                          \\
+Switch for dumping the OM export variables to NetCDF file.
+Defaults to .TRUE.                                                         \\
+\vspace{6pt}
+
+
 \textbf{OM\_outputInterval:} [INTEGER][optional]                           \\
 FISOC collects OM output once every OM\_outputInterval OM timesteps. 
 Defaults to 1.  dt\_ratio/OM\_outputInterval must be integer.              \\
@@ -263,7 +271,7 @@ End year and month define the finish time of the coupled simulation.       \\
 \textbf{end\_month:}         [INTEGER][required]                           \\
 \vspace{6pt}
 \textbf{verbose\_coupling:}  [LOGICAL][required]                           \\
-Print FISOC comments to screen (a log will be written independently of the settings of this value).\\
+Print FISOC comments to screen (a log file will be written independently of the settings of this value).\\
 \end{flushleft}
 
 \subsubsection{Timestepping}

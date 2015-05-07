@@ -26,13 +26,15 @@
   FISOC_ISM_DerVars:  ISM_dTdz_l0 ISM_z_l0_previous
 
   OM_configFile:      /home/elmeruser/Source/romsIceShelf/ROMS/External/ocean_iceshelf2d.in
+#  FISOC_OM_ReqVars:   OM_dBdt_l0
   FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0
   OM_ReqVars_stagger: EDGE1 EDGE2
 # Iupoint Ivpoint iCross Idot
 # EDGE1 EDGE2 CENTER CORNER
 # TODO: get stagger info from OM?
   OM_ReqVars:         sst sst
-  FISOC_OM_DerVars:        
+  FISOC_OM_DerVars:   
+  OM_writeNetcdf:     .TRUE.
 
   OM_outputInterval:  2
   OM_dt_sec:          200000   
@@ -42,7 +44,7 @@
   end_year:           2010
   end_month:          2
 
-!  verbose_coupling:   .FALSE.
-  verbose_coupling:   .TRUE.
+  verbose_coupling:   .FALSE.
+!  verbose_coupling:   .TRUE.
 
 

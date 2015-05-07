@@ -16,19 +16,27 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! This dummy wrapper aims to create the dummy grid and required variables 
   ! in the ESMF formats.  
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ReqVarList,OM_ExpFB,OM_dummyGrid,FISOC_config,mpic,localPet,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_dummyGrid,FISOC_config,mpic,localPet,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: OM_ReqVarList(:)
     INTEGER,INTENT(IN)                    :: mpic ! mpi comm, duplicate from the OM VM
     INTEGER,INTENT(IN)                    :: localPet ! local persistent execution thread (1:1 relationship to process)
     TYPE(ESMF_grid),INTENT(OUT)           :: OM_dummyGrid
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ExpFB
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
+    CHARACTER(len=ESMF_MAXSTR)            :: label
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: FISOC_OM_ReqVarList(:)
     LOGICAL                               :: verbose_coupling
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! extract a list of required ocean variables from the configuration object
+    label = 'FISOC_OM_ReqVars:' ! the FISOC names for the vars
+    CALL FISOC_getStringListFromConfig(FISOC_config, label, FISOC_OM_ReqVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -50,7 +58,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL FISOC_populateFieldBundle(OM_ReqVarList,OM_ExpFB,OM_dummyGrid,rc=rc)
+    CALL FISOC_populateFieldBundle(FISOC_OM_ReqVarList,OM_ExpFB,OM_dummyGrid,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)

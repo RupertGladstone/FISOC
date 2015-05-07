@@ -64,7 +64,6 @@ CONTAINS
     TYPE(ESMF_VM)        :: VM
     LOGICAL              :: verbose_coupling
 
-
     rc = ESMF_FAILURE
 
     CALL ESMF_GridCompGet(FISOC_parent, config=config, localPet=localPet, rc=rc)
@@ -270,6 +269,7 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     rc = ESMF_SUCCESS
+
     
   END SUBROUTINE FISOC_init
   
@@ -287,6 +287,7 @@ CONTAINS
     TYPE(ESMF_config)    :: config
     INTEGER              :: urc, localPet
     TYPE(ESMF_VM)        :: vm
+    INTEGER(ESMF_KIND_I8)  :: advanceCount
 
     rc = ESMF_FAILURE
 
