@@ -60,6 +60,13 @@ MODULE ElmerSolver_mod
   PUBLIC :: ElmerSolver, ElmerSolver_init, ElmerSolver_run, ElmerSolver_runAll, ElmerSolver_finalize
 
 
+
+#ifdef USE_ISO_C_BINDINGS
+  REAL(KIND=dp)      :: CT0  
+  REAL(KIND=dp),SAVE :: RT0
+#else
+  REAL(KIND=dp)      :: CT0  
+  REAL(KIND=dp),SAVE :: RT0
   INTERFACE
      FUNCTION RealTime()
        USE MainUtils
@@ -72,8 +79,8 @@ MODULE ElmerSolver_mod
        REAL(KIND=dp) :: CPUTime
      END FUNCTION CPUTime
   END INTERFACE
-  REAL(KIND=dp)      :: CT0  
-  REAL(KIND=dp),SAVE :: RT0
+#endif
+
   INTEGER            :: NoArgs
 
   INTEGER,SAVE       :: iter,Ndeg,istat,nproc,tlen,nthreads
@@ -177,14 +184,22 @@ CONTAINS
        ! Print banner to output:
 #include "../config.h"
        ! -----------------------
+#ifdef USE_ISO_C_BINDINGS
+       NoArgs = COMMAND_ARGUMENT_COUNT()
+#else
        NoArgs = IARGC()
+#endif 
        ! Info Level is always true until the model has been read!
        ! This makes it possible to cast something 
        Silent = .FALSE.
        Version = .FALSE.
        IF( NoArgs > 0 ) THEN 
           DO ii = 1, NoArgs 
+#ifdef USE_ISO_C_BINDINGS
+             CALL GET_COMMAND_ARGUMENT(ii, OptionString)
+#else
              CALL getarg( ii,OptionString )
+#endif
              Silent = Silent .OR. &
                   ( OptionString=='-s' .OR. OptionString=='--silent' ) 
              Version = Version .OR. &
@@ -197,7 +212,11 @@ CONTAINS
        !$ nthreads = omp_get_max_threads()
        IF (nthreads > 1) THEN
           ! Check if OMP_NUM_THREADS environment variable is set
+#if USE_ISO_C_BINDINGS
+          CALL envir( 'OMP_NUM_THREADS', threads, tlen )
+#else
           CALL envir( 'OMP_NUM_THREADS'//CHAR(0), threads, tlen )
+#endif
           IF (tlen==0) THEN
              CALL Warn('MAIN','OMP_NUM_THREADS not set. Using only 1 thread.')
              nthreads = 1
@@ -266,10 +285,19 @@ CONTAINS
     !----------------------------------------------------------------------
     GotModelName = .FALSE.
     IF ( ParEnv % PEs <= 1 .AND. NoArgs > 0 ) THEN
+#ifdef USE_ISO_C_BINDINGS
+       CALL GET_COMMAND_ARGUMENT(1, ModelName)
+#else
        CALL getarg( 1,ModelName )
+#endif
        IF( ModelName(1:1) /= '-') THEN 
           GotModelName = .TRUE.
+          
+#ifdef USE_ISO_C_BINDINGS
+          IF (NoArgs > 1) CALL GET_COMMAND_ARGUMENT(2, eq)
+#else
           IF ( NoArgs > 1 ) CALL getarg( 2,eq )
+#endif 
        END IF
     END IF
     
@@ -605,6 +633,9 @@ CONTAINS
        IF ( .NOT.ReloadInputFile(CurrentModel) ) CONTINUE
     END IF
 
+
+     CALL CompareToReferenceSolution( Finalize = .TRUE. )
+
     !------------------------------------------------------------------------------
     !    THIS IS THE END (...,at last, the end, my friend,...)
     !------------------------------------------------------------------------------
@@ -616,12 +647,171 @@ CONTAINS
     CALL TrilinosCleanup()
 #endif
     
-    IF ( ParEnv % PEs>1 )  CALL ParallelFinalize()
+    CALL ParallelFinalize()
+!    IF ( ParEnv % PEs>1 )  CALL ParallelFinalize()
     CALL Info('ElmerSolver','The end',Level=3)
             
   END SUBROUTINE ElmerSolver_finalize
 
   
+  
+
+     ! The user may request unit tests to be performed. 
+     ! This will be done if any reference norm is given.
+     ! The success will be written to file TEST.PASSED as 0/1. 
+     !--------------------------------------------------------
+     SUBROUTINE CompareToReferenceSolution( Finalize ) 
+       LOGICAL, OPTIONAL :: Finalize 
+
+       INTEGER :: i, j, k, n, solver_id, TestCount=0, PassCount=0, FailCount, Dofs
+       REAL(KIND=dp) :: Norm, RefNorm, Tol, Err, val, refval
+       TYPE(Solver_t), POINTER :: Solver
+       TYPE(Variable_t), POINTER :: Var
+       LOGICAL :: Found, Success = .TRUE., FinalizeOnly, CompareNorm, CompareSolution
+
+       SAVE TestCount, PassCount 
+
+
+       ! Write the success to a file for further use e.g. by cmake
+       !----------------------------------------------------------
+       FinalizeOnly = .FALSE.
+       IF( PRESENT( Finalize ) ) FinalizeOnly = .TRUE.
+
+       IF( FinalizeOnly ) THEN
+
+         ! Nothing tested
+         IF( TestCount == 0 ) RETURN
+         
+         Success = ( PassCount == TestCount )  
+         FailCount = TestCount - PassCount
+         
+         IF( Success ) THEN
+           CALL Info('CompareToReferenceSolution',&
+               'PASSED all '//TRIM(I2S(TestCount))//' tests!',Level=4)
+         ELSE         
+           CALL Warn('CompareToReferenceSolution','FAILED '//TRIM(I2S(FailCount))//&
+               ' tests out of '//TRIM(I2S(TestCount))//'!')
+         END IF
+         
+         IF( FinalizeOnly ) THEN
+           IF( ParEnv % MyPe == 0 ) THEN
+             OPEN( 10, FILE = 'TEST.PASSED' )
+             IF( Success ) THEN
+               WRITE( 10,'(I1)' ) 1
+             ELSE
+               WRITE( 10,'(I1)' ) 0
+             END IF
+           END IF
+         END IF
+
+         RETURN
+       END IF
+
+
+       DO solver_id=1,CurrentModel % NumberOfSolvers
+         Solver => CurrentModel % Solvers(solver_id)
+
+         RefNorm = ListGetConstReal( Solver % Values,'Reference Norm', CompareNorm )
+         CompareSolution = ListCheckPrefix( Solver % Values,'Reference Solution')
+         
+         IF(.NOT. ( CompareNorm .OR. CompareSolution ) ) CYCLE
+         
+         Var => Solver % Variable
+         IF( .NOT. ASSOCIATED( Var ) ) THEN
+           CALL Warn('CompareToReferenceSolution','Variable in Solver '&
+               //TRIM(I2S(i))//' not associated, cannot compare')
+           CYCLE
+         END IF
+
+         TestCount = TestCount + 1
+         Success = .TRUE.
+
+         ! Compare either to existing norm (ensures consistancy) 
+         ! or to existing solution (may also be used to directly verify)
+         ! Usually only either of these is given but for the sake of completeness
+         ! both may be used at the same time. 
+         IF( CompareNorm ) THEN
+           Tol = ListGetConstReal( Solver % Values,'Reference Norm Tolerance', Found )
+           IF(.NOT. Found ) Tol = 1.0d-5
+           Norm = Var % Norm 
+           Err = ABS( Norm - RefNorm ) / RefNorm 
+
+           ! Compare to given reference norm
+           IF( Err > Tol ) THEN
+             ! Warn only in the main core
+             IF( ParEnv % MyPe == 0 ) THEN
+               WRITE( Message,'(A,I0,A,ES12.6,A,ES12.6)') &
+                   'Solver ',solver_id,' FAILED:  Norm = ',Norm,'  RefNorm = ',RefNorm
+               CALL Warn('CompareToReferenceSolution',Message)
+               WRITE( Message,'(A,ES12.6)') 'Relative Error to reference norm: ',Err
+               CALL Info('CompareToReferenceSolution',Message, Level = 4 )
+             END IF
+             Success = .FALSE.
+           ELSE         
+             WRITE( Message,'(A,I0,A,ES12.6,A,ES12.6)') &
+                 'Solver ',solver_id,' PASSED:  Norm = ',Norm,'  RefNorm = ',RefNorm
+             CALL Info('CompareToReferenceSolution',Message,Level=4)
+           END IF
+         END IF
+
+         IF( CompareSolution ) THEN
+           Tol = ListGetConstReal( Solver % Values,'Reference Solution Tolerance', Found )
+           IF(.NOT. Found ) Tol = 1.0d-5
+           Dofs = Var % Dofs
+           n = 0 
+           RefNorm = 0.0_dp
+           Norm = 0.0_dp
+           Err = 0.0_dp
+           DO i=1,Solver % Mesh % NumberOfNodes
+             j = Var % Perm(i)
+             IF( j == 0 ) CYCLE
+             DO k=1,Dofs
+               IF( Dofs == 1 ) THEN
+                 refval = ListGetRealAtNode( Solver % Values,'Reference Solution',i,Found ) 
+               ELSE
+                 refval = ListGetRealAtNode( Solver % Values,'Reference Solution '//TRIM(I2S(k)),i,Found ) 
+               END IF
+               IF( Found ) THEN
+                 val = Var % Values( Dofs*(j-1)+k)
+                 RefNorm = RefNorm + refval**2
+                 Norm = Norm + val**2
+                 Err = Err + (refval-val)**2
+                 n = n + 1
+               END IF
+             END DO
+           END DO
+           IF( ParEnv % PEs > 1 ) CALL Warn('CompareToReferefenSolution','Not implemented in parallel!')
+           IF( n == 0 ) CALL Fatal('CompareToReferenceSolution','Could not find any reference solution')
+           RefNorm = SQRT( RefNorm / n ) 
+           Norm = SQRT( Norm / n )
+           Err = SQRT( Err / n ) 
+
+           IF( Err > Tol ) THEN
+             ! Normally warning is done for every partition but this time it is the same for all
+             IF( ParEnv % MyPe == 0 ) THEN
+               WRITE( Message,'(A,I0,A,ES12.6,A,ES12.6)') &
+                   'Solver ',solver_id,' FAILED:  Solution = ',Norm,'  RefSolution = ',RefNorm
+               CALL Warn('CompareToReferenceSolution',Message)
+               WRITE( Message,'(A,ES12.6)') 'Relative Error to reference solution: ',Err
+               CALL Info('CompareToReferenceSolution',Message, Level = 4 )
+             END IF
+             Success = .FALSE.
+           ELSE         
+             WRITE( Message,'(A,I0,A,ES12.6,A,ES12.6)') &
+                 'Solver ',solver_id,' PASSED:  Solution = ',Norm,'  RefSolution = ',RefNorm
+             CALL Info('CompareToReferenceSolution',Message,Level=4)
+           END IF
+         END IF
+
+
+
+         IF( Success ) PassCount = PassCount + 1
+       END DO
+      
+
+     END SUBROUTINE CompareToReferenceSolution
+
+     
      ! This is a dirty hack that adds an instance of ResultOutputSolver to the list of Solvers.
      ! The idea is that it is much easier for the end user to take into use the vtu output this way.
      ! The solver itself has limited set of parameters needed and is therefore approapriate for this
@@ -1225,8 +1415,11 @@ CONTAINS
      LOGICAL :: AdaptiveTime = .TRUE.
 
      TYPE(Solver_t), POINTER :: Solver
-
+#ifdef USE_ISO_C_BINDINGS
+     REAL(KIND=dp) :: newtime, prevtime=0, maxtime, exitcond
+#else
      REAL(KIND=dp) :: RealTime, newtime, prevtime=0, maxtime, exitcond
+#endif
      REAL(KIND=dp), ALLOCATABLE :: xx(:,:), xxnrm(:), yynrm(:), PrevXX(:,:,:)
 
 !$omp parallel
