@@ -42,10 +42,11 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! The first phase of initialisation is mainly to initialise the ocean model, and access 
   ! grid and variable initial information.
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_grid,FISOC_config,mpic,localPet,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_grid,FISOC_config,mpic,vm,localPet,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     INTEGER,INTENT(IN),OPTIONAL           :: mpic ! mpi comm, duplicate from the OM VM
+    TYPE(ESMF_VM),INTENT(IN),OPTIONAL     :: vm
     INTEGER,INTENT(IN),OPTIONAL           :: localPet ! local persistent execution thread (1:1 relationship to process)
     TYPE(ESMF_grid),INTENT(OUT)           :: OM_grid
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ExpFB
@@ -107,6 +108,12 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL OM_updateFields(OM_ExpFB,FISOC_config,vm,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     
   END SUBROUTINE FISOC_OM_Wrapper_Init_Phase1
 
@@ -305,6 +312,116 @@ CONTAINS
 
   END SUBROUTINE FISOC_OM_Wrapper_Finalize
 
+
+  !--------------------------------------------------------------------------------------
+  ! update the fields in the ocean export field bundle from the OM
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE OM_updateFields(OM_ExpFB,FISOC_config,vm,rc)
+
+    USE mod_iceshelfvar, ONLY : ICESHELFVAR
+    USE mod_param, ONLY       : BOUNDS, Ngrids
+
+    IMPLICIT NONE
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+    TYPE(ESMF_VM),INTENT(IN)              :: vm
+
+    INTEGER                               :: fieldCount, localPet, petCount
+    TYPE(ESMF_FIELD)                      :: FISOC_field
+    TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
+    CHARACTER(len=ESMF_MAXSTR)            :: fieldName
+    REAL(ESMF_KIND_R8),POINTER            :: ptr(:,:)
+    INTEGER                               :: IstrR, IendR, JstrR, JendR ! tile start and end coords
+    INTEGER                               :: ii, jj, nn
+!    INTEGER                               :: LBi, UBi, LBj, UBj ! tile start and end coords including halo
+
+    rc = ESMF_FAILURE
+
+    IF (Ngrids .ne. 1) THEN
+       msg = "ERROR: not expecting multiple ROMS grids"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) RETURN
+  
+    ! get the tile position from the OM (a tile is a rectangular domain decomposition element)
+    IstrR=BOUNDS(Ngrids)%IstrR(localPet)
+    IendR=BOUNDS(Ngrids)%IendR(localPet)
+    JstrR=BOUNDS(Ngrids)%JstrR(localPet)
+    JendR=BOUNDS(Ngrids)%JendR(localPet)
+    
+!    ! get the tile (including halo) position from the OM
+!    LBi = BOUNDS(Ngrids)%LBi(localPet)
+!    UBi = BOUNDS(Ngrids)%UBi(localPet)
+!    LBj = BOUNDS(Ngrids)%LBj(localPet)
+!    UBj = BOUNDS(Ngrids)%UBj(localPet)
+    
+    ! get a list of fields and their names form the OM export field bundle
+    fieldCount = 0
+    CALL ESMF_FieldBundleGet(OM_ExpFB, fieldCount=fieldCount, rc=rc)
+    ALLOCATE(fieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(OM_ExpFB, fieldList=fieldList, rc=rc)
+    
+    fieldLoop: DO nn = 1,fieldCount
+       
+       CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+            line=__LINE__, file=__FILE__)) RETURN
+       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+            line=__LINE__, file=__FILE__)) RETURN
+              
+!       if (localPet == 1) then
+!          print*,"STUFF", nn, size(ptr),size(ptr(:,1)),size(ptr(1,:)),localPet
+!          print*,IstrR, IendR, JstrR, JendR
+!          print*,size(ICESHELFVAR(Ngrids) % m),size(ICESHELFVAR(Ngrids) % m(:,1)),size(ICESHELFVAR(Ngrids) % m(1,:))
+!       end if
+       
+       ptr = FISOC_missingData
+       
+       SELECT CASE (TRIM(ADJUSTL(fieldName)))
+          
+       CASE ('OM_dBdt_l0')
+          DO jj = JstrR, JendR
+             DO ii = IstrR, IendR
+                ptr(ii,jj) = ICESHELFVAR(1) % m(ii,jj)
+             END DO
+          END DO
+          
+       CASE ('OM_temperature_l0')
+          DO jj = JstrR, JendR
+             DO ii = IstrR, IendR
+                ptr(ii,jj) = ICESHELFVAR(1) % Tb(ii,jj)
+             END DO
+          END DO
+          !ICESHELFVAR(ng) % Tb(LBi:UBi,LBj:UBj)
+          
+       CASE DEFAULT
+          msg = "ERROR: unknown variable"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       END SELECT
+       
+       IF (ASSOCIATED(ptr)) THEN
+          NULLIFY(ptr)
+       END IF
+       
+    END DO fieldLoop
+    
+    rc = ESMF_SUCCESS
+    
+  END SUBROUTINE OM_updateFields
+  
+
+  !--------------------------------------------------------------------------------------
   subroutine OM_createGrid(OM_grid, localPet, verbose_coupling, rc)
     
     use mod_grid , only : GRID
