@@ -42,16 +42,16 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! The first phase of initialisation is mainly to initialise the ocean model, and access 
   ! grid and variable initial information.
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_grid,FISOC_config,mpic,vm,localPet,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_grid,FISOC_config,vm,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    INTEGER,INTENT(IN),OPTIONAL           :: mpic ! mpi comm, duplicate from the OM VM
-    TYPE(ESMF_VM),INTENT(IN),OPTIONAL     :: vm
-    INTEGER,INTENT(IN),OPTIONAL           :: localPet ! local persistent execution thread (1:1 relationship to process)
+    TYPE(ESMF_VM),INTENT(IN)              :: vm ! ESMF virtual machine (parallel context)
     TYPE(ESMF_grid),INTENT(OUT)           :: OM_grid
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ExpFB
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
+    INTEGER                           :: localPet ! local persistent execution thread (1:1 relationship to process)
+    INTEGER                               :: mpic ! mpi comm, duplicate from the OM VM
     CHARACTER(len=ESMF_MAXSTR)            :: label
     TYPE(ESMF_staggerLoc),ALLOCATABLE     :: OM_ReqVars_stagger(:)
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: OM_ReqVarList(:),FISOC_OM_ReqVarList(:)
@@ -70,14 +70,24 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    IF (PRESENT(mpic)) THEN
-       CALL ROMS_initialize(first,mpic,OM_configFile)
-    ELSE
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL FISOC_VM_MPI_Comm_dup(vm,mpic,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF (mpic.EQ.FISOC_mpic_missing) THEN
        msg = "ERROR: not currently configured for serial ROMS simulations"
        ! TODO: check whether ROMS needs a dummy mpic in serial configuration
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ELSE
+       CALL ROMS_initialize(first,mpic,OM_configFile)
     END IF
     
     ! extract a list of required ocean variables from the configuration object
@@ -109,7 +119,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL OM_updateFields(OM_ExpFB,FISOC_config,vm,rc=rc)
+    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -191,6 +201,9 @@ CONTAINS
     LOGICAL                    :: verbose_coupling
     TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_dBdt_l0
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)
+    INTEGER                    :: OM_dt_sec
+    REAL(ESMF_KIND_R8)         :: OM_dt_sec_float
+
 
     rc = ESMF_FAILURE
     
@@ -198,6 +211,41 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+print *,"send field data to OM"
+!    IF (PRESENT(OM_ImpFB)) THEN       
+!       CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
+!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!            line=__LINE__, file=__FILE__)) &
+!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    END IF
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_dt_sec, label='OM_dt_sec:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    OM_dt_sec_float = REAL(OM_dt_sec,ESMF_KIND_R8)
+
+
+print*,"add timestep check: check ROMS timestep is consistent with FISOC time stepping"
+
+!alternative coupling modes re asynchronous coupling: add to issues in github
+
+!check how to call ROMS run (just one timestep)
+
+CALL ROMS_run(OM_dt_sec_float)
+    
+print*,"get field data from OM"
+
+!    IF (PRESENT(OM_ExpFB)) THEN
+!       CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
+!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!            line=__LINE__, file=__FILE__)) &
+!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    END IF
+
+print*,"put this in the ISM derived vars?"
+!use ISM timestep and depth and prev depth to populate rom iceshelfvar % DDDT
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
@@ -229,6 +277,8 @@ CONTAINS
        END IF
 
     END IF
+
+print*,"move this stuff to subroutines"
 
     ! Lets get pointers to the depth of the ice base and the temperature gradient.  These we 
     ! get fromthe OM import state, which contains the ISM export fields on the ocean grid.
@@ -272,6 +322,8 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+print*,"check for all the places where I use the netcdf writer... remove or use a sensible netcdf file name"
     
 !    OM_dBdt_l0_ptr = 12345.6
 !       NULLIFY(OM_dBdt_l0_ptr)
@@ -316,7 +368,7 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! update the fields in the ocean export field bundle from the OM
   !--------------------------------------------------------------------------------------
-  SUBROUTINE OM_updateFields(OM_ExpFB,FISOC_config,vm,rc)
+  SUBROUTINE getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc)
 
     USE mod_iceshelfvar, ONLY : ICESHELFVAR
     USE mod_param, ONLY       : BOUNDS, Ngrids
@@ -418,7 +470,7 @@ CONTAINS
     
     rc = ESMF_SUCCESS
     
-  END SUBROUTINE OM_updateFields
+  END SUBROUTINE GetFieldDataFromOM
   
 
   !--------------------------------------------------------------------------------------

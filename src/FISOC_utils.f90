@@ -8,7 +8,8 @@ MODULE FISOC_utils_MOD
   PRIVATE
 
   PUBLIC  FISOC_getStringListFromConfig, FISOC_populateFieldBundle, FISOC_ConfigDerivedAttribute, &
-       FISOC_initCumulatorFB, FISOC_zeroBundle, FISOC_cumulateFB, FISOC_processCumulator, msg
+       FISOC_initCumulatorFB, FISOC_zeroBundle, FISOC_cumulateFB, FISOC_processCumulator, msg,    &
+       FISOC_VM_MPI_Comm_dup
 
   INTERFACE FISOC_populateFieldBundle
       MODULE PROCEDURE FISOC_populateFieldBundleOn2dGrid
@@ -25,6 +26,43 @@ MODULE FISOC_utils_MOD
 CONTAINS
 
   
+  !--------------------------------------------------------------------------------------
+  ! use the ESMF VM to access the mpi communicator and return a duplicate
+  SUBROUTINE FISOC_VM_MPI_Comm_dup(vm,mpic_dup,rc)
+
+    TYPE(ESMF_VM),INTENT(IN)       :: VM
+    INTEGER, INTENT(OUT)           :: mpic_dup
+    INTEGER, OPTIONAL, INTENT(OUT) :: rc
+
+    INTEGER                        :: mpic, ierr
+
+    rc = ESMF_FAILURE
+
+    !-------------------------------------------------------------------------------
+    ! Get the parallel context, specifically the mpi communicator, for the OM to 
+    ! use.
+    ! The returned MPI communicator spans the same MPI processes that the VM
+    ! is defined on.
+    CALL ESMF_VMGet(vm, mpiCommunicator=mpic, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ! Duplicate the MPI communicator not to interfere with ESMF communications.
+    ! The duplicate MPI communicator can be used in any MPI call in the user
+    ! code. 
+    ! The ifdef statements are needed here because the MPI_comm_dup call will cause
+    ! compilation to fail if the MPI library is not available.
+#ifdef FISOC_MPI
+    CALL MPI_Comm_dup(mpic, mpic_dup, ierr)
+    PRINT*,"ADD ERROR HANDLING for IERR",ierr
+#else
+    mpic_dup = FISOC_mpic_missing
+#endif
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_VM_MPI_Comm_dup
+
   !--------------------------------------------------------------------------------------
   ! set values of fields in this bundle to zero
   SUBROUTINE FISOC_zeroBundle(fieldBundle,rc)
@@ -503,21 +541,26 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       DO jj = 0, localDECount-1
-          CALL ESMF_FieldGet(field=field, localDe=jj, farrayPtr=field_ptr, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!          field_ptr(:,:) = initial_value
-          field_ptr      = initial_value
-          !      if (associated(ptr2d)) then
-          NULLIFY(field_ptr)
-       END DO
+!       DO jj = 0, localDECount-1
+!          CALL ESMF_FieldGet(field=field, localDe=jj, farrayPtr=field_ptr, rc=rc)
+!          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!               line=__LINE__, file=__FILE__)) &
+!               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!          field_ptr      = initial_value
+!          NULLIFY(field_ptr)
+!       END DO
+       CALL ESMF_FieldGet(field=field, localDe=0, farrayPtr=field_ptr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       field_ptr      = initial_value
        CALL ESMF_FieldBundleAdd(fieldBundle, (/field/), rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END DO
+
+    NULLIFY(field_ptr)
 
     rc = ESMF_SUCCESS
     
@@ -560,7 +603,7 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       field_ptr(:) = initial_value       
+       field_ptr = initial_value       
        CALL ESMF_FieldBundleAdd(fieldBundle, (/field/), rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &

@@ -2,6 +2,9 @@
 *.o
 *~
 *#
+*.pdf
+*.aux
+*.bst
 *.nc
 *.so
 *.Log

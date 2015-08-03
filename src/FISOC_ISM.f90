@@ -348,19 +348,239 @@ CONTAINS
   END SUBROUTINE FISOC_ISM_finalise
   
 
+
   !------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_calcDerivedFields(ISM_ExpFB,FISOC_config,rc)
 
-    TYPE(ESMF_config),INTENT(IN) :: FISOC_config
-    INTEGER, INTENT(OUT)         :: rc
-    TYPE(ESMF_fieldBundle)       :: ISM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    INTEGER, INTENT(OUT),OPTIONAL          :: rc
 
-    TYPE(ESMF_field)       :: ISM_temperature_l0, ISM_temperature_l1
-    TYPE(ESMF_field)       :: ISM_z_l0, ISM_z_l1
-    TYPE(ESMF_field)       :: ISM_dTdz_l0, ISM_z_l0_previous
+    CALL FISOC_ISM_calcDerivedFields_pre(ISM_ExpFB,FISOC_config,rc)
+    CALL FISOC_ISM_calcDerivedFields_post(ISM_ExpFB,FISOC_config,rc)
+
+  END SUBROUTINE FISOC_ISM_calcDerivedFields
+
+  
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE FISOC_ISM_calcDerivedFields_pre(ISM_ExpFB,FISOC_config,rc)
+
+    TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    INTEGER, INTENT(OUT),OPTIONAL          :: rc
+
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: FISOC_ISM_DerVarList(:),FISOC_ISM_ReqVarList(:)
+    INTEGER                                :: ii, numDerVars
+
+    rc = ESMF_FAILURE
+
+    ! extract a list of derived ISM variables from the configuration object
+    label = 'FISOC_ISM_DerVars:' 
+    CALL FISOC_getStringListFromConfig(FISOC_config, label, FISOC_ISM_DerVarList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    label = 'FISOC_ISM_ReqVars:' 
+    CALL FISOC_getStringListFromConfig(FISOC_config, label, FISOC_ISM_ReqVarList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    numDerVars = SIZE(FISOC_ISM_DerVarList)
+
+    DO ii = 1,numDerVars
+
+       SELECT CASE(FISOC_ISM_DerVarList(ii))
+
+       CASE ("ISM_z_l0_previous")
+          CALL ISM_derive_z_l0_previous(ISM_ExpFB,FISOC_ISM_ReqVarList,rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       CASE ("ISM_dddt","ISM_dTdz_l0")
+
+       CASE DEFAULT
+          msg="ERROR: derived variable name not recognised"
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       END SELECT
+
+    END DO
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_ISM_calcDerivedFields_pre
+
+
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE FISOC_ISM_calcDerivedFields_post(ISM_ExpFB,FISOC_config,rc)
+
+    TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    INTEGER, INTENT(OUT),OPTIONAL          :: rc
+
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: FISOC_ISM_DerVarList(:),FISOC_ISM_ReqVarList(:)
+    INTEGER                                :: ii, numDerVars
+
+    rc = ESMF_FAILURE
+
+    ! extract a list of derived ISM variables from the configuration object
+    label = 'FISOC_ISM_DerVars:' 
+    CALL FISOC_getStringListFromConfig(FISOC_config, label, FISOC_ISM_DerVarList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    label = 'FISOC_ISM_ReqVars:' 
+    CALL FISOC_getStringListFromConfig(FISOC_config, label, FISOC_ISM_ReqVarList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    numDerVars = SIZE(FISOC_ISM_DerVarList)
+
+    DO ii = 1,numDerVars
+
+       SELECT CASE(FISOC_ISM_DerVarList(ii))
+
+       CASE ("ISM_z_l0_previous")
+
+       CASE ("ISM_dddt")
+          CALL ISM_derive_dddt(ISM_ExpFB,FISOC_ISM_ReqVarList,rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       CASE ("ISM_dTdz_l0")
+          CALL ISM_derive_dTdz_l0(ISM_ExpFB,FISOC_ISM_ReqVarList,rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       CASE DEFAULT
+          msg="ERROR: derived variable name not recognised"
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       END SELECT
+
+    END DO
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_ISM_calcDerivedFields_post
+
+
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE ISM_derive_z_l0_previous(ISM_ExpFB,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)            :: ISM_ExpFB
+    INTEGER, INTENT(OUT),OPTIONAL                   :: rc
+
+    TYPE(ESMF_field)           :: ISM_z_l0
+    TYPE(ESMF_field)           :: ISM_z_l0_previous
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:) 
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_previous_ptr(:) 
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0_previous", field=ISM_z_l0_previous, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_z_l0_previous, localDe=0, farrayPtr=ISM_z_l0_previous_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    ISM_z_l0_previous_ptr = ISM_z_l0_ptr
+
+    NULLIFY(ISM_z_l0_previous_ptr)
+    NULLIFY(ISM_z_l0_ptr)
+
+    RC = ESMF_SUCCESS
+
+  END SUBROUTINE ISM_derive_z_l0_previous
+
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE ISM_derive_dddt(ISM_ExpFB,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)            :: ISM_ExpFB
+    INTEGER, INTENT(OUT),OPTIONAL                   :: rc
+
+    TYPE(ESMF_field)           :: ISM_z_l0
+    TYPE(ESMF_field)           :: ISM_z_l0_previous
+    TYPE(ESMF_field)           :: ISM_dddt
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:) 
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_previous_ptr(:) 
+    REAL(ESMF_KIND_R8),POINTER :: ISM_dddt_ptr(:) 
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0_previous", field=ISM_z_l0_previous, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_z_l0_previous, localDe=0, farrayPtr=ISM_z_l0_previous_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_dddt", field=ISM_dddt, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_dddt, localDe=0, farrayPtr=ISM_dddt_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+get ISM timestep... from config object? put it in next line
+
+    ISM_dddt_ptr = (ISM_z_l0_ptr - ISM_z_l0_previous_ptr) / ISM_dt
+
+    NULLIFY(ISM_z_l0_previous_ptr)
+    NULLIFY(ISM_z_l0_ptr)
+    NULLIFY(ISM_dddt_ptr)
+
+    RC = ESMF_SUCCESS
+
+  END SUBROUTINE ISM_derive_dddt
+
+
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE ISM_derive_dTdz_l0(ISM_ExpFB,rc)
+
+    CHARACTER,CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: FISOC_ISM_ReqVarList(:)
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)            :: ISM_ExpFB
+    INTEGER, INTENT(OUT),OPTIONAL                   :: rc
+
+    TYPE(ESMF_field)           :: ISM_z_l0,ISM_z_l1
+    TYPE(ESMF_field)           :: ISM_temperature_l0, ISM_temperature_l1
+    TYPE(ESMF_field)           :: ISM_dTdz_l0
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:), ISM_z_l1_ptr(:) 
     REAL(ESMF_KIND_R8),POINTER :: ISM_temperature_l0_ptr(:),ISM_temperature_l1_ptr(:) 
-    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:),ISM_z_l1_ptr(:) 
-    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:),ISM_z_l0_previous_ptr(:) 
+    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:)
 
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_temperature_l0", field=ISM_temperature_l0, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -372,34 +592,54 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_temperature_l1", field=ISM_temperature_l1, rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_FieldGet(field=ISM_temperature_l1, localDe=0, farrayPtr=ISM_temperature_l1_ptr, rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l1", field=ISM_z_l1, rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_FieldGet(field=ISM_z_l1, localDe=0, farrayPtr=ISM_z_l1_ptr, rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_dTdz_l0", field=ISM_dTdz_l0, rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_FieldGet(field=ISM_dTdz_l0, localDe=0, farrayPtr=ISM_dTdz_l0_ptr, rc=rc)
-    IF (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! the simplest approximation for the vertical temperature gradient at the ice base is to 
     ! use the lowest two levels and assume the gradient doesn't change between these two 
     ! levels.
     ISM_dTdz_l0_ptr(:) = (ISM_temperature_l1_ptr-ISM_temperature_l0_ptr) / (ISM_z_l1_ptr-ISM_z_l0_ptr)
 
-!    PRINT*,"temperature gradient: add configurable options for more advanced calculations"
+    NULLIFY(ISM_dTdz_l0_ptr)
+    NULLIFY(ISM_temperature_l1_ptr)
+    NULLIFY(ISM_temperature_l0_ptr)
+    NULLIFY(ISM_z_l1_ptr)
+    NULLIFY(ISM_z_l0_ptr)
 
-!    print*,"previous B to be calculated only at run time"
-
-  END SUBROUTINE FISOC_ISM_calcDerivedFields
-
+    rc = ESMF_SUCCESS
+    
+  END SUBROUTINE ISM_derive_dTdz_l0
+  
 END MODULE FISOC_ISM_MOD

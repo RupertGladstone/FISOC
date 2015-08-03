@@ -59,7 +59,6 @@ CONTAINS
     TYPE(ESMF_grid)            :: OM_grid
     TYPE(ESMF_fieldBundle)     :: OM_ExpFB,OM_ExpFBcum
     TYPE(ESMF_VM)              :: VM
-    INTEGER                    :: mpic, mpic2, ierr, localPet
 
     CHARACTER(len=ESMF_MAXSTR) :: label
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: OM_ReqVarList(:)
@@ -76,24 +75,6 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    !-------------------------------------------------------------------------------
-    ! Get the parallel context, specifically the mpi communicator, for the OM to 
-    ! use.
-    ! The returned MPI communicator spans the same MPI processes that the VM
-    ! is defined on.
-    CALL ESMF_VMGet(vm, localPet=localPet, mpiCommunicator=mpic, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ! Duplicate the MPI communicator not to interfere with ESMF communications.
-    ! The duplicate MPI communicator can be used in any MPI call in the user
-    ! code. 
-#ifdef FISOC_MPI
-    CALL MPI_Comm_dup(mpic, mpic2, ierr)
-#else
-    mpic2 = -999
-#endif
     
     ! create empty field bundle to be populated my model-specific code.
     OM_ExpFB = ESMF_FieldBundleCreate(name='OM export fields', rc=rc)
@@ -107,17 +88,10 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! model-specific initialisation
-#ifdef FISOC_MPI
-    CALL FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_grid,FISOC_config,mpic2,vm,localPet,rc=rc)
+    CALL FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_grid,FISOC_config,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-#else
-    CALL FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_grid,FISOC_config,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-#endif
 
     CALL FISOC_initCumulatorFB(OM_ExpFB,OM_ExpFBcum,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -161,7 +135,6 @@ CONTAINS
     TYPE(ESMF_Clock)       :: FISOC_clock
     INTEGER, INTENT(OUT)   :: rc
 
-    INTEGER                :: localPet
     TYPE(ESMF_VM)          :: vm
     TYPE(ESMF_config)      :: FISOC_config
     TYPE(ESMF_fieldbundle) :: OM_ImpFB
@@ -173,17 +146,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
     CALL ESMF_StateGet(OM_ImpSt, "OM import fields", OM_ImpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     
-    CALL FISOC_OM_Wrapper_Init_Phase2(OM_ImpFB,FISOC_config,localPet,rc=rc)
+    CALL FISOC_OM_Wrapper_Init_Phase2(OM_ImpFB,OM_ExpFB,FISOC_config,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
