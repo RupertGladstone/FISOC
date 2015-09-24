@@ -6,6 +6,7 @@
 \usepackage{color}
 \usepackage{hyperref}
 
+
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
 \definecolor{mauve}{rgb}{0.58,0,0.82}
@@ -23,15 +24,15 @@
   commentstyle=\color{dkgreen},
   stringstyle=\color{mauve},
   breaklines=true,
-  breakatwhitespace=true,
-  tabsize=3
+  tabsize=3, 
+  postbreak=\raisebox{0ex}[0ex][0ex]{\ensuremath{\color{red}\hookrightarrow\space}}
 }
 
 \begin{document}
 
 \title{Framework for Ice Sheet - Ocean Coupled modelling (FISOC) Manual}
 \author{Rupert Gladstone (RupertGladstone1972@gmail.com) \and Ben Galton-Fenzi}
-\date{Version 0.0, April 2015}
+\date{Version 0.1, September 2015}
 \maketitle
 
 
@@ -389,16 +390,26 @@ The config object can be passed to the wrapper and accessed directly.
 
 \section{Pre-requisite installation notes}
 \label{app:A}
-The following commands worked to install NetCDF and ESMF on a Linux Mint system in Feb 2015.
+The following commands worked to install NetCDF and ESMF on a Linux Mint system in 2015.
 Some pre-requisites for netcdf were also installed.
+The system already had a working OpenMPI installation.
 
-\begin{lstlisting}
+
+
+\begin{lstlisting}[language=bash]
+
+
+# instructions on installing ESMF can be found here:
+# http://www.earthsystemmodeling.org/esmf_releases/last_built/ESMF_usrdoc/node9.html
+
+# netcdf instructions
+# http://www.unidata.ucar.edu/software/netcdf/docs/netcdf-install.html
+
 cd /somewhere/to/download/and/compile/source/code
 
 sudo apt-get install m4
 
-wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4/
-                                                        zlib-1.2.8.tar.gz
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4/zlib-1.2.8.tar.gz
 tar -xzf zlib-1.2.8.tar.gz 
 cd zlib-1.2.8
  ./configure --prefix=/usr/local/
@@ -406,55 +417,61 @@ cd zlib-1.2.8
  sudo -E make install
 cd ..
 
-wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4/
-                                                       hdf5-1.8.13.tar.gz	
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4/hdf5-1.8.13.tar.gz	
 tar -xzf hdf5-1.8.13.tar.gz 
 cd hdf5-1.8.13
- # Note the O0 flag in the next line.  The default is O3, which is
- # strong optimisation.  This can result in failed checks on some
- #  systems.
- CC=mpicc FC=mpif90 ./configure  --prefix=/usr/local/ --with-zlib=/usr/local  --enable-fortran --enable-parallel
-
- CFLAGS=-O0 ./configure --prefix=/usr/local/ --with-zlib=/usr/local  --enable-fortran 
+ # Note the O0 flag in the next line.  The default is O3, 
+ # which is strong optimisation.  This can result in failed 
+ # checks on some systems.
+ CFLAGS="-O0 -fPIC" CC=mpicc CXX=mpiCC FC=mpif90 ./configure --prefix=/usr/local/ --with-zlib=/usr/local  --enable-fortran --enable-parallel --enable-shared
  make check
  sudo -E make install
 cd ..
 
+# note that netcdf fortran library is now compiled from a 
+# seperate source from the main netcdf c library. Install 
+# the c library first, and make sure to create the shared
+# object file. 
 wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.3.3.tar.gz
 tar -xzf netcdf-4.3.3.tar.gz 
 cd netcdf-4.3.3/
- CPPFLAGS="-I/usr/local/include -I/usr/local/hdf5/include" LDFLAGS="-L/usr/local/hdf5/lib -L/usr/local/lib" ./configure --prefix=/usr/local 
- CPPFLAGS=-I/usr/local/include LDFLAGS=-L/usr/local/lib ./configure --prefix=/usr/local 
+ LIBS=-ldl CC=mpicc CXX=mpiCC FC=mpif90 CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/  ./configure --prefix=/usr/local --enable-parallel 
  make check
  sudo -E make install
 cd ..
 
-wget ftp://ftp.unidata.ucar.edu/pub/netcdf/
-                                              netcdf-fortran-4.4.2.tar.gz
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-fortran-4.4.2.tar.gz
 tar -xzf netcdf-fortran-4.4.2.tar.gz 
 cd netcdf-fortran-4.4.2
- LD_LIBRARY_PATH=/usr/local/lib/ CPPFLAGS="-I/usr/local/include  -I/usr/local/hdf5/include -DUSE_NETCDF4" LDFLAGS="-L/usr/local/lib -L/usr/local/hdf5/lib" ./configure  --prefix=/usr/local
- LD_LIBRARY_PATH=/usr/local/lib/ CPPFLAGS="-I/usr/local/include -DUSE_NETCDF4" LDFLAGS="-L/usr/local/lib" ./configure  --prefix=/usr/local
+ LIBS=-ldl CC=mpicc CXX=mpiCC FC=mpif90 LDFLAGS=-L/usr/local/lib/ CPPFLAGS="-I/usr/local/include -DUSE_NETCDF4"  ./configure --prefix=/usr/local
  make check
  sudo -E make install
 cd ..
 
+# convenient viewer for contents of netcdf files (not essential)
+sudo apt-get install ncview
+
+# ESMF requires ESMF_DIR and probably other environment variables.  
+# These can be set at the command line or, for example, in your 
+# .bashrc file.  These might work:
 export ESMF_DIR="/top/level/directory/for/esmf/"
 export ESMF_NETCDF="split"
 export ESMF_NETCDF_INCLUDE="/usr/local/include"
 export ESMF_NETCDF_LIBPATH="/usr/local/lib"
 export ESMF_COMM="openmpi"
-export ESMFMKFILE="$ESMF_DIR/DEFAULTINSTALLDIR/lib/libO/
-                             Linux.gfortran.64.openmpi.default/esmf.mk"
                                                                                                               
-wget downloads.sourceforge.net/project/esmf/ESMF_6_3_0r/
-                                 ESMF_6_3_0rp1/esmf_6_3_0rp1_src.tar.gz
-                                                                                                              
+wget downloads.sourceforge.net/project/esmf/ESMF_6_3_0r/ESMF_6_3_0rp1/esmf_6_3_0rp1_src.tar.gz
 tar -xf esmf_6_3_0rp1_src.tar.gz
 cd esmf 
  make check
  sudo -E make install
 cd ..
+
+# In order to actually use ESMF you must set the environment 
+# variable ESMFMKFILE.  If you didn't use environment 
+# variables to specify the install location this make file 
+# will probably end up somewhere like this:
+export ESMFMKFILE="$ESMF_DIR/DEFAULTINSTALLDIR/lib/libO/"\\"Linux.gfortran.64.openmpi.default/esmf.mk"
 
 \end{lstlisting}
 
