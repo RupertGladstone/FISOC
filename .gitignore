@@ -1,5 +1,6 @@
 *.vtk
 *.o
+*sty
 *~
 *#
 *.nc
@@ -15,6 +16,10 @@ a.out
 FISOC_mesh1a_2D/
 FISOC_mesh1a_3D/
 FISOC_mesh1a_DEM/
+doc/FISOC_manual.aux
+doc/FISOC_manual.out
+doc/FISOC_manual.pdf
+doc/README_copernicus_package_3_6.txt
 examples/MISevolSetup4Elmer/README
 examples/MISevolSetup4Elmer/longThinMIS.grd
 examples/MISevolSetup4Elmer/longThinMIS.sif.template
