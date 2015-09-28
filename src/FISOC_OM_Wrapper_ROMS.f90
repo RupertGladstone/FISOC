@@ -129,15 +129,15 @@ CONTAINS
 
   
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(OM_ImpFB,FISOC_config,localPet,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(OM_ImpFB,OM_ExpFB,FISOC_config,vm,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB, OM_ExpFB
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
-    INTEGER,INTENT(IN)                    :: localPet
+    TYPE(ESMF_VM),INTENT(IN)              :: vm
 
-    LOGICAL                               :: verbose_coupling
-
+    LOGICAL                      :: verbose_coupling
+    INTEGER                      :: localpet
     TYPE(ESMF_field)             :: ISM_temperature_l0
     REAL(ESMF_KIND_R8),POINTER   :: ISM_temperature_l0_ptr(:,:)
     CHARACTER(len=ESMF_MAXSTR)   :: nameList(10)
@@ -145,6 +145,11 @@ CONTAINS
     rc = ESMF_FAILURE
 
     NULLIFY(ISM_temperature_l0_ptr)
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -546,8 +551,17 @@ print*,"check for all the places where I use the netcdf writer... remove or use 
        deBlockList(1,2,tile+1)=BOUNDS(ng)%Iend(tile)
        deBlockList(2,1,tile+1)=BOUNDS(ng)%Jstr(tile)
        deBlockList(2,2,tile+1)=BOUNDS(ng)%Jend(tile)
+print*,tile
+print*,BOUNDS(ng)%Jstr(tile)
+print*,BOUNDS(ng)%Jstr
     end do
-    
+print*,""
+print*,""
+print*,""
+print*,"BLOCKHEAD"
+print*,""
+print*,""
+print*,deBlockList
     !-----------------------------------------------------------------------
     !     Create ESMF DistGrid based on ROMS model domain decomposition
     !-----------------------------------------------------------------------

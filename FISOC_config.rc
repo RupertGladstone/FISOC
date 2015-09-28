@@ -28,7 +28,7 @@
   OM_configFile:      /home/elmeruser/Source/romsIceShelf/ROMS/External/ocean_iceshelf2d.in
   FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0
   OM_ReqVars_stagger: CENTER CENTER
-#  OM_ReqVars:         sst sst
+  OM_ReqVars:         sst sst
   FISOC_OM_DerVars:   
   OM_writeNetcdf:     .TRUE.
 

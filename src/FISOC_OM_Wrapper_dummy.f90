@@ -16,15 +16,16 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! This dummy wrapper aims to create the dummy grid and required variables 
   ! in the ESMF formats.  
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_dummyGrid,FISOC_config,mpic,localPet,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_dummyGrid,FISOC_config,vm,rc)
 
-    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    INTEGER,INTENT(IN)                    :: mpic ! mpi comm, duplicate from the OM VM
-    INTEGER,INTENT(IN)                    :: localPet ! local persistent execution thread (1:1 relationship to process)
-    TYPE(ESMF_grid),INTENT(OUT)           :: OM_dummyGrid
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    TYPE(ESMF_grid),INTENT(OUT)           :: OM_dummyGrid
+    TYPE(ESMF_VM),INTENT(IN)              :: vm
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
+    INTEGER                    :: mpic ! mpi comm, duplicate from the OM VM
+    INTEGER                    :: localPet ! local persistent execution thread (1:1 relationship to process)
     CHARACTER(len=ESMF_MAXSTR)            :: label
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: FISOC_OM_ReqVarList(:)
     LOGICAL                               :: verbose_coupling
@@ -68,15 +69,15 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! This dummy wrapper aims to create the dummy grid and required variables 
   ! in the ESMF formats.  
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(OM_ImpFB,FISOC_config,localPet,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(OM_ImpFB,OM_ExpFB,FISOC_config,vm,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB, OM_ExpFB
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
-    INTEGER,INTENT(IN)                    :: localPet
+    TYPE(ESMF_VM),INTENT(IN)              :: vm
 
-    LOGICAL                               :: verbose_coupling
-
+    LOGICAL                      :: verbose_coupling
+    INTEGER                      :: localPet
     TYPE(ESMF_field)             :: ISM_temperature_l0
     REAL(ESMF_KIND_R8),POINTER   :: ISM_temperature_l0_ptr(:,:)
     CHARACTER(len=ESMF_MAXSTR)   :: nameList(10)

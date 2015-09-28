@@ -58,7 +58,7 @@ CONTAINS
     TYPE(ESMF_config)          :: FISOC_config
     TYPE(ESMF_grid)            :: OM_grid
     TYPE(ESMF_fieldBundle)     :: OM_ExpFB,OM_ExpFBcum
-    TYPE(ESMF_VM)              :: VM
+    TYPE(ESMF_VM)              :: vm
 
     CHARACTER(len=ESMF_MAXSTR) :: label
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: OM_ReqVarList(:)
@@ -76,7 +76,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    ! create empty field bundle to be populated my model-specific code.
+    ! create empty field bundle to be populated by model-specific code.
     OM_ExpFB = ESMF_FieldBundleCreate(name='OM export fields', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -137,7 +137,7 @@ CONTAINS
 
     TYPE(ESMF_VM)          :: vm
     TYPE(ESMF_config)      :: FISOC_config
-    TYPE(ESMF_fieldbundle) :: OM_ImpFB
+    TYPE(ESMF_fieldbundle) :: OM_ImpFB, OM_ExpFB
 
     rc = ESMF_FAILURE
 
@@ -147,6 +147,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_StateGet(OM_ImpSt, "OM import fields", OM_ImpFB, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+    CALL ESMF_StateGet(OM_ExpSt, "OM export fields", OM_ExpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
