@@ -9,3 +9,5 @@ FISh_caller.f90
 FISh.f90
 makefile  
 
+A shared library libFISh.so should now be created containing initialise, run and finalise routines.  FISOC can link to this.
+
