@@ -1,16 +1,16 @@
 
-module FISh_main
+module FISh_MOD
 
   implicit none
   
   !      flowline ice shelf model
   
   double precision :: secpyr, A, C, L, tend, dt, rhoi
-  double precision :: n, m, mb, rhos, grav
+  double precision :: n, m, rhos, grav
   integer :: maxx, fluxBC
   
   !      flow parameter ice and basal sliding
-  parameter (secpyr = 365 * 25 * 3600)
+  parameter (secpyr = 365 * 24 * 3600)
   parameter (A = 1.d-25 * secpyr, C = 1.d7)
   
   !      flux condition ocean: fluxBC=1 (water pressure); fluxBC=0 (u=0)
@@ -19,9 +19,9 @@ module FISh_main
   !      domain length
   parameter (L = 200e3)
   
-  parameter (maxx = 500, tend = 500.0, dt = .1)
+  parameter (maxx = 5, tend = 500.0, dt = .1)
   parameter (rhoi = 900., rhos = 1000., grav = 9.8)
-  parameter (n = 3., mb = 0., m = 1./3.)
+  parameter (n = 3., m = 1./3.)
 
   !      h = ice thickness
   !      hb = lower boundary of ice sheet/ice shelf
@@ -35,10 +35,10 @@ module FISh_main
   double precision :: gridx, ub(maxx), u(maxx), up(maxx)
   double precision :: con(maxx), dtdx2, f(maxx), g(maxx)
   double precision :: cen(maxx), txx(maxx), haf(maxx)
-  double precision :: bstag(maxx), dn(maxx), h0(maxx)
+  double precision :: bstag(maxx), dn(maxx), h0(maxx), mb(maxx)
   real :: totH, time
   integer :: grl(maxx)
-  integer :: tl, grlj
+  integer :: tc, tl, grlj
   
 contains
   
@@ -47,6 +47,8 @@ contains
     integer :: i
     
     !---------   Initialization  -----------------
+
+    mb = 0.
     
     gridx = L / (maxx-1)
     do i=1,maxx
@@ -62,16 +64,17 @@ contains
     
     tl = nint(tend / dt) + 1
 
+    tc = 0
+
   end subroutine FISh_initialize
 
 
   !----------	  Loop in time ----------------------
-  subroutine FISh_run(tc,h,u)
+  subroutine FISh_run()
     
-    integer,intent(in) :: tc
-    double precision   :: u(maxx), h(maxx)
-
     integer :: k, i
+
+    tc = tc + 1
 
     time = (tc - 1) * dt
     !          floating condition for ice sheet geometry
@@ -140,7 +143,7 @@ contains
           up(i) = (-u(i)) * dtdx2
           dn(i) = u(i-1) * dtdx2
           cen(i) = 1. - up(i) - dn(i)
-          con(i) = h(i) + mb * dt
+          con(i) = h(i) + mb(i) * dt
        enddo
        
        !              tridiagonal matrix solution
@@ -243,7 +246,7 @@ contains
     
   end subroutine ShelfU
   
-end module FISh_main
+end module FISh_MOD
 
 
 	   

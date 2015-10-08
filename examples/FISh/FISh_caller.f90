@@ -1,16 +1,14 @@
 
 program FISh_caller
 
-  use FISh_main
+  use FISh_MOD
 
   implicit none 
-
-  integer :: tc
 
   call FISh_initialize()
 
   do tc = 1,tl
-     call FISh_run(tc,h,u)
+     call FISh_run()
   end do
 
   call FISh_finalize()

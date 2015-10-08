@@ -3,6 +3,7 @@ FC          = gfortran
 FFLAGS     += -fPIC
 INSTALL_DIR = $(HOME)/bin
 LIBDIR      = /usr/local/lib/
+INCDIR      = /usr/local/include/
 
 .SUFFIXES: .f90
 %.o : %.f90
@@ -20,6 +21,7 @@ FISh.o:           FISh.f90
 install: FISh_caller libFISh.so
 	cp FISh_caller $(INSTALL_DIR)
 	cp libFISh.so $(LIBDIR)
+	cp fish_mod.mod $(INCDIR)
 
 .PHONY: clean
 
