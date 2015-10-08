@@ -167,7 +167,7 @@ CONTAINS
     INTEGER,ALLOCATABLE              :: ESMF_elementTypeList(:),elementIDlist(:)
 
     ! ESMF mesh vars
-    INTEGER,ALLOCATABLE              :: nodeOwners(:),elemIds(:), elemTypes(:)
+    INTEGER,ALLOCATABLE              :: nodeOwners(:)
     INTEGER,ALLOCATABLE              :: elemConn(:), nodeIds(:)
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
     INTEGER                          :: numNodes, numQuadElems, numTriElems, numTotElems
@@ -276,6 +276,7 @@ CONTAINS
     DEALLOCATE(elemConn)
     DEALLOCATE(nodeIds)
     DEALLOCATE(nodeCoords)
+    DEALLOCATE(nodeOwners)
 
     rc = ESMF_SUCCESS
  

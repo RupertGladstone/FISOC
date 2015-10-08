@@ -75,6 +75,7 @@ contains
     integer :: k, i
 
     tc = tc + 1
+print*,"fishRun", tc
 
     time = (tc - 1) * dt
     !          floating condition for ice sheet geometry
