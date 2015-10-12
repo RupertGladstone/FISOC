@@ -11,8 +11,8 @@ if not os.path.isdir(DEM_dir):
     ret = os.mkdir(DEM_dir)
 
 # some hard coded parameters governing the DEMs
-bedShape = "MM_overdeepened" # MM is short for MISMIP, so this is Schoof's overdeepened bed
-#bedShape = "linear" 
+#bedShape = "MM_overdeepened" # MM is short for MISMIP, so this is Schoof's overdeepened bed
+bedShape = "linear" 
 H     = 200. # initial thickness in metres
 z0    = 100. # z0 and zlast are highest and lowest bed elevations for use with linear bedShape.
 zlast = -900.
@@ -47,7 +47,7 @@ if (ny!=noData & yLen!=noData):
 # set up well for grids that match exactly the domain size...
 ny   = ny + 1
 yLen = yLen + dy
-print ny, yLen
+#print ny, yLen
 
 #print nx,ny,xLen,yLen,dx,dy
 #sys.exit(0)
@@ -99,7 +99,7 @@ replacements = {
     'XXX_execNever'      : '',
     'XXX_execReadInputs' : 'Exec Solver = Before Simulation',
     'XXX_nt'             : '20000',
-    'XXX_outFreq'        : '50',
+    'XXX_outFreq'        : '1',
     'XXX_restartFile'    :  '',
     'XXX_restartPosition':  '',
     'XXX_restartB4Init'  :  '',
