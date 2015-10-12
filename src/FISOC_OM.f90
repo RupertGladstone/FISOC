@@ -180,13 +180,11 @@ CONTAINS
     CHARACTER(len=ESMF_MAXSTR) :: OutputFileName 
     TYPE(ESMF_VM)              :: vm
     INTEGER(ESMF_KIND_I8)      :: advanceCount
-    INTEGER                    :: localPet,advanceCountInt4,OM_outputCount = 1
+    INTEGER                    :: localPet,advanceCountInt4
     TYPE(ESMF_fieldbundle)     :: OM_ImpFB, OM_ExpFB, OM_ExpFBcum
     TYPE(ESMF_config)          :: FISOC_config
     TYPE(ESMF_Alarm)           :: alarm_OM_output, alarm_ISM, alarm_ISM_exportAvailable
     LOGICAL                    :: verbose_coupling, OM_writeNetcdf
-
-    SAVE OM_outputCount
 
     rc = ESMF_FAILURE
    
@@ -229,10 +227,18 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+!       print*,"NETCDF ",ESMF_IO_NETCDF_PRESENT 
+!       print*,"parallel NETCDF ",ESMF_IO_PNETCDF_PRESENT 
 
     ! Decide how to call OM run wrapper depending on relevant alarms
     OM_output: IF (ESMF_AlarmIsRinging(alarm_OM_output, rc=rc)) THEN
        
+       ! "AdvanceCount" gives the number of (OM) timesteps.  Use it to make NetCDF filename.
+       CALL ESMF_ClockGet(FISOC_clock, advanceCount=advanceCount, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
        CALL ESMF_StateGet(OM_ExpSt, "OM export fields", OM_ExpFB, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
@@ -250,6 +256,28 @@ CONTAINS
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
           
+          writeNCimp: IF (OM_writeNetcdf) THEN
+             CALL ESMF_VMBarrier(vm, rc=rc)
+             msg = "Writing NetCDF output from FISOC on ocean grid (OM import)"
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+                  line=__LINE__, file=__FILE__, rc=rc)
+             IF (ESMF_IO_NETCDF_PRESENT) THEN
+                NC_status=ESMF_FILESTATUS_REPLACE
+                WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_imp_t", advanceCount, ".nc"
+                CALL  ESMF_FieldBundleWrite(OM_ImpFB, TRIM(OutputFileName),  overwrite=.FALSE., & 
+                     status=NC_status, iofmt=ESMF_IOFMT_NETCDF, rc=rc)
+                IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+                     line=__LINE__, file=__FILE__)) &
+                     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+             ELSE
+                msg = "ERROR: trying to write NetCDF output but NetCDF "// &
+                     "not present in this ESMF build."
+                CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+                     line=__LINE__, file=__FILE__, rc=rc)
+                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+             END IF
+          END IF writeNCimp
+          
        ELSE
           CALL FISOC_OM_Wrapper_Run(FISOC_config,localPet,OM_ExpFB=OM_ExpFB,rc=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -257,30 +285,19 @@ CONTAINS
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
        END IF
        
-!       print*,"NETCDF ",ESMF_IO_NETCDF_PRESENT 
-!       print*,"parallel NETCDF ",ESMF_IO_PNETCDF_PRESENT 
-
-       ! "AdvanceCount" gives the number of timesteps.  Use it to make NetCDF filename.
-       CALL ESMF_ClockGet(FISOC_clock, advanceCount=advanceCount, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-!       advanceCountInt4 = advanceCount
-       WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_out_t", advanceCount, ".nc"
-
        writeNC: IF (OM_writeNetcdf) THEN
           CALL ESMF_VMBarrier(vm, rc=rc)
-          msg = "Writing NetCDF output from FISOC on ocean grid"
+          msg = "Writing NetCDF output from FISOC on ocean grid (OM export)"
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
                line=__LINE__, file=__FILE__, rc=rc)
           NCpresent: IF (ESMF_IO_NETCDF_PRESENT) THEN
              NC_status=ESMF_FILESTATUS_REPLACE
+             WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_exp_t", advanceCount, ".nc"
              CALL  ESMF_FieldBundleWrite(OM_ExpFB, TRIM(OutputFileName),  overwrite=.FALSE., & 
                   status=NC_status, iofmt=ESMF_IOFMT_NETCDF, rc=rc)
              IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                   line=__LINE__, file=__FILE__)) &
-                     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-             OM_outputCount = OM_outputCount + 1
+                  CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
           ELSE
              msg = "ERROR: trying to write NetCDF output but NetCDF "// &
                   "not present in this ESMF build."
@@ -289,7 +306,7 @@ CONTAINS
              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
           END IF NCpresent
        END IF writeNC
-
+       
     ELSE
        
        IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN

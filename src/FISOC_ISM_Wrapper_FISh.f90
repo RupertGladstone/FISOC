@@ -244,6 +244,9 @@ CONTAINS
     ! FISh is essentially 1D.  Here we make it 2D by defining a hard coded domain width and 
     ! making a mesh of quadrilateral elements
     !
+    ! domain length is given by L in FISh module; width is hard coded above in domainWidth
+    ! (units are metres)
+    !
     ! node numbering layout for the FISh mesh as represented in 2D as an ESMF mesh:
     !
     ! maxx+1 -- maxx+2 -- maxx+3  ...  --maxx*2    
@@ -290,7 +293,7 @@ CONTAINS
     DO ii = maxx+1, 2*maxx
        nodeIndexDim1 = (ii-1)*2+1
        nodeIndexDim2 = ii*2
-       nodeCoords(nodeIndexDim1) = x(ii)
+       nodeCoords(nodeIndexDim1) = x(ii-maxx)
        nodeCoords(nodeIndexDim2) = domainWidth
     END DO
 

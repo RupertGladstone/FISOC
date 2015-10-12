@@ -259,9 +259,22 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL         :: rc
 
     REAL(ESMF_KIND_R8),POINTER :: coordY(:),coordX(:)
-    INTEGER                    :: ii, jj, lbnd(1), ubnd(1)
+    REAL(ESMF_KIND_R8)         :: Lx, Ly, dx, dy
+    INTEGER                    :: ii, jj, lbnd(1), ubnd(1), nx, ny
 
     NULLIFY (coordY,coordX)
+
+    ! number of grid points
+    nx = 200  
+    ny = 50 
+
+    ! domain size
+    Lx = 300000.
+    Ly = 30000.
+
+    ! grid cell size
+    dx = Lx/FLOAT(nx-1)
+    dy = Ly/FLOAT(ny-1)
 
     ! this next grid creation section is more or less a copy from the ref documentation example:
     ! http://www.earthsystemmodeling.org/esmf_releases/public/last/ESMF_refdoc/node5.html#SECTION05083200000000000000
@@ -277,7 +290,7 @@ CONTAINS
     !-------------------------------------------------------------------
     OM_dummyGrid=ESMF_GridCreateNoPeriDim(          &
          ! Define a regular distribution
-         maxIndex=(/11,6/), & ! define index space
+         maxIndex=(/nx,ny/), & ! define index space
          !         regDecomp=(/2,3/),  & ! define how to divide among DEs
          coordSys=ESMF_COORDSYS_CART, &
          ! Specify mapping of coords dim to Grid dim
@@ -307,7 +320,7 @@ CONTAINS
     ! Calculate and set coordinates in the first dimension.
     !-------------------------------------------------------------------
     DO ii=lbnd(1),ubnd(1)
-       coordX(ii) = (ii-1)*180000.0
+       coordX(ii) = (ii-1)*dx
     END DO
     
     !-------------------------------------------------------------------
@@ -323,8 +336,11 @@ CONTAINS
     ! Calculate and set coordinates in the second dimension 
     !-------------------------------------------------------------------
     DO jj=lbnd(1),ubnd(1)
-       coordY(jj) = (jj-1)*10000.0
+       coordY(jj) = (jj-1)*dy
     END DO
+
+    NULLIFY(coordX)
+    NULLIFY(coordY)
 
   END SUBROUTINE dummyCreateGrid
 
