@@ -25,8 +25,8 @@
   ISM_ReqVars:        
   FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dTdz_l0 ISM_dddt  
 
-#  OM_configFile:      /home/elmeruser/Source/romsIceShelf/ROMS/External/ocean_iceshelf2d.in
-  OM_configFile:      /home/elmeruser/Source/ROMSIceShelf/ROMS/External/ocean_iceshelf2d.in
+  OM_configFile:      /home/elmeruser/Source/romsIceShelf/ROMS/External/ocean_iceshelf2d.in
+#  OM_configFile:      /home/elmeruser/Source/ROMSIceShelf/ROMS/External/ocean_iceshelf2d.in
 
   FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0
   OM_ReqVars_stagger: CENTER CENTER
@@ -34,15 +34,19 @@
   FISOC_OM_DerVars:   
   OM_writeNetcdf:     .TRUE.
 
-  OM_outputInterval:  2
-  OM_dt_sec:          200000   
-  dt_ratio:           4 
+  OM_outputInterval:  1
+  OM_dt_sec:          3153600
+  dt_ratio:           1
+#  OM_outputInterval:  10512
+#  OM_dt_sec:          300
+#  dt_ratio:           10512
+# 3153600 (sec per month)
   start_year:         2010
   start_month:        1
-  end_year:           2010
-  end_month:          2
+  end_year:           2011
+  end_month:          3
 
-!  verbose_coupling:   .FALSE.
-  verbose_coupling:   .TRUE.
+  verbose_coupling:   .FALSE.
+!  verbose_coupling:   .TRUE.
 
 
