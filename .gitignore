@@ -1,8 +1,12 @@
+*.sty
 *.vtk
 *.o
 *sty
 *~
 *#
+*.pdf
+*.aux
+*.bst
 *.nc
 *.so
 *.Log

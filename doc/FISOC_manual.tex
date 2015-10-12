@@ -6,6 +6,7 @@
 \usepackage{color}
 \usepackage{hyperref}
 
+
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
 \definecolor{mauve}{rgb}{0.58,0,0.82}
@@ -23,17 +24,20 @@
   commentstyle=\color{dkgreen},
   stringstyle=\color{mauve},
   breaklines=true,
-  breakatwhitespace=true,
-  tabsize=3
+  tabsize=3, 
+  postbreak=\raisebox{0ex}[0ex][0ex]{\ensuremath{\color{red}\hookrightarrow\space}}
 }
 
 \begin{document}
 
 \title{Framework for Ice Sheet - Ocean Coupled modelling (FISOC) Manual}
 \author{Rupert Gladstone (RupertGladstone1972@gmail.com) \and Ben Galton-Fenzi}
-\date{Version 0.0, April 2015}
+\date{Version 0.1, September 2015}
 \maketitle
 
+\newpage 
+\tableofcontents
+\newpage 
 
 \section{Introduction}
 
@@ -62,10 +66,8 @@ into the FISOC framework (Section~\ref{sec:FISOC_SDG}).
 
 
 
-\section{Using FISOC with established components}
-\label{sec:FISOC_SUG}
-
-\subsection{Installing FISOC}
+\section{Installing FISOC with established components}
+\label{sec:FISOC_install}
 
 FISOC can be obtained by emailing a request to the author.  It is maintained and developed in a 
 private GitHub repository.  We intend to make this public in 2016.
@@ -80,10 +82,11 @@ in the top level FISOC directory:
 make install
 \end{lstlisting}
 
-TODO: note on parallelism, tested with mpich and or openmpi?
-FISOC\_MPI flag, also flags inherited from esmfmkfile.
+FISOC has been tested with GNU compilers on Linux Mint using OpenMPI. 
 
-\subsubsection{FISOC Environment Variables}
+
+
+\subsection{FISOC Environment Variables}
 \label{sec:EnvVars}
 
 Several environment variables may be used in the build process. 
@@ -139,10 +142,8 @@ Specifies the linker directives needed to link the ISM library to FISOC. \\
 
 
 
-\subsubsection{Pre-requisites}
+\subsection{Pre-requisites}
 \label{sec:PreReq}
-
-FISOC has been tested with GNU compilers on Linux Mint using OpenMPI. 
 
 A Message Passing Interface (MPI) implementation, such as 
 OpenMPI (\url{http://www.open-mpi.org/}), is required. 
@@ -164,15 +165,74 @@ ESMF should have been built with NetCDF and MPI
 
 Viable ISM and OM components must be available for any physically meaningful simulations
 (the build may be tested using ``dummy'' components).  
-See Sections~\ref{sec:Elmer} and \ref{sec:ROMS}.
+See Sections~\ref{sec:PreReqElmer} and \ref{sec:PreReqROMS}.
+
+\subsubsection{Elmer/Ice}
+\label{sec:PreReqElmer}
+
+***how this should be written depends on whether the FISOC changes to 
+Elmer code make it in to the Elmer repository. currently FISOC contains 
+top level control structures that replace Elmer ones and the whole of 
+Elmer needs to be re-compiled.  We aim to commit these changes to the 
+main Elmer/Ice repo.***
+
+***ref and link Elmer/Ice
+
+When compiling FISOC with Elmer/Ice, FISOC needs to know where to 
+find the relevant Elmer/Ice libraries.  
+This can be done at FISOC compile time through the 
+\$FISOC\_ISM
+environment variables.  
 
 
-\subsection{Running FISOC}
+\begin{lstlisting}
+export FISOC_ISM="Elmer"
+export FISOC_ISM_INCLUDE="$ELMER_HOME/share/elmersolver/include"
+export FISOC_ISM_LIBPATH="$ELMER_HOME/lib/"
+export FISOC_ISM_LIBS="-lelmersolver"
+\end{lstlisting}
+
+\subsubsection{ROMS}
+\label{sec:PreReqROMS}
+
+FISOC has been developed and tested with an ice shelf enabled version of ROMS. 
+This is branched from the Rutgers ROMS repository and is publicly available 
+through github: \\
+https://github.com/bkgf/romsIceShelf
+
+***add refs here and link to main ROMS web site
+
+When compiling ROMS for use with FISOC, It is essential to activate the option 
+to compile the ROMS shared library, which 
+is done by setting the environment variable \$ROMS\_MAKE\_SHAREDLIB to any value. 
+The shared library will be installed in the location given by the 
+ \$LIBDIR environment variable. 
+By default ROMS will install the module files in the directory given by 
+ \$SCRATCH\_DIR.  
+
+When compiling FISOC with ROMS, FISOC needs to know where to 
+find the relevant ROMS libraries.  
+This can be done at FISOC compile time through the 
+\$FISOC\_OM
+environment variables.  
+Similarly to the ISM options, FISOC uses the variables \$FISOC\_OM\_LIBPATH and
+ \$FISOC\_OM\_LIBS to locate the shared library.
+FISOC uses the  \$FISOC\_OM\_INCLUDE variable to locate the module files, 
+which are needed during compilation.
+
+***add example paths here
+
+
+
+
+
+\section{Running FISOC}
+\label{sec:FISOC_SUG}
 
 The FISOC executable is called FISOC\_caller, and should be located in your path after installation. 
-The installation is specific to the choice of component (you need to re-compile if you switch , for 
+The installation is specific to the choice of component (you need to re-compile if you switch, for 
 example, from one ISM to another).  
-Beyond choice of component, all other run choices are made in the FISOC\_config.rc file
+Beyond choice of components, all run time choices are made in the FISOC\_config.rc file
 (Section~\ref{sec:config}), 
 or through component specific initialisation.
 
@@ -184,24 +244,26 @@ In verbose mode (Section~\ref{sec:config}) some run time information may be prin
 Independently of this, log files are always written, 
 with default filenames of ``PET\#.FISOC.Log'', where ``\#'' is a number from 0 upwards indicating the 
 ``Persistent Execution Thread'' (PET). 
-These logs containing run time messages and errors can be helpful with trobleshooting.
+These logs containing run time messages and errors can be helpful with troubleshooting.
 Note that FISOC appends to the logs rather than over-writing at run time, so you may wish to delete old logs 
 periodically. 
 
 Aside: PET is an ESMF abstraction designed to be general over differing parallel implementations. 
-In FISOC, there is always a 1:1 relationship between PETs and MPI processes 
-(Section~\ref{sec:FISOC_SDG}). 
+In FISOC, there is always a 1:1 relationship between PETs and MPI processes. 
+%(Section~\ref{sec:FISOC_SDG}). 
 
 
-\subsubsection{FISOC configuration}
+\subsection{FISOC configuration}
 \label{sec:config}
 
-The FISOC config file is named FISOC\_config.rc.  This is a resource file, as described by the 
+The FISOC config file is named FISOC\_config.rc, and is expected to be present 
+in the current directory.  
+This is a resource file, as described by the 
 ESMF documentation.  It supports different types and also lists. 
-In principle, llists of mixed types are supported, though FISOC does not utilise this utility.
+In principle, llists of mixed types are supported, though FISOC does not utilise this capability.
 
 FISOC\_config.rc contains code specific to the coupling.  Components may also use their 
-independent means for initialisation.
+independent means for configuration.
 
 Some of the FISOC config entries are required.
 This section describes all the valid standard entries in a FISOC config file as follows:
@@ -274,61 +336,38 @@ End year and month define the finish time of the coupled simulation.       \\
 Print FISOC comments to screen (a log file will be written independently of the settings of this value).\\
 \end{flushleft}
 
-\subsubsection{Timestepping}
+\subsection{Timestepping}
 Asynchronous timestepping.
 ***fill in this section we've implemented both tight coupling (ice and ocean both running 
 on the same timescale) and loose coupling (for longer time scales where the ocean is run 
 to steady state then the ice sheet continues until significant change has occurred in the cavity).
 
-\subsection{Elmer/Ice}
-\label{sec:Elmer}
-***ref or link Elmer/Ice
 
-FISOC needs to know where to find the relevant Elmer/Ice libraries.  
-This can be done at FISOC compile time through the 
-\$FISOC\_ISM
-environment variables.  
-
+\subsection{Running FISOC with Elmer/Ice} 
 For dynamic linked libraries, shared object files may be needed at run time.  
 This can be ensured through use of 
 the \$LD\_LIBRARY\_PATH environment variable. 
 
 For example (it is assumed \$ELMER\_HOME was set during Elmer installation):
 \begin{lstlisting}
-export FISOC_ISM="Elmer"
-export FISOC_ISM_INCLUDE="$ELMER_HOME/share/elmersolver/include"
-export FISOC_ISM_LIBPATH="$ELMER_HOME/lib/"
-export FISOC_ISM_LIBS="-lelmersolver"
 export LD_LIBRARY_PATH="$FISOC_ISM_LIBPATH/:$LD_LIBRARY_PATH"
 \end{lstlisting}
 
 
-\subsection{ROMS}
-\label{sec:ROMS}
-
-FISOC has been developed and tested with an ice shelf enabled version of ROMS. 
-This is branched from the Rutgers ROMS repository and is publicly available 
-through github: \\
-https://github.com/bkgf/romsIceShelf
-
-When compiling ROMS for use with FISOC, It is essential to activate the option 
-to compile the ROMS shared library, which 
-is done by setting the environment variable \$ROMS\_MAKE\_SHAREDLIB to any value. 
-The shared library will be installed in the location given by the 
- \$LIBDIR environment variable. 
-By default ROMS will install the module files in the directory given by 
- \$SCRATCH\_DIR.  
-
-Similarly to the ISM options, FISOC uses the variables \$FISOC\_OM\_LIBPATH and
- \$FISOC\_OM\_LIBS to locate the shared library.
-FISOC uses the  \$FISOC\_OM\_INCLUDE variable to locate the module files, 
-which are needed during compilation.
+\subsection{Running FISOC with ROMS}
+\label{sec:runningROMS}
 
 FISOC needs to access the shared library at run time.  One way of ensuring this 
 is to set the \$ LD\_LIBRARY\_PATH variable, e.g.:
 \begin{lstlisting}
 export LD_LIBRARY_PATH="$FISOC_OM_LIBPATH/:$LD_LIBRARY_PATH"
 \end{lstlisting}
+
+
+
+
+
+
 
 \section{Adapting new components to run with  FISOC}
 \label{sec:FISOC_SDG}
@@ -389,16 +428,26 @@ The config object can be passed to the wrapper and accessed directly.
 
 \section{Pre-requisite installation notes}
 \label{app:A}
-The following commands worked to install NetCDF and ESMF on a Linux Mint system in Feb 2015.
+The following commands worked to install NetCDF and ESMF on a Linux Mint system in 2015.
 Some pre-requisites for netcdf were also installed.
+The system already had a working OpenMPI installation.
 
-\begin{lstlisting}
+
+
+\begin{lstlisting}[language=bash]
+
+
+# instructions on installing ESMF can be found here:
+# http://www.earthsystemmodeling.org/esmf_releases/last_built/ESMF_usrdoc/node9.html
+
+# netcdf instructions
+# http://www.unidata.ucar.edu/software/netcdf/docs/netcdf-install.html
+
 cd /somewhere/to/download/and/compile/source/code
 
 sudo apt-get install m4
 
-wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4/
-                                                        zlib-1.2.8.tar.gz
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4/zlib-1.2.8.tar.gz
 tar -xzf zlib-1.2.8.tar.gz 
 cd zlib-1.2.8
  ./configure --prefix=/usr/local/
@@ -406,55 +455,61 @@ cd zlib-1.2.8
  sudo -E make install
 cd ..
 
-wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4/
-                                                       hdf5-1.8.13.tar.gz	
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4/hdf5-1.8.13.tar.gz	
 tar -xzf hdf5-1.8.13.tar.gz 
 cd hdf5-1.8.13
- # Note the O0 flag in the next line.  The default is O3, which is
- # strong optimisation.  This can result in failed checks on some
- #  systems.
- CC=mpicc FC=mpif90 ./configure  --prefix=/usr/local/ --with-zlib=/usr/local  --enable-fortran --enable-parallel
-
- CFLAGS=-O0 ./configure --prefix=/usr/local/ --with-zlib=/usr/local  --enable-fortran 
+ # Note the O0 flag in the next line.  The default is O3, 
+ # which is strong optimisation.  This can result in failed 
+ # checks on some systems.
+ CFLAGS="-O0 -fPIC" CC=mpicc CXX=mpiCC FC=mpif90 ./configure --prefix=/usr/local/ --with-zlib=/usr/local  --enable-fortran --enable-parallel --enable-shared
  make check
  sudo -E make install
 cd ..
 
+# note that netcdf fortran library is now compiled from a 
+# seperate source from the main netcdf c library. Install 
+# the c library first, and make sure to create the shared
+# object file. 
 wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.3.3.tar.gz
 tar -xzf netcdf-4.3.3.tar.gz 
 cd netcdf-4.3.3/
- CPPFLAGS="-I/usr/local/include -I/usr/local/hdf5/include" LDFLAGS="-L/usr/local/hdf5/lib -L/usr/local/lib" ./configure --prefix=/usr/local 
- CPPFLAGS=-I/usr/local/include LDFLAGS=-L/usr/local/lib ./configure --prefix=/usr/local 
+ LIBS=-ldl CC=mpicc CXX=mpiCC FC=mpif90 CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/  ./configure --prefix=/usr/local --enable-parallel 
  make check
  sudo -E make install
 cd ..
 
-wget ftp://ftp.unidata.ucar.edu/pub/netcdf/
-                                              netcdf-fortran-4.4.2.tar.gz
+wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-fortran-4.4.2.tar.gz
 tar -xzf netcdf-fortran-4.4.2.tar.gz 
 cd netcdf-fortran-4.4.2
- LD_LIBRARY_PATH=/usr/local/lib/ CPPFLAGS="-I/usr/local/include  -I/usr/local/hdf5/include -DUSE_NETCDF4" LDFLAGS="-L/usr/local/lib -L/usr/local/hdf5/lib" ./configure  --prefix=/usr/local
- LD_LIBRARY_PATH=/usr/local/lib/ CPPFLAGS="-I/usr/local/include -DUSE_NETCDF4" LDFLAGS="-L/usr/local/lib" ./configure  --prefix=/usr/local
+ LIBS=-ldl CC=mpicc CXX=mpiCC FC=mpif90 LDFLAGS=-L/usr/local/lib/ CPPFLAGS="-I/usr/local/include -DUSE_NETCDF4"  ./configure --prefix=/usr/local
  make check
  sudo -E make install
 cd ..
 
+# convenient viewer for contents of netcdf files (not essential)
+sudo apt-get install ncview
+
+# ESMF requires ESMF_DIR and probably other environment variables.  
+# These can be set at the command line or, for example, in your 
+# .bashrc file.  These might work:
 export ESMF_DIR="/top/level/directory/for/esmf/"
 export ESMF_NETCDF="split"
 export ESMF_NETCDF_INCLUDE="/usr/local/include"
 export ESMF_NETCDF_LIBPATH="/usr/local/lib"
 export ESMF_COMM="openmpi"
-export ESMFMKFILE="$ESMF_DIR/DEFAULTINSTALLDIR/lib/libO/
-                             Linux.gfortran.64.openmpi.default/esmf.mk"
                                                                                                               
-wget downloads.sourceforge.net/project/esmf/ESMF_6_3_0r/
-                                 ESMF_6_3_0rp1/esmf_6_3_0rp1_src.tar.gz
-                                                                                                              
+wget downloads.sourceforge.net/project/esmf/ESMF_6_3_0r/ESMF_6_3_0rp1/esmf_6_3_0rp1_src.tar.gz
 tar -xf esmf_6_3_0rp1_src.tar.gz
 cd esmf 
  make check
  sudo -E make install
 cd ..
+
+# In order to actually use ESMF you must set the environment 
+# variable ESMFMKFILE.  If you didn't use environment 
+# variables to specify the install location this make file 
+# will probably end up somewhere like this:
+export ESMFMKFILE="$ESMF_DIR/DEFAULTINSTALLDIR/lib/libO/Linux.gfortran.64.openmpi.default/esmf.mk"
 
 \end{lstlisting}
 

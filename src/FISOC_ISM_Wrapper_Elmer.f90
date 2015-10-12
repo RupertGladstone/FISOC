@@ -16,6 +16,28 @@ MODULE FISOC_ISM_Wrapper
 
   ! Note that CurrentModel is shared through the Types module (via MainUtils)
 
+  ! Elmer element types (not directly available from Elmer, though ideally they should be)
+  INTEGER, PARAMETER :: ELMER_ELEMENT_NODAL            = 101
+  INTEGER, PARAMETER :: ELMER_ELEMENT_LINE_LINEAR      = 202
+  INTEGER, PARAMETER :: ELMER_ELEMENT_LINE_QUADRAT     = 203
+  INTEGER, PARAMETER :: ELMER_ELEMENT_LINE_CUBIC       = 204
+  INTEGER, PARAMETER :: ELMER_ELEMENT_TRIANGLE_LINEAR  = 303
+  INTEGER, PARAMETER :: ELMER_ELEMENT_TRIANGLE_QUADRAT = 306
+  INTEGER, PARAMETER :: ELMER_ELEMENT_TRIANGLE_CUBIC   = 310
+  INTEGER, PARAMETER :: ELMER_ELEMENT_QUADRIL_BILINEAR = 404
+  INTEGER, PARAMETER :: ELMER_ELEMENT_QUADRIL_QUADRAT  = 408
+  INTEGER, PARAMETER :: ELMER_ELEMENT_QUADRIL_QUADRAT2 = 409
+  INTEGER, PARAMETER :: ELMER_ELEMENT_QUADRIL_CUBIC    = 412
+  INTEGER, PARAMETER :: ELMER_ELEMENT_TETRA_LINEAR     = 504
+  INTEGER, PARAMETER :: ELMER_ELEMENT_TETRA_QUADRAT    = 510
+  INTEGER, PARAMETER :: ELMER_ELEMENT_PYRAMID_LINEAR   = 605
+  INTEGER, PARAMETER :: ELMER_ELEMENT_PYRAMID_QUADRAT  = 613
+  INTEGER, PARAMETER :: ELMER_ELEMENT_WEDGE_LINEAR     = 706
+  INTEGER, PARAMETER :: ELMER_ELEMENT_WEDGE_QUADRAT    = 715
+  INTEGER, PARAMETER :: ELMER_ELEMENT_HEXAHED_TRILIN   = 808
+  INTEGER, PARAMETER :: ELMER_ELEMENT_HEXAHED_QUADRAT  = 820
+  INTEGER, PARAMETER :: ELMER_ELEMENT_HEXAHED_QUADRAT2 = 827
+
 CONTAINS
 
   !--------------------------------------------------------------------------------------
@@ -53,7 +75,7 @@ CONTAINS
     CALL ElmerSolver_init(Elmer_Mesh,.TRUE.) 
     ! It is intended that ElmerSolver_init should return the mesh prior to extrusion 
 
-    CALL Elmer2ESMF_mesh(Elmer_mesh,ISM_mesh,rc=rc)
+    CALL Elmer2ESMF_mesh(Elmer_mesh,ISM_mesh,vm,rc=rc)
 
     CALL FISOC_populateFieldBundle(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -130,12 +152,14 @@ CONTAINS
   !
   ! Convert an Elmer mesh to ESMF structures 
   !
-  ! Note: this subroutine expects to recieve a 2D Elmer mesh containing triangles and 
-  ! quads.
+  ! Note: this subroutine expects to recieve a 2D Elmer mesh containing triangles 
+  ! or and quads.
   !
-  SUBROUTINE Elmer2ESMF_mesh(Elmer_mesh,ESMF_ElmerMesh,rc)
+  SUBROUTINE Elmer2ESMF_mesh(Elmer_mesh,ESMF_ElmerMesh,vm,rc)
+
     TYPE(ESMF_mesh),INTENT(INOUT)    :: ESMF_ElmerMesh
     TYPE(Mesh_t),INTENT(IN)          :: Elmer_Mesh
+    TYPE(ESMF_VM),INTENT(IN)         :: vm
     INTEGER,INTENT(OUT),OPTIONAL     :: rc
 
     INTEGER                          :: ii, nodeIndex
@@ -143,16 +167,21 @@ CONTAINS
     INTEGER,ALLOCATABLE              :: ESMF_elementTypeList(:),elementIDlist(:)
 
     ! ESMF mesh vars
-    INTEGER,ALLOCATABLE              :: nodeOwners(:),elemIds(:), elemTypes(:)
+    INTEGER,ALLOCATABLE              :: nodeOwners(:)
     INTEGER,ALLOCATABLE              :: elemConn(:), nodeIds(:)
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
     INTEGER                          :: numNodes, numQuadElems, numTriElems, numTotElems
+    INTEGER                          :: localPet, petCount
 
     rc = ESMF_FAILURE
 
     msg = "Elmer to ESMF mesh format conversion"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
          line=__LINE__, file=__FILE__)
+
+    CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) RETURN
 
     ! some basic sanity checks
     IF (Elmer_mesh % MeshDim.NE.2) THEN
@@ -197,6 +226,8 @@ CONTAINS
     ALLOCATE(ESMF_elementTypeList(numQuadElems+numTriElems))
     ALLOCATE(elementIDlist(numQuadElems+numTriElems))
     ALLOCATE(elemConn(4*numQuadElems+3*numTriElems))
+
+!print*,"ELMER MESH STUFF", numQuadElems, numTriElems
 
     numTotElems = numElementsByType(Elmer_mesh,(/ELMER_ELEMENT_QUADRIL_BILINEAR,ELMER_ELEMENT_QUADRIL_QUADRAT,&
          ELMER_ELEMENT_QUADRIL_QUADRAT2,ELMER_ELEMENT_QUADRIL_CUBIC,ELMER_ELEMENT_TRIANGLE_LINEAR,&
@@ -245,6 +276,7 @@ CONTAINS
     DEALLOCATE(elemConn)
     DEALLOCATE(nodeIds)
     DEALLOCATE(nodeCoords)
+    DEALLOCATE(nodeOwners)
 
     rc = ESMF_SUCCESS
  

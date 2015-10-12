@@ -287,7 +287,7 @@ CONTAINS
     TYPE(ESMF_config)    :: config
     INTEGER              :: urc, localPet
     TYPE(ESMF_VM)        :: vm
-    INTEGER(ESMF_KIND_I8)  :: advanceCount
+    INTEGER(ESMF_KIND_I8):: advanceCount
 
     rc = ESMF_FAILURE
 

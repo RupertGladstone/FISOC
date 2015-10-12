@@ -16,15 +16,16 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! This dummy wrapper aims to create the dummy grid and required variables 
   ! in the ESMF formats.  
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_dummyGrid,FISOC_config,mpic,localPet,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_dummyGrid,FISOC_config,vm,rc)
 
-    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    INTEGER,INTENT(IN)                    :: mpic ! mpi comm, duplicate from the OM VM
-    INTEGER,INTENT(IN)                    :: localPet ! local persistent execution thread (1:1 relationship to process)
-    TYPE(ESMF_grid),INTENT(OUT)           :: OM_dummyGrid
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    TYPE(ESMF_grid),INTENT(OUT)           :: OM_dummyGrid
+    TYPE(ESMF_VM),INTENT(IN)              :: vm
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
+    INTEGER                    :: mpic ! mpi comm, duplicate from the OM VM
+    INTEGER                    :: localPet ! local persistent execution thread (1:1 relationship to process)
     CHARACTER(len=ESMF_MAXSTR)            :: label
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: FISOC_OM_ReqVarList(:)
     LOGICAL                               :: verbose_coupling
@@ -68,15 +69,15 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! This dummy wrapper aims to create the dummy grid and required variables 
   ! in the ESMF formats.  
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(OM_ImpFB,FISOC_config,localPet,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(OM_ImpFB,OM_ExpFB,FISOC_config,vm,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB, OM_ExpFB
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
-    INTEGER,INTENT(IN)                    :: localPet
+    TYPE(ESMF_VM),INTENT(IN)              :: vm
 
-    LOGICAL                               :: verbose_coupling
-
+    LOGICAL                      :: verbose_coupling
+    INTEGER                      :: localPet
     TYPE(ESMF_field)             :: ISM_temperature_l0
     REAL(ESMF_KIND_R8),POINTER   :: ISM_temperature_l0_ptr(:,:)
     CHARACTER(len=ESMF_MAXSTR)   :: nameList(10)
@@ -258,9 +259,22 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL         :: rc
 
     REAL(ESMF_KIND_R8),POINTER :: coordY(:),coordX(:)
-    INTEGER                    :: ii, jj, lbnd(1), ubnd(1)
+    REAL(ESMF_KIND_R8)         :: Lx, Ly, dx, dy
+    INTEGER                    :: ii, jj, lbnd(1), ubnd(1), nx, ny
 
     NULLIFY (coordY,coordX)
+
+    ! number of grid points
+    nx = 200  
+    ny = 50 
+
+    ! domain size
+    Lx = 300000.
+    Ly = 30000.
+
+    ! grid cell size
+    dx = Lx/FLOAT(nx-1)
+    dy = Ly/FLOAT(ny-1)
 
     ! this next grid creation section is more or less a copy from the ref documentation example:
     ! http://www.earthsystemmodeling.org/esmf_releases/public/last/ESMF_refdoc/node5.html#SECTION05083200000000000000
@@ -276,7 +290,7 @@ CONTAINS
     !-------------------------------------------------------------------
     OM_dummyGrid=ESMF_GridCreateNoPeriDim(          &
          ! Define a regular distribution
-         maxIndex=(/11,6/), & ! define index space
+         maxIndex=(/nx,ny/), & ! define index space
          !         regDecomp=(/2,3/),  & ! define how to divide among DEs
          coordSys=ESMF_COORDSYS_CART, &
          ! Specify mapping of coords dim to Grid dim
@@ -306,7 +320,7 @@ CONTAINS
     ! Calculate and set coordinates in the first dimension.
     !-------------------------------------------------------------------
     DO ii=lbnd(1),ubnd(1)
-       coordX(ii) = (ii-1)*180000.0
+       coordX(ii) = (ii-1)*dx
     END DO
     
     !-------------------------------------------------------------------
@@ -322,8 +336,11 @@ CONTAINS
     ! Calculate and set coordinates in the second dimension 
     !-------------------------------------------------------------------
     DO jj=lbnd(1),ubnd(1)
-       coordY(jj) = (jj-1)*10000.0
+       coordY(jj) = (jj-1)*dy
     END DO
+
+    NULLIFY(coordX)
+    NULLIFY(coordY)
 
   END SUBROUTINE dummyCreateGrid
 

@@ -46,6 +46,31 @@ endif
 
 include $(ESMFMKFILE)
 
+$(info )
+$(info ********************************************************************)
+$(info *** Building FISOC, Framework for Ice Sheet Ocean model Coupling ***)
+$(info *** Relevant variables for the build are now listed              ***)
+$(info ********************************************************************)
+$(info )
+$(info FISOC will be installed in [${INSTALL_DIR}])
+$(info )
+$(info ESMFMKFILE        [${ESMFMKFILE}])
+$(info FISOC_MPI         [${FISOC_MPI}])
+#$(info FISOC_MPI_SYMBOL  [${FISOC_MPI_SYMBOL}])
+#$(info FISOC_INSTALL_DIR [${FISOC_INSTALL_DIR}])
+#$(info INSTALL_DIR       [${INSTALL_DIR}])
+$(info )
+$(info FISOC_ISM         [${FISOC_ISM}])
+$(info FISOC_ISM_LIBS    [${FISOC_ISM_LIBS}])
+$(info FISOC_ISM_LIBPATH [${FISOC_ISM_LIBPATH}])
+$(info FISOC_ISM_INCLUDE [${FISOC_ISM_INCLUDE}])
+$(info )
+$(info FISOC_OM          [${FISOC_OM}])
+$(info FISOC_OM_LIBS     [${FISOC_OM_LIBS}])
+$(info FISOC_OM_LIBPATH  [${FISOC_OM_LIBPATH}])
+$(info FISOC_OM_INCLUDE  [${FISOC_OM_INCLUDE}])
+$(info )
+
 ################################################################################
 
 .SUFFIXES: .f90
