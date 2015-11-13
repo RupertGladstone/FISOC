@@ -222,6 +222,10 @@ which are needed during compilation.
 
 ***add example paths here
 
+\section{Troubleshooting}
+
+
+
 
 
 
@@ -336,6 +340,76 @@ End year and month define the finish time of the coupled simulation.       \\
 Print FISOC comments to screen (a log file will be written independently of the settings of this value).\\
 \end{flushleft}
 
+\subsubsection{FISOC variables}
+
+The union of \textbf{FISOC\_ISM\_ReqVars}, \textbf{FISOC\_ISM\_DerVars}, \textbf{FISOC\_OM\_ReqVars} 
+and \textbf{FISOC\_OM\_DerVars} describes the full set of variables required by FISOC for a given simulation. 
+Valid values are given in Table~\ref{tab:vars}.
+Note that the units given in Table~\ref{tab:vars} are suggested units.  FISOC doesn't care about units, but 
+the user must ensure unit consistency.  There may be hard coded unit assumptions in the model specific 
+wrappers.
+
+***variable names: sort out dddt and dBdt\_l0.  consistent naming convention needed.
+
+\begin{table}
+\begin{center}
+\begin{tabular}{ l|l|l }
+Variable              & Description                                  & Units \\
+\hline
+ISM\_temperature\_l0  & Ice temperature at the ice ocean interface.  & K \\
+ISM\_temperature\_l1  & Ice temperature in the ISM one level above   & K \\
+                      & the ice ocean interface.                     &   \\ 
+ISM\_z\_l0            & Height relative to sea level of the ice      & m \\
+                      & base.                                        &   \\
+ISM\_z\_l1            & Height relative to sea level of the first    &   \\
+                      & ISM model level above the ice base.          & m \\
+ISM\_z\_l0\_previous  & Height relative to sea level of the ice      &   \\
+                      & base one timestep previously.                & m \\
+ISM\_dTdz\_l0         & Vertical temperature gradient in the ice     &   \\
+                      & at the ice base.                             & K/m \\
+ISM\_dddt             & Rate of change of the height of the ice      &   \\
+                      & base relative to sea level with respect to   &   \\
+                      & time.                                        & m/a \\
+ISM\_velocity\_l0     & Ice flow velocity at the ice base            & m/a \\
+OM\_dBdt\_l0          & Ice shelf basal melt rate                    & m/a \\
+OM\_temperature\_l0   & Ocean temperature at the ice ocean           &   \\
+                      & interface  ***or is this the ocean model...  &   \\
+                      & guessing the ice temperature at the interface&   \\
+\end{tabular}
+\end{center}
+\caption{FISOC standard variables and typical units.}
+\label{tab:vars}
+\end{table}
+
+As a naming convention, ``z'' refers to the vertical coordinate, and ``l0'' and ``l1'' refer to the 
+model level at the ice-ocean interface (this would typically be the lowest level of the ISM or 
+the uppermost level of the OM) and one level above it, respectively.
+
+FISOC outputting occurs on the ocean grid, and consists of dumping both the import and 
+export fields to netcdf files. 
+\textbf{FISOC\_ISM\_ReqVars} may contain variables that are required only so that they can be written 
+out on the ocean grid (typically as a sanity check) rather than actuallly being needed by the OM.
+
+
+The list of derived variables, \textbf{FISOC\_ISM\_DerVars}, indicates which variables are needed by the 
+OM but are not calculated by the ISM or its wrapper. 
+The methods for calculating the derived variables are hard coded in FISOC\_ISM.f90. 
+Valid values for  \textbf{FISOC\_ISM\_DerVars} include:
+
+ISM\_z\_l0\_previous.  This is the depth of ice base at previous ISM timestep. This is simply stored 
+in memory.  No calculation is required, but this variable is needed for the other ``derived'' variables. 
+
+ISM\_dTdz\_l0.  Temperature gradient at ice base.  This is calculated as 
+\begin{equation}
+ISM\_dTdz\_l0 = \frac{ISM\_temperature\_l1 - ISM\_temperature\_l0}{ISM\_z\_l1 - ISM\_z\_l0}
+\end{equation}
+
+ISM\_dddt.  Rate of change of depth of ice base.  This is calculated as 
+\begin{equation}
+ISM\_dddt = \frac{ISM\_z\_l0 - ISM\_z\_l0\_previous}{ISM\_dt}
+\end{equation}
+
+
 \subsection{Timestepping}
 Asynchronous timestepping.
 ***fill in this section we've implemented both tight coupling (ice and ocean both running 
@@ -362,6 +436,13 @@ is to set the \$ LD\_LIBRARY\_PATH variable, e.g.:
 \begin{lstlisting}
 export LD_LIBRARY_PATH="$FISOC_OM_LIBPATH/:$LD_LIBRARY_PATH"
 \end{lstlisting}
+
+\section{Troubleshooting}
+
+If the error messages to the screen are not helpful, remember to check whether useful 
+information has been logged.  By default this will be in files in the current directory 
+with names like PETX.FISOC.Log (where X is a process number).
+
 
 
 
