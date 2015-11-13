@@ -19,7 +19,7 @@ module FISh_MOD
   !      domain length
   parameter (L = 200e3)
   
-  parameter (maxx = 5, tend = 500.0, dt = .1)
+  parameter (maxx = 5, tend = 10.0, dt = .1)
   parameter (rhoi = 900., rhos = 1000., grav = 9.8)
   parameter (n = 3., m = 1./3.)
 
@@ -29,16 +29,16 @@ module FISh_MOD
   !      x = horizontal distance
   !      s = surface elevation: s = h + hb
   
-  double precision :: x(maxx), b(maxx), h(maxx), h2(maxx)
-  double precision :: hb(maxx), s(maxx), hstag(maxx)
-  double precision :: xstag(maxx), slope(maxx), taud(maxx)
-  double precision :: gridx, ub(maxx), u(maxx), up(maxx)
-  double precision :: con(maxx), dtdx2, f(maxx), g(maxx)
-  double precision :: cen(maxx), txx(maxx), haf(maxx)
-  double precision :: bstag(maxx), dn(maxx), h0(maxx), mb(maxx)
-  real :: totH, time
-  integer :: grl(maxx)
-  integer :: tc, tl, grlj
+  double precision,save :: x(maxx), b(maxx), h(maxx), h2(maxx)
+  double precision,save :: hb(maxx), s(maxx), hstag(maxx)
+  double precision,save :: xstag(maxx), slope(maxx), taud(maxx)
+  double precision,save :: gridx, ub(maxx), u(maxx), up(maxx)
+  double precision,save :: con(maxx), dtdx2, f(maxx), g(maxx)
+  double precision,save :: cen(maxx), txx(maxx), haf(maxx)
+  double precision,save :: bstag(maxx), dn(maxx), h0(maxx), mb(maxx)
+  real,save :: totH, time
+  integer,save :: grl(maxx)
+  integer,save :: tc, tl, grlj
   
 contains
   
@@ -132,10 +132,12 @@ print*,"fishRun", tc
     do k=1,3
        if (k==1) then
           if (tc==1) then
-             call ShelfU(u,h,grl,taud,txx,A,C,gridx,secpyr,maxx,m,n,fluxBC)
+!             call ShelfU(u,h,grl,taud,txx,A,C,gridx,secpyr,maxx,m,n,fluxBC)
+              call ShelfU(h)
           endif
        else
-          call ShelfU(u,h2,grl,taud,txx,A,C,gridx,secpyr,maxx,m,n,fluxBC)
+          call ShelfU(h2)
+!          call ShelfU(u,h2,grl,taud,txx,A,C,gridx,secpyr,maxx,m,n,fluxBC)
        end if
        
        !   		   arrange staggered u-grid
@@ -146,6 +148,7 @@ print*,"fishRun", tc
           cen(i) = 1. - up(i) - dn(i)
           con(i) = h(i) + mb(i) * dt
        enddo
+
        
        !              tridiagonal matrix solution
        f(1) = 0
@@ -161,6 +164,7 @@ print*,"fishRun", tc
        else
           h2(maxx) = 0
        end if
+
        do i=maxx-1,2,-1
           h2(i) = g(i) + f(i) * h2(i+1)
        enddo
@@ -174,6 +178,7 @@ print*,"fishRun", tc
        totH = totH + h(i)
     enddo
     
+
   end subroutine FISh_run
   !-------------- end of loop in time -------------
   
@@ -182,47 +187,51 @@ print*,"fishRun", tc
   end subroutine FISh_finalize
 
   
-  subroutine ShelfU(u,h,grl,taud,txx,A,c,gridx,secpyr,maxx,m,n,fluxBC)
+!  subroutine ShelfU(u,h,grl,taud,txx,A,c,gridx,secpyr,maxx,m,n,fluxBC)
+   subroutine ShelfU(h_loc)
     
-    integer :: maxx, fluxBC
-    integer :: grl(maxx), k, i
+!    integer :: maxx, fluxBC
+!    integer :: grl(maxx), k, i
+!    double precision :: u(maxx), h(maxx), taud(maxx)
+!    double precision :: secpyr, m, n, A, c, gridx, txx(maxx)
 
-    double precision :: u(maxx), h(maxx), taud(maxx)
-    double precision :: secpyr, m, n, A, c, gridx, txx(maxx)
+    double precision :: h_loc(maxx)
     
-    double precision :: up(maxx), dn(maxx), cen(maxx)
-    double precision :: g(maxx), eeff(maxx), mu(maxx)
-    double precision :: f(maxx), con(maxx), beta(maxx)
+    integer :: kk, ii
+!    double precision :: up(maxx), dn(maxx), cen(maxx)
+!    double precision :: g(maxx)
+!    double precision :: f(maxx), con(maxx)
+    double precision ::  eeff(maxx), mu(maxx), beta(maxx)
     
-    do k=1,5
+    do kk=1,5
        !          ice shelf viscosity
-       do i=2,maxx
-          eeff(i) = ((u(i) - u(i-1)) / gridx)**2.
-          if (eeff(i)<1.d-30) then
-             eeff(i) = 1.d-30
+       do ii=2,maxx
+          eeff(ii) = ((u(ii) - u(ii-1)) / gridx)**2.
+          if (eeff(ii)<1.d-30) then
+             eeff(ii) = 1.d-30
           endif
        enddo
        eeff(1) = eeff(3)
        eeff(maxx) = eeff(maxx-1)
-       do i=1,maxx
-          mu(i) = 0.5 * h(i) * A**(-1./n) * eeff(i)**((1.-n)/(2.*n))
+       do ii=1,maxx
+          mu(ii) = 0.5 * h_loc(ii) * A**(-1./n) * eeff(ii)**((1.-n)/(2.*n))
        enddo
        
        !          calculation of basal friction beta
-       do i=1,maxx
-          if (grl(i)<2) then
-             beta(i) = c * abs(u(i))**(m-1.)/(secpyr**m)
+       do ii=1,maxx
+          if (grl(ii)<2) then
+             beta(ii) = c * abs(u(ii))**(m-1.)/(secpyr**m)
           else
-             beta(i) = 0.
+             beta(ii) = 0.
           end if
        enddo
        beta(1)=beta(2)
        
-       do i=2,maxx-1
-          dn(i) = (-4.) * mu(i) / (gridx**2.)
-          cen(i) = (-4.) * (mu(i) + mu(i+1)) / (gridx**2.) - beta(i)
-          up(i)= (-4.) * mu(i+1) / (gridx**2.)
-          con(i) = (-taud(i))
+       do ii=2,maxx-1
+          dn(ii) = (-4.) * mu(ii) / (gridx**2.)
+          cen(ii) = (-4.) * (mu(ii) + mu(ii+1)) / (gridx**2.) - beta(ii)
+          up(ii)= (-4.) * mu(ii+1) / (gridx**2.)
+          con(ii) = (-taud(ii))
        enddo
        
        !          tridiagonal matrix solution
@@ -233,13 +242,13 @@ print*,"fishRun", tc
           f(maxx) = 0
           g(maxx) = 0
        end if
-       do i=maxx-1,2,-1
-          f(i) = dn(i) / (cen(i) - up(i) * f(i+1))
-          g(i) = (con(i) + up(i) * g(i+1)) / (cen(i) - up(i) * f(i+1))
+       do ii=maxx-1,2,-1
+          f(ii) = dn(ii) / (cen(ii) - up(ii) * f(ii+1))
+          g(ii) = (con(ii) + up(ii) * g(ii+1)) / (cen(ii) - up(ii) * f(ii+1))
        enddo
        u(1) = (-g(2)) / (1. + f(2))
-       do i=2,maxx
-          u(i) = g(i) + f(i) * u(i-1)
+       do ii=2,maxx
+          u(ii) = g(ii) + f(ii) * u(ii-1)
        enddo
     enddo
     

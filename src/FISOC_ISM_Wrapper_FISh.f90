@@ -57,6 +57,8 @@ CONTAINS
     END IF
 
     CALL FISh_initialize()
+!print*,"init"
+!print*,h2
 
     CALL FISh2ESMF_mesh(ISM_mesh,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -134,8 +136,8 @@ CONTAINS
     INTEGER,INTENT(IN)     :: localPet
     INTEGER,INTENT(OUT),OPTIONAL :: rc
 
-    TYPE(ESMF_field)             :: OM_dBdt_l0, ISM_z_l0, ISM_z_l1
-    REAL(ESMF_KIND_R8),POINTER   :: OM_dBdt_l0_ptr(:),ISM_z_l0_ptr(:),ISM_z_l1_ptr(:)
+    TYPE(ESMF_field)             :: OM_dBdt_l0, ISM_velocity_l0, ISM_z_l0, ISM_z_l1
+    REAL(ESMF_KIND_R8),POINTER   :: OM_dBdt_l0_ptr(:),ISM_velocity_l0_ptr(:),ISM_z_l0_ptr(:),ISM_z_l1_ptr(:)
     LOGICAL                      :: verbose_coupling
 
     rc = ESMF_FAILURE
@@ -168,12 +170,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     mb = OM_dBdt_l0_ptr(1:maxx)
-
+print*, OM_dBdt_l0_ptr
     ! now run the FISh model for one timestep
     CALL FISh_run()
 
     ! access the ice shelf base depth from the ISM export field bundle and set it 
-    ! using the FISh hb.
+    ! using the FISh variable hb (short for height at the base).
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -185,9 +187,29 @@ CONTAINS
     ISM_z_l0_ptr(1:maxx)        = hb
     ISM_z_l0_ptr(maxx+1:2*maxx) = hb
 
+    ! access the ice shelf base velocity from the ISM export field bundle and set it 
+    ! using the FISh variable u.
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_velocity_l0", field=ISM_velocity_l0, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_velocity_l0, localDe=0, farrayPtr=ISM_velocity_l0_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ISM_velocity_l0_ptr(1:maxx)        = u
+    ISM_velocity_l0_ptr(maxx+1:2*maxx) = u
+
+!print*, u
+!print*, hb
+
+    NULLIFY(ISM_velocity_l0_ptr)
+    NULLIFY(ISM_z_l0_ptr)
+
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_ISM_Wrapper_Run
+
 
 
   !--------------------------------------------------------------------------------------

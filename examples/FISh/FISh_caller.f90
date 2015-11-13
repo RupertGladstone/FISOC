@@ -5,9 +5,12 @@ program FISh_caller
 
   implicit none 
 
+  integer :: tc_count
+
   call FISh_initialize()
 
-  do tc = 1,tl
+print*,tl," tl"
+  do tc_count = 1,tl
      call FISh_run()
   end do
 

@@ -219,11 +219,15 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     
+    CALL FISOC_ISM_calcDerivedFields_pre(ISM_ExpFB,FISOC_config,rc)
+
     CALL FISOC_ISM_Wrapper_Run(FISOC_config,localPet,ISM_ImpFB,ISM_ExpFB,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     
+    CALL FISOC_ISM_calcDerivedFields_post(ISM_ExpFB,FISOC_config,rc)
+
     msg = "ISM run complete for current timestep"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
@@ -395,7 +399,6 @@ CONTAINS
        SELECT CASE(FISOC_ISM_DerVarList(ii))
 
        CASE ("ISM_z_l0_previous")
-!          CALL ISM_derive_z_l0_previous(ISM_ExpFB,FISOC_ISM_ReqVarList,rc)
           CALL ISM_derive_z_l0_previous(ISM_ExpFB,rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
@@ -451,14 +454,12 @@ CONTAINS
        CASE ("ISM_z_l0_previous")
 
        CASE ("ISM_dddt")
-!          CALL ISM_derive_dddt(ISM_ExpFB,FISOC_ISM_ReqVarList,rc)
           CALL ISM_derive_dddt(ISM_ExpFB,FISOC_config,rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        CASE ("ISM_dTdz_l0")
-!          CALL ISM_derive_dTdz_l0(ISM_ExpFB,FISOC_ISM_ReqVarList,rc)
           CALL ISM_derive_dTdz_l0(ISM_ExpFB,rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
