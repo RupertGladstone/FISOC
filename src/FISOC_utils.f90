@@ -9,7 +9,7 @@ MODULE FISOC_utils_MOD
 
   PUBLIC  FISOC_getStringListFromConfig, FISOC_populateFieldBundle, FISOC_ConfigDerivedAttribute, &
        FISOC_initCumulatorFB, FISOC_zeroBundle, FISOC_cumulateFB, FISOC_processCumulator, msg,    &
-       FISOC_VM_MPI_Comm_dup
+       FISOC_VM_MPI_Comm_dup, FISOC_FieldRegridStore
 
   INTERFACE FISOC_populateFieldBundle
       MODULE PROCEDURE FISOC_populateFieldBundleOn2dGrid
@@ -91,7 +91,7 @@ CONTAINS
 
     ! loop over fields, setting all values to zero
     DO ii=1,fieldCount
-       CALL ESMF_FieldGet(field=fieldList(ii), localDe=0, farrayPtr=field_ptr, rc=rc)
+       CALL ESMF_FieldGet(field=fieldList(ii), farrayPtr=field_ptr, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -666,5 +666,119 @@ CONTAINS
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_getStringListFromConfig
+
+
+  !--------------------------------------------------------------------
+  ! This is a wrapper for ESMF_FieldRegridStore.  This subroutine 
+  ! exists because ESMF_FieldRegridStore does not preserve data in the 
+  ! field used to create the route handle.  This wrapper copies the 
+  ! data before calling ESMF_FieldRegridStore and writes it back in 
+  ! afterwards.
+  !
+  SUBROUTINE FISOC_FieldRegridStore(InField, OutField, regridmethod, &
+       unmappedaction, routeHandle, rc)
+
+    TYPE(ESMF_Field),INTENT(INOUT)                    :: InField, OutField
+    TYPE(ESMF_RegridMethod_Flag),INTENT(IN),OPTIONAL  :: regridmethod
+    TYPE(ESMF_UnmappedAction_Flag),INTENT(IN),OPTIONAL:: unmappedaction
+
+    TYPE(ESMF_RouteHandle),INTENT(OUT),OPTIONAL       :: routeHandle
+    INTEGER,INTENT(OUT),OPTIONAL                      :: rc
+
+    REAL(ESMF_KIND_R8),ALLOCATABLE   :: InFieldData1D_cp(:), OutFieldData1D_cp(:)
+    REAL(ESMF_KIND_R8),ALLOCATABLE   :: InFieldData2D_cp(:,:), OutFieldData2D_cp(:,:)
+    REAL(ESMF_KIND_R8),POINTER       :: InFieldData1D(:), OutFieldData1D(:)
+    REAL(ESMF_KIND_R8),POINTER       :: InFieldData2D(:,:), OutFieldData2D(:,:)
+    INTEGER                          :: InDims, OutDims
+
+    rc = ESMF_FAILURE
+
+    ! check dimensionality of fields
+    CALL ESMF_FieldGet(field=InField, dimCount=InDims, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=OutField, dimCount=OutDims, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! take copy of fields
+    SELECT CASE(InDims)
+    CASE(1)
+       CALL ESMF_FieldGet(field=InField, farrayPtr=InFieldData1D, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       ALLOCATE(InFieldData1D_cp(SIZE(InFieldData1D)))
+       InFieldData1D_cp = InFieldData1D
+    CASE(2)
+       CALL ESMF_FieldGet(field=InField, farrayPtr=InFieldData2D, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       ALLOCATE(InFieldData2D_cp(SIZE(InFieldData2D,1),SIZE(InFieldData2D,2)))
+       InFieldData2D_cp = InFieldData2D
+    CASE DEFAULT
+       msg = 'ERROR: field neither 1D nor 2D in regrid wrapper'
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END SELECT
+    SELECT CASE(OutDims)
+    CASE(1)
+       CALL ESMF_FieldGet(field=OutField, farrayPtr=OutFieldData1D, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       ALLOCATE(OutFieldData1D_cp(SIZE(OutFieldData1D)))
+       OutFieldData1D_cp = OutFieldData1D
+    CASE(2)
+       CALL ESMF_FieldGet(field=OutField, farrayPtr=OutFieldData2D, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       ALLOCATE(OutFieldData2D_cp(SIZE(OutFieldData2D,1),SIZE(OutFieldData2D,2)))
+       OutFieldData2D_cp = OutFieldData2D       
+    CASE DEFAULT
+       msg = 'ERROR: field neither 1D nor 2D in regrid wrapper'
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END SELECT
+    
+    ! create the routehandle for regridding
+    CALL ESMF_FieldRegridStore(InField, OutField, regridmethod=regridmethod, &
+         unmappedaction=unmappedaction, routehandle=routeHandle, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! copy the field data back in, cleaning up as we go
+    SELECT CASE(InDims)
+    CASE(1)
+       InFieldData1D=InFieldData1D_cp
+       DEALLOCATE(InFieldData1D_cp)
+       NULLIFY(InFieldData1D)
+    CASE(2)
+       InFieldData2D=InFieldData2D_cp
+       DEALLOCATE(InFieldData2D_cp)
+       NULLIFY(InFieldData2D)
+    END SELECT
+
+    SELECT CASE(OutDims)
+    CASE(1)
+       OutFieldData1D=OutFieldData1D_cp
+       DEALLOCATE(OutFieldData1D_cp)
+       NULLIFY(OutFieldData1D)
+    CASE(2)
+       OutFieldData2D=OutFieldData2D_cp
+       DEALLOCATE(OutFieldData2D_cp)
+       NULLIFY(OutFieldData2D)
+    END SELECT
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_FieldRegridStore
 
 END MODULE FISOC_utils_MOD

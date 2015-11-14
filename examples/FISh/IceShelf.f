@@ -16,7 +16,7 @@ c      flux condition ocean: fluxBC=1 (water pressure); fluxBC=0 (u=0)
 c      domain length
        parameter (L = 200e3)
 	   
-       parameter (maxx = 500, tend = 500.0, dt = .1)
+       parameter (maxx = 50, tend = 500.0, dt = .1)
        parameter (rhoi = 900., rhos = 1000., grav = 9.8)
        parameter (n = 3., mb = 0., m = 1./3.)
 
@@ -110,6 +110,7 @@ c          initialization of velocity field based on SIA
      .                abs(taud(i))**(n-1.) * taud(i)
                enddo
            end if
+      print*,ub
 		   
 c          iteration on implicit scheme (u=f(h2))
            do k=1,3

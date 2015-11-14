@@ -57,8 +57,6 @@ CONTAINS
     END IF
 
     CALL FISh_initialize()
-!print*,"init"
-!print*,h2
 
     CALL FISh2ESMF_mesh(ISM_mesh,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -170,7 +168,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     mb = OM_dBdt_l0_ptr(1:maxx)
-print*, OM_dBdt_l0_ptr
+
     ! now run the FISh model for one timestep
     CALL FISh_run()
 
@@ -199,9 +197,6 @@ print*, OM_dBdt_l0_ptr
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     ISM_velocity_l0_ptr(1:maxx)        = u
     ISM_velocity_l0_ptr(maxx+1:2*maxx) = u
-
-!print*, u
-!print*, hb
 
     NULLIFY(ISM_velocity_l0_ptr)
     NULLIFY(ISM_z_l0_ptr)

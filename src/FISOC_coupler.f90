@@ -1,6 +1,7 @@
 MODULE FISOC_coupler_MOD
   
   USE ESMF
+  USE FISOC_utils_MOD
     
   IMPLICIT NONE
   
@@ -8,8 +9,6 @@ MODULE FISOC_coupler_MOD
   
   PUBLIC FISOC_coupler_register
     
-  CHARACTER(len=ESMF_MAXSTR) :: msg
-
 CONTAINS
   
   !------------------------------------------------------------------------------
@@ -186,13 +185,21 @@ CONTAINS
 !    print*,dimCount
 
     ! Create a route handle to add to the state object.  This will be used for regridding.
-    CALL ESMF_FieldRegridStore(ISM_ExpFieldList(1), OM_ExpFieldList(1), &
+    CALL FISOC_FieldRegridStore(ISM_ExpFieldList(1), OM_ExpFieldList(1), &
          regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
          routehandle=ISM2OM_regridRouteHandle, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+!    CALL ESMF_FieldRegridStore(ISM_ExpFieldList(1), OM_ExpFieldList(1), &
+!         regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+!         unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
+!         routehandle=ISM2OM_regridRouteHandle, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
 
 !    CALL ESMF_StateGet(OM_ExpSt, "OM export fields", OM_ExpFB, rc=rc)
@@ -380,13 +387,20 @@ CONTAINS
 
 
     ! Create a route handle to add to the state object.  This will be used for regridding.
-    CALL ESMF_FieldRegridStore(OM_ExpFieldList(1), ISM_ExpFieldList(1), &
+    CALL FISOC_FieldRegridStore(OM_ExpFieldList(1), ISM_ExpFieldList(1), &
          regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
          routehandle=OM2ISM_regridRouteHandle, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    CALL ESMF_FieldRegridStore(OM_ExpFieldList(1), ISM_ExpFieldList(1), &
+!         regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+!         unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
+!         routehandle=OM2ISM_regridRouteHandle, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_StateAdd(OM_ExpSt, (/OM2ISM_regridRouteHandle/),rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
