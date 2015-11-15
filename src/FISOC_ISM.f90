@@ -23,22 +23,26 @@ CONTAINS
     CALL ESMF_GridCompSetEntryPoint(FISOC_ISM, ESMF_METHOD_INITIALIZE, &
          userRoutine=FISOC_ISM_init_phase1, phase=1, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) RETURN
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_GridCompSetEntryPoint(FISOC_ISM, ESMF_METHOD_INITIALIZE, &
          userRoutine=FISOC_ISM_init_phase2, phase=2, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) RETURN
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     CALL ESMF_GridCompSetEntryPoint(FISOC_ISM, ESMF_METHOD_RUN, &
          userRoutine=FISOC_ISM_run, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) RETURN
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     CALL ESMF_GridCompSetEntryPoint(FISOC_ISM, ESMF_METHOD_FINALIZE, &
          userRoutine=FISOC_ISM_finalise, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) RETURN
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     rc = ESMF_SUCCESS
  
@@ -58,14 +62,12 @@ CONTAINS
     TYPE(ESMF_config)          :: FISOC_config
     TYPE(ESMF_mesh)            :: ISM_mesh
     TYPE(ESMF_fieldBundle)     :: ISM_ExpFB
-    CHARACTER(len=ESMF_MAXSTR) :: ISM_meshFile
-    INTEGER                    :: mpic, mpic2, ierr, localPet
     TYPE(ESMF_VM)              :: vm
 
-    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: ISM_ReqVarList(:),ISM_DerVarList(:)
     CHARACTER(len=ESMF_MAXSTR) :: label
-
-    rc = ESMF_SUCCESS
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: ISM_ReqVarList(:),ISM_DerVarList(:)
+ 
+    rc = ESMF_FAILURE
 
     msg = "ISM initialise started"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
@@ -88,6 +90,7 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     ! create empty field bundle
     ISM_ExpFB = ESMF_FieldBundleCreate(name='ISM export fields', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -130,6 +133,8 @@ CONTAINS
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
+    rc = ESMF_SUCCESS
+
   END SUBROUTINE FISOC_ISM_init_phase1
 
 
@@ -143,7 +148,6 @@ CONTAINS
 
     TYPE(ESMF_config)      :: FISOC_config
     TYPE(ESMF_fieldbundle) :: ISM_ImpFB
-    INTEGER                :: localPet
     TYPE(ESMF_VM)          :: vm
 
     rc = ESMF_FAILURE
@@ -153,17 +157,17 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_StateGet(ISM_ImpSt, "ISM import fields", ISM_ImpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
-    CALL FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,localPet,rc=rc)
+    CALL FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -179,6 +183,7 @@ CONTAINS
 
   !------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_run(FISOC_ISM, ISM_ImpSt, ISM_ExpSt, FISOC_clock, rc)
+
     TYPE(ESMF_GridComp)    :: FISOC_ISM
     TYPE(ESMF_State)       :: ISM_ImpSt, ISM_ExpSt
     TYPE(ESMF_Clock)       :: FISOC_clock
@@ -220,6 +225,9 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     
     CALL FISOC_ISM_calcDerivedFields_pre(ISM_ExpFB,FISOC_config,rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
     CALL FISOC_ISM_Wrapper_Run(FISOC_config,localPet,ISM_ImpFB,ISM_ExpFB,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -227,6 +235,9 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     
     CALL FISOC_ISM_calcDerivedFields_post(ISM_ExpFB,FISOC_config,rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
     msg = "ISM run complete for current timestep"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &

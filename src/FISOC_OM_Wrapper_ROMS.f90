@@ -55,11 +55,17 @@ CONTAINS
     CHARACTER(len=ESMF_MAXSTR)            :: label
     TYPE(ESMF_staggerLoc),ALLOCATABLE     :: OM_ReqVars_stagger(:)
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: OM_ReqVarList(:),FISOC_OM_ReqVarList(:)
-    CHARACTER(len=ESMF_MAXSTR)            :: OM_configFile
+    CHARACTER(len=ESMF_MAXSTR)            :: OM_configFile, OM_stdoutFile
     LOGICAL                               :: verbose_coupling, first
 
     first = .TRUE.
 
+    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_stdoutFile, label='OM_stdoutFile:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    OPEN(unit=31, file=OM_stdoutFile, STATUS='REPLACE', ERR=101)
+    
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -124,6 +130,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    RETURN
+    
+101 msg = "OM failed to open stdoutFile"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+         line=__LINE__, file=__FILE__, rc=rc)
+    CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
   END SUBROUTINE FISOC_OM_Wrapper_Init_Phase1
 
@@ -217,7 +229,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-print *,"send field data to OM"
+print*,"sendFieldDataToOM HERE!!!"
 !    IF (PRESENT(OM_ImpFB)) THEN       
 !       CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
 !       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -285,38 +297,7 @@ print*,"put this in the ISM derived vars?"
 
 print*,"move this stuff to subroutines"
 
-    ! Lets get pointers to the depth of the ice base and the temperature gradient.  These we 
-    ! get fromthe OM import state, which contains the ISM export fields on the ocean grid.
-    IF (PRESENT(OM_ImpFB)) THEN
-
-       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
-       CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_dTdz_l0", field=ISM_dTdz_l0, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
-       CALL ESMF_FieldGet(field=ISM_dTdz_l0, localDe=0, farrayPtr=ISM_dTdz_l0_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
-
-
-
-    IF (PRESENT(OM_ExpFB)) THEN
-       CALL  ESMF_FieldBundleWrite(OM_ExpFB, "test.nc", status=ESMF_FILESTATUS_REPLACE,&
-            iofmt=ESMF_IOFMT_NETCDF, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-       
+    IF (PRESENT(OM_ExpFB)) THEN       
        ! Lets get a pointer to the basal melt rate.  This we get from the OM export field bundle, which 
        ! contains the OM variables to be exported to the ISM.
        CALL ESMF_FieldBundleGet(OM_ExpFB, fieldName="OM_dBdt_l0", field=OM_dBdt_l0, rc=rc)
@@ -355,6 +336,8 @@ print*,"check for all the places where I use the netcdf writer... remove or use 
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CLOSE(unit=31, ERR=102)
+
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
        PRINT*,"******************************************************************************"
@@ -366,6 +349,13 @@ print*,"check for all the places where I use the netcdf writer... remove or use 
     END IF
 
     rc = ESMF_SUCCESS
+
+    RETURN
+    
+102 msg = "OM failed to close stdoutFile"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+         line=__LINE__, file=__FILE__, rc=rc)
+    CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   END SUBROUTINE FISOC_OM_Wrapper_Finalize
 
@@ -479,6 +469,48 @@ print*,"check for all the places where I use the netcdf writer... remove or use 
   
 
   !--------------------------------------------------------------------------------------
+  SUBROUTINE sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: OM_ImpFB 
+    TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
+    TYPE(ESMF_VM),INTENT(IN)                 :: vm
+    INTEGER,INTENT(OUT),OPTIONAL             :: rc
+
+    TYPE(ESMF_field)                         :: ISM_dTdz_l0, ISM_z_l0
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:,:), ISM_dTdz_l0_ptr(:,:)
+ 
+
+    ! Lets get pointers to the depth of the ice base and the temperature gradient.  These we 
+    ! get from the OM import state, which contains the ISM export fields on the ocean grid.
+
+    rc = ESMF_FAILURE
+
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
+    CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_dTdz_l0", field=ISM_dTdz_l0, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
+    CALL ESMF_FieldGet(field=ISM_dTdz_l0, localDe=0, farrayPtr=ISM_dTdz_l0_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    print*,"sendFieldDataToOM NYI"
+
+    rc = ESMF_SUCCESS
+    
+  END SUBROUTINE sendFieldDataToOM
+
+
+  !--------------------------------------------------------------------------------------
   subroutine OM_createGrid(OM_grid, localPet, verbose_coupling, rc)
     
     use mod_grid , only : GRID
@@ -551,17 +583,7 @@ print*,"check for all the places where I use the netcdf writer... remove or use 
        deBlockList(1,2,tile+1)=BOUNDS(ng)%Iend(tile)
        deBlockList(2,1,tile+1)=BOUNDS(ng)%Jstr(tile)
        deBlockList(2,2,tile+1)=BOUNDS(ng)%Jend(tile)
-print*,tile
-print*,BOUNDS(ng)%Jstr(tile)
-print*,BOUNDS(ng)%Jstr
     end do
-print*,""
-print*,""
-print*,""
-print*,"BLOCKHEAD"
-print*,""
-print*,""
-print*,deBlockList
     !-----------------------------------------------------------------------
     !     Create ESMF DistGrid based on ROMS model domain decomposition
     !-----------------------------------------------------------------------

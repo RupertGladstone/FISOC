@@ -94,13 +94,14 @@ CONTAINS
   
 
   !-----------------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,localPet,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,vm,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ImpFB
+    TYPE(ESMF_VM),INTENT(IN)              :: vm
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
-    INTEGER,INTENT(IN)                    :: localPet
 
+    INTEGER                               :: localPet
     LOGICAL                               :: verbose_coupling
 
     rc = ESMF_FAILURE

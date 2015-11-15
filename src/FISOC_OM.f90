@@ -12,6 +12,7 @@ MODULE FISOC_OM_MOD
     
 CONTAINS
   
+  !------------------------------------------------------------------------------
   SUBROUTINE FISOC_OM_register(FISOC_OM, rc)
     
     TYPE(ESMF_GridComp)  :: FISOC_OM
@@ -49,6 +50,10 @@ CONTAINS
 
 
   !------------------------------------------------------------------------------
+  ! Initialisation is implemented in two stages.  The first stage is for independent 
+  ! initialisation of the ISM and the second stage occurrs after the OM has been 
+  ! initialised, to allow inter-component consistency checks or use of the OM 
+  ! state to complete ISM initalisation.
   SUBROUTINE FISOC_OM_init_phase1(FISOC_OM, OM_ImpSt, OM_ExpSt, FISOC_clock, rc)
     TYPE(ESMF_GridComp)        :: FISOC_OM
     TYPE(ESMF_State)           :: OM_ImpSt, OM_ExpSt 
@@ -62,7 +67,6 @@ CONTAINS
 
     CHARACTER(len=ESMF_MAXSTR) :: label
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: OM_ReqVarList(:)
-
 
     rc = ESMF_FAILURE
 
@@ -103,8 +107,9 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! we only add the OM field bundle to the import state as a way of letting the coupler get hold of the 
-    ! grid.  There must be a better way to do this.
+    ! we only add the OM export field bundle to the import state as a way of 
+    ! letting the coupler get hold of the grid.  There must be a better way 
+    ! to do this.
     CALL ESMF_StateAdd(OM_ImpSt, (/OM_ExpFB/), rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -168,9 +173,11 @@ CONTAINS
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_OM_init_phase2
+
   
   !------------------------------------------------------------------------------
   SUBROUTINE FISOC_OM_run(FISOC_OM, OM_ImpSt, OM_ExpSt, FISOC_clock, rc)
+
     TYPE(ESMF_GridComp)        :: FISOC_OM
     TYPE(ESMF_State)           :: OM_ImpSt, OM_ExpSt 
     TYPE(ESMF_Clock)           :: FISOC_clock
@@ -212,6 +219,10 @@ CONTAINS
             line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
+    ! Clocks and alarms are used to control the asynchronous timestepping
+    ! between the OM and ISM.  Most of the logic is on the OM side since 
+    ! it is assumed (actually it is required) that the ISM timestep is 
+    ! an exact multiple of the OM timestep.
     CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_ISM", alarm_ISM, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -227,8 +238,6 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!       print*,"NETCDF ",ESMF_IO_NETCDF_PRESENT 
-!       print*,"parallel NETCDF ",ESMF_IO_PNETCDF_PRESENT 
 
     ! Decide how to call OM run wrapper depending on relevant alarms
     OM_output: IF (ESMF_AlarmIsRinging(alarm_OM_output, rc=rc)) THEN
