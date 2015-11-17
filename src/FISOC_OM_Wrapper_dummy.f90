@@ -131,13 +131,14 @@ CONTAINS
   
   
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,localPet,OM_ExpFB,OM_ImpFB,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB,OM_ImpFB,rc)
     
     TYPE(ESMF_config),INTENT(INOUT)                :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT),OPTIONAL  :: OM_ExpFB, OM_ImpFB 
-    INTEGER,INTENT(IN)                             :: localPet
+    TYPE(ESMF_VM),INTENT(IN)                       :: vm
     INTEGER,INTENT(OUT),OPTIONAL                   :: rc
 
+    INTEGER                    :: localPet
     LOGICAL                    :: verbose_coupling
     TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_dBdt_l0
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)

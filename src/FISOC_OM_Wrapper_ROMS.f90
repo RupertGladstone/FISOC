@@ -208,13 +208,14 @@ CONTAINS
   
   
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,localPet,OM_ExpFB,OM_ImpFB,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB,OM_ImpFB,rc)
     
     TYPE(ESMF_config),INTENT(INOUT)                :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT),OPTIONAL  :: OM_ExpFB, OM_ImpFB 
-    INTEGER,INTENT(IN)                             :: localPet
+    TYPE(ESMF_VM),INTENT(IN)                       :: vm
     INTEGER,INTENT(OUT),OPTIONAL                   :: rc
 
+    INTEGER                    :: localPet
     LOGICAL                    :: verbose_coupling
     TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_dBdt_l0
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)
@@ -224,6 +225,11 @@ CONTAINS
 
     rc = ESMF_FAILURE
     
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -250,7 +256,18 @@ print*,"add timestep check: check ROMS timestep is consistent with FISOC time st
 
 !check how to call ROMS run (just one timestep)
 
+WRITE (31,*) 'FISOC is about to call ROMS run method.'
+CALL ESMF_VMBarrier(vm, rc=rc)
+print*,"change ocean dt back..."
+OM_dt_sec_float = REAL(600,ESMF_KIND_R8)
+print*,"sec ",OM_dt_sec_float
+
+
+
 CALL ROMS_run(OM_dt_sec_float)
+CALL ESMF_VMBarrier(vm, rc=rc)
+WRITE (31,*) 'FISOC has just called ROMS run method.'
+WRITE (*,*) 'FISOC has just called ROMS run method.'
     
 print*,"get field data from OM"
 

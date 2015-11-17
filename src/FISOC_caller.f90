@@ -25,6 +25,9 @@ PROGRAM FISOC_main
   TYPE(ESMF_Alarm)        :: alarm_OM, alarm_OM_output, alarm_ISM, alarm_ISM_exportAvailable
   LOGICAL                 :: tight_coupling
 
+  TYPE(ESMF_VM)           :: vm
+  INTEGER                 :: localPet
+
   ! A parent gridded component is used to support the hierarchical approach  
   ! of ESMF, but the actual grid and state are dummy properties.  The parent 
   ! merely coordinates the child components (ice, ocean and regridding)
@@ -238,6 +241,17 @@ PROGRAM FISOC_main
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   !------------------------------------------------------------------------------
+  CALL ESMF_GridCompGet(FISOC_parent, vm=vm, rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+  
+  !------------------------------------------------------------------------------
   msg = "FISOC run complete, tidying up..."  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
@@ -268,7 +282,20 @@ PROGRAM FISOC_main
   msg = "FISOC finished"  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
+
+  print*,"LOCALPET   ",localpet
+  CALL ESMF_VMBarrier(vm, rc=rc)
+  print*,"need finish   ",localpet
+  IF (localPet.EQ.0) THEN
+     CALL ESMF_Finalize()
+  CALL ESMF_VMBarrier(vm, rc=rc)
+  END IF
+  print*,"need finish 2 ",localpet
+  
+  CALL ESMF_VMBarrier(vm, rc=rc)
   CALL ESMF_Finalize()
+  print*,"need finish 3 ",localpet
+
 
 END PROGRAM FISOC_main
 !------------------------------------------------------------------------------

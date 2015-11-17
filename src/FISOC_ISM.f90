@@ -260,10 +260,15 @@ CONTAINS
     TYPE(ESMF_config)            :: FISOC_config
     TYPE(ESMF_fieldbundle)       :: ISM_ImpFB, ISM_ExpFB
     INTEGER                      :: FieldCount,ii
-    TYPE(ESMF_field),ALLOCATABLE :: FieldList(:)
+    TYPE(ESMF_field),ALLOCATABLE :: ImpFieldList(:)
+    TYPE(ESMF_field),ALLOCATABLE :: ExpFieldList(:)
     TYPE(ESMF_mesh)              :: ISM_mesh
+
+    CHARACTER(len=ESMF_MAXSTR) :: name
     
     rc = ESMF_FAILURE
+
+    CALL ESMF_VMBarrier(vm, rc=rc)
 
     msg = "ISM finalise: destroy fields, bundles and mesh"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
@@ -279,80 +284,94 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_StateGet(ISM_ImpSt, "ISM import fields", ISM_ImpFB, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+    IF (localPet.EQ.0) THEN
 
-    ! ...how many fields?...
-    CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldCount=FieldCount, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    ! ... get list of fields from bundle.
-    ALLOCATE(FieldList(FieldCount))
-    CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldCount=FieldCount, fieldList=FieldList,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL ESMF_FieldGet(FieldList(1), mesh=ISM_mesh, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_MeshDestroy(ISM_mesh,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    DO ii = 1,FieldCount
-       CALL ESMF_FieldDestroy(FieldList(ii), rc=rc)
+       CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+       
+       ! ...how many fields?...
+       CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=FieldCount, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END DO
-
-    DEALLOCATE(FieldList)
-
-    CALL ESMF_FieldBundleDestroy(ISM_ImpFB, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
-
-    CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-
-    ! ...how many fields?...
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=FieldCount, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    ! ... get list of fields from bundle.
-    ALLOCATE(FieldList(FieldCount))
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=FieldCount, fieldList=FieldList,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    DO ii = 1,FieldCount
-       CALL ESMF_FieldDestroy(FieldList(ii), rc=rc)
+       
+       ! ... get list of fields from bundle.
+       ALLOCATE(ExpFieldList(FieldCount))
+       CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldList=ExpFieldList,rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END DO
+       
+       DO ii = 1,FieldCount
 
-    DEALLOCATE(FieldList)
-
-    CALL ESMF_FieldBundleDestroy(ISM_ExpFB, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!          CALL ESMF_FieldGet(field=ExpFieldList(ii),name=name, rc=rc)
+!          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!               line=__LINE__, file=__FILE__)) &
+!               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
+          CALL ESMF_VMBarrier(vm, rc=rc)
+      
+          CALL ESMF_FieldDestroy(ExpFieldList(ii), rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END DO
+       
+       DEALLOCATE(ExpFieldList)
+       
+       CALL ESMF_FieldBundleDestroy(ISM_ExpFB, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+
+       
+       CALL ESMF_StateGet(ISM_ImpSt, "ISM import fields", ISM_ImpFB, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+       
+       ! ...how many fields?...
+       CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldCount=FieldCount, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       ! ... get list of fields from bundle.
+       ALLOCATE(ImpFieldList(FieldCount))
+       CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldList=ImpFieldList,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       !    CALL ESMF_FieldGet(ImpFieldList(1), mesh=ISM_mesh, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+!    CALL ESMF_MeshDestroy(ISM_mesh,rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       DO ii = 1,FieldCount
+          CALL ESMF_FieldDestroy(ImpFieldList(ii), rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END DO
+       
+       DEALLOCATE(ImpFieldList)
+
+!    CALL ESMF_FieldBundleDestroy(ISM_ImpFB, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+    END IF
+
     CALL FISOC_ISM_Wrapper_Finalize(FISOC_config,localPet,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &

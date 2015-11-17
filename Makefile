@@ -7,7 +7,7 @@
 ################################################################################
 
 SRCDIR = src
-FFLAGS = 
+FFLAGS = -fbacktrace -g -O0
 
 # check for presence of required env vars
 ifneq ($(origin ESMFMKFILE), environment)
@@ -75,12 +75,12 @@ $(info )
 
 .SUFFIXES: .f90
 %.o : %.f90
-	$(ESMF_F90COMPILER) $(FISOC_MPI_SYMBOL) -c $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS) $(ESMF_F90COMPILEFREENOCPP) -I$(FISOC_ISM_INCLUDE)  -I$(FISOC_OM_INCLUDE)  -cpp  -o $@  $<
+	$(ESMF_F90COMPILER) $(FFLAGS) $(FISOC_MPI_SYMBOL) -c $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS) $(ESMF_F90COMPILEFREENOCPP) -I$(FISOC_ISM_INCLUDE)  -I$(FISOC_OM_INCLUDE)  -cpp  -o $@  $<
 
 ################################################################################
 
 FISOC_caller: $(SRCDIR)/FISOC_caller.o $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_OM.o  $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o $(SRCDIR)/FISOC_ISM.o $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o $(SRCDIR)/FISOC_coupler.o $(SRCDIR)/FISOC_utils.o
-	$(ESMF_F90LINKER) $(ESMF_F90LINKOPTS) $(ESMF_F90LINKPATHS) $(ESMF_F90LINKRPATHS) -o $@ $^ $(ESMF_F90ESMFLINKLIBS) -L$(FISOC_ISM_LIBPATH) -L$(FISOC_OM_LIBPATH) $(FISOC_ISM_LIBS) $(FISOC_OM_LIBS)
+	$(ESMF_F90LINKER) $(ESMF_F90LINKOPTS) $(ESMF_F90LINKPATHS) $(ESMF_F90LINKRPATHS) -o $@ $^ $(ESMF_F90ESMFLINKLIBS) -L$(FISOC_ISM_LIBPATH) -L$(FISOC_OM_LIBPATH) $(FISOC_ISM_LIBS) $(FISOC_OM_LIBS) $(FFLAGS)
 
 $(SRCDIR)/FISOC_caller.o:                   $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_caller.f90
 $(SRCDIR)/FISOC_parent.o:                   $(SRCDIR)/FISOC_parent.f90 $(SRCDIR)/FISOC_OM.o  $(SRCDIR)/FISOC_ISM.o $(SRCDIR)/FISOC_coupler.o
