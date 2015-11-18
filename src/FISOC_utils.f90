@@ -54,7 +54,12 @@ CONTAINS
     ! compilation to fail if the MPI library is not available.
 #ifdef FISOC_MPI
     CALL MPI_Comm_dup(mpic, mpic_dup, ierr)
-    PRINT*,"ADD ERROR HANDLING for IERR",ierr
+    IF (ierr.NE.0) THEN
+       msg = "ERROR: Failed call to MPI_Comm_dup"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
 #else
     mpic_dup = FISOC_mpic_missing
 #endif

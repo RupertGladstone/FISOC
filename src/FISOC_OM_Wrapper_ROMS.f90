@@ -89,7 +89,7 @@ CONTAINS
     IF (mpic.EQ.FISOC_mpic_missing) THEN
        msg = "ERROR: not currently configured for serial ROMS simulations"
        ! TODO: check whether ROMS needs a dummy mpic in serial configuration
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     ELSE
