@@ -283,19 +283,9 @@ PROGRAM FISOC_main
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
-  print*,"LOCALPET   ",localpet
-  CALL ESMF_VMBarrier(vm, rc=rc)
-  print*,"need finish   ",localpet
-  IF (localPet.EQ.0) THEN
-     CALL ESMF_Finalize()
-  CALL ESMF_VMBarrier(vm, rc=rc)
-  END IF
-  print*,"need finish 2 ",localpet
-  
   CALL ESMF_VMBarrier(vm, rc=rc)
   CALL ESMF_Finalize()
-  print*,"need finish 3 ",localpet
-
+  
 
 END PROGRAM FISOC_main
 !------------------------------------------------------------------------------
