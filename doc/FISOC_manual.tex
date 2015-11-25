@@ -270,7 +270,8 @@ FISOC\_config.rc contains code specific to the coupling.  Components may also us
 independent means for configuration.
 
 Some of the FISOC config entries are required.
-This section describes all the valid standard entries in a FISOC config file as follows:
+This section describes all the valid standard (but note that model-specific non-standard entries 
+can be added as required) entries in a FISOC config file as follows:
 
 \begin{flushleft}
 \textbf{label:}               [TYPE]   [Required?]                         \\
@@ -310,8 +311,8 @@ Corresponding exactly to the above, descriptions of the grid stagger for each va
 List of variables derived by FISOC from the OM vars.  
 To be calculated from ISM vars by hard coded routines in FISOC\_OM.        \\
 \vspace{6pt}
-\textbf{OM\_writeNetcdf:}   [LOGICAL] [optional]                          \\
-Switch for dumping the OM export variables to NetCDF file.
+\textbf{OM\_writeNetcdf:}   [LOGICAL] [optional]                           \\
+Switch for dumping the OM import and export variables to NetCDF file.
 Defaults to .TRUE.                                                         \\
 \vspace{6pt}
 
@@ -432,10 +433,28 @@ export LD_LIBRARY_PATH="$FISOC_ISM_LIBPATH/:$LD_LIBRARY_PATH"
 \label{sec:runningROMS}
 
 FISOC needs to access the shared library at run time.  One way of ensuring this 
-is to set the \$ LD\_LIBRARY\_PATH variable, e.g.:
+is to add the location of the library to the \$ LD\_LIBRARY\_PATH variable, e.g.:
 \begin{lstlisting}
 export LD_LIBRARY_PATH="$FISOC_OM_LIBPATH/:$LD_LIBRARY_PATH"
 \end{lstlisting}
+
+ROMS writes a lot of information to the screen when run alone.  
+When run through FISOC this is redirected to a file named 
+\textbf{OM\_stdoutFile}, which must be provided in the FISOC config file 
+whenever ROMS is used.
+
+The number of processes to launch FISOC with must be consistent with the number of 
+partitions in the ROMS grid.  This is set in the \textbf{OM\_configFile} by the 
+Ntile parameters.  For example, the following gives 4 partitions
+\begin{lstlisting}
+      NtileI == 1                               ! I-direction partition
+      NtileJ == 4                               ! J-direction partition
+\end{lstlisting}
+This could be launched with
+\begin{lstlisting}
+mpirun -np 4 FISOC_caller
+\end{lstlisting}
+
 
 \section{Troubleshooting}
 
@@ -443,6 +462,15 @@ If the error messages to the screen are not helpful, remember to check whether u
 information has been logged.  By default this will be in files in the current directory 
 with names like PETX.FISOC.Log (where X is a process number).
 
+Errors like the following can ocurr (in the log files) when the number of processes is 
+not consistent with the number of component partitons (this example involves ROMS):
+\begin{lstlisting}
+20151119 112603.491 ERROR            PET0 ESMCI_DistGrid.C:1200 ESMCI::DistGrid::create() Value unrecognized or out of range - deBlockList contains out-of-bounds elements
+20151119 112603.491 ERROR            PET0 ESMCI_DistGrid_F.C:152 c_esmc_distgridcreatedb() Value unrecognized or out of range Internal subroutine call returned Error
+20151119 112603.491 ERROR            PET0 ESMF_DistGrid.F90:1220 ESMF_DistGridCreateDB() Value unrecognized or out of range - Internal subroutine call returned Error
+20151119 112603.491 ERROR            PET0 src/FISOC_OM_Wrapper_ROMS.f90:612 Value unrecognized or out of range - Passing error in return code
+20151119 112603.491 ERROR            PET0 src/FISOC_OM_Wrapper_ROMS.f90:120 Value unrecognized or out of range - Passing error in return code
+\end{lstlisting}
 
 
 
