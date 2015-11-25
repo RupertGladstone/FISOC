@@ -238,22 +238,22 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    ! "AdvanceCount" gives the number of (OM) timesteps.  Use it to make NetCDF filename.
+    CALL ESMF_ClockGet(FISOC_clock, advanceCount=advanceCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
 
     ! Decide how to call OM run wrapper depending on relevant alarms
     OM_output: IF (ESMF_AlarmIsRinging(alarm_OM_output, rc=rc)) THEN
        
-       ! "AdvanceCount" gives the number of (OM) timesteps.  Use it to make NetCDF filename.
-       CALL ESMF_ClockGet(FISOC_clock, advanceCount=advanceCount, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-
        CALL ESMF_StateGet(OM_ExpSt, "OM export fields", OM_ExpFB, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-       IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN
+       ISM_input: IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN
 
           CALL ESMF_StateGet(OM_ImpSt, "OM import fields", OM_ImpFB, rc=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -270,21 +270,8 @@ CONTAINS
              msg = "Writing NetCDF output from FISOC on ocean grid (OM import)"
              CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
                   line=__LINE__, file=__FILE__, rc=rc)
-             IF (ESMF_IO_NETCDF_PRESENT) THEN
-                NC_status=ESMF_FILESTATUS_REPLACE
-                WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_imp_t", advanceCount, ".nc"
-                CALL  ESMF_FieldBundleWrite(OM_ImpFB, TRIM(OutputFileName),  overwrite=.FALSE., & 
-                     status=NC_status, iofmt=ESMF_IOFMT_NETCDF, rc=rc)
-                IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-                     line=__LINE__, file=__FILE__)) &
-                     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-             ELSE
-                msg = "ERROR: trying to write NetCDF output but NetCDF "// &
-                     "not present in this ESMF build."
-                CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-                     line=__LINE__, file=__FILE__, rc=rc)
-                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-             END IF
+             WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_imp_t", advanceCount, ".nc"
+             CALL FISOC_FB2NC(OutputFileName,OM_ImpFB)
           END IF writeNCimp
           
        ELSE
@@ -292,28 +279,15 @@ CONTAINS
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
-       END IF
+       END IF ISM_input
        
        writeNC: IF (OM_writeNetcdf) THEN
           CALL ESMF_VMBarrier(vm, rc=rc)
           msg = "Writing NetCDF output from FISOC on ocean grid (OM export)"
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
                line=__LINE__, file=__FILE__, rc=rc)
-          NCpresent: IF (ESMF_IO_NETCDF_PRESENT) THEN
-             NC_status=ESMF_FILESTATUS_REPLACE
-             WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_exp_t", advanceCount, ".nc"
-             CALL  ESMF_FieldBundleWrite(OM_ExpFB, TRIM(OutputFileName),  overwrite=.FALSE., & 
-                  status=NC_status, iofmt=ESMF_IOFMT_NETCDF, rc=rc)
-             IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-                  line=__LINE__, file=__FILE__)) &
-                  CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-          ELSE
-             msg = "ERROR: trying to write NetCDF output but NetCDF "// &
-                  "not present in this ESMF build."
-             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-                  line=__LINE__, file=__FILE__, rc=rc)
-             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-          END IF NCpresent
+          WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_exp_t", advanceCount, ".nc"
+          CALL FISOC_FB2NC(OutputFileName,OM_ExpFB)
        END IF writeNC
        
     ELSE
@@ -330,6 +304,15 @@ CONTAINS
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
           
+          IF (OM_writeNetcdf) THEN
+             CALL ESMF_VMBarrier(vm, rc=rc)
+             msg = "Writing NetCDF output from FISOC on ocean grid (OM import)"
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+                  line=__LINE__, file=__FILE__, rc=rc)
+             WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_imp_t", advanceCount, ".nc"
+             CALL FISOC_FB2NC(OutputFileName,OM_ImpFB)
+          END IF
+
        ELSE
           CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,rc=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
