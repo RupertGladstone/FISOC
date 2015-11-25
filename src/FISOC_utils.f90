@@ -9,7 +9,7 @@ MODULE FISOC_utils_MOD
 
   PUBLIC  FISOC_getStringListFromConfig, FISOC_populateFieldBundle, FISOC_ConfigDerivedAttribute, &
        FISOC_initCumulatorFB, FISOC_zeroBundle, FISOC_cumulateFB, FISOC_processCumulator, msg,    &
-       FISOC_VM_MPI_Comm_dup, FISOC_FieldRegridStore
+       FISOC_VM_MPI_Comm_dup, FISOC_FieldRegridStore, FISOC_FB2NC
 
   INTERFACE FISOC_populateFieldBundle
       MODULE PROCEDURE FISOC_populateFieldBundleOn2dGrid
@@ -671,6 +671,38 @@ CONTAINS
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_getStringListFromConfig
+
+
+
+  !--------------------------------------------------------------------
+  SUBROUTINE FISOC_FB2NC(filename,fieldBundle)
+
+
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: filename
+    TYPE(ESMF_FieldBundle),INTENT(IN)     :: fieldBundle
+
+    TYPE(ESMF_FileStatus_Flag)            :: NC_status
+    INTEGER                               :: rc
+
+    IF (ESMF_IO_NETCDF_PRESENT) THEN
+       NC_status=ESMF_FILESTATUS_REPLACE
+       CALL  ESMF_FieldBundleWrite(fieldBundle, TRIM(filename),  overwrite=.FALSE., & 
+            status=NC_status, iofmt=ESMF_IOFMT_NETCDF, rc=rc)
+print*,rc
+print*,ESMF_LOGERR_PASSTHRU
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+    ELSE
+       msg = "ERROR: trying to write NetCDF output but NetCDF "// &
+            "not present in this ESMF build."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+    END IF
+    
+  END SUBROUTINE FISOC_FB2NC
+
 
 
   !--------------------------------------------------------------------
