@@ -179,30 +179,6 @@ CONTAINS
        PRINT*,""
     END IF
 
-
-    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       
-       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_temperature_l0", field=ISM_temperature_l0, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-       CALL ESMF_FieldGet(field=ISM_temperature_l0, localDe=0, farrayPtr=ISM_temperature_l0_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-       PRINT*,"Temperature field size in x direction is ",SIZE(ISM_temperature_l0_ptr(:,1))
-       PRINT*,"Temperature field size in y direction is ",SIZE(ISM_temperature_l0_ptr(1,:))
-       PRINT*,"Show a few rows of data... we originally set the regridding to fill with zeros where source (ISM)"
-       PRINT*,"grid doesn't cover destination (OM) grid."
-       PRINT*,"Row 1 data:  ",ISM_temperature_l0_ptr(1,:)
-       PRINT*,"Row 2 data:  ",ISM_temperature_l0_ptr(2,:)
-       PRINT*,"Row 3 data:  ",ISM_temperature_l0_ptr(3,:)
-       PRINT*,"Row 11 data: ",ISM_temperature_l0_ptr(11,:)
-       PRINT*,""
-       
-    END IF
     
   END SUBROUTINE FISOC_OM_Wrapper_Init_Phase2
   
@@ -249,37 +225,20 @@ print*,"sendFieldDataToOM HERE!!!"
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     OM_dt_sec_float = REAL(OM_dt_sec,ESMF_KIND_R8)
 
-
-print*,"add timestep check: check ROMS timestep is consistent with FISOC time stepping"
-
-!alternative coupling modes re asynchronous coupling: add to issues in github
-
-!check how to call ROMS run (just one timestep)
-
-WRITE (31,*) 'FISOC is about to call ROMS run method.'
-CALL ESMF_VMBarrier(vm, rc=rc)
-print*,"change ocean dt back..."
-OM_dt_sec_float = REAL(600,ESMF_KIND_R8)
-print*,"sec ",OM_dt_sec_float
-
-
-
-CALL ROMS_run(OM_dt_sec_float)
-CALL ESMF_VMBarrier(vm, rc=rc)
-WRITE (31,*) 'FISOC has just called ROMS run method.'
-WRITE (*,*) 'FISOC has just called ROMS run method.'
+    WRITE (31,*) 'FISOC is about to call ROMS run method.'
+    CALL ESMF_VMBarrier(vm, rc=rc)
+    CALL ROMS_run(OM_dt_sec_float)
+    CALL ESMF_VMBarrier(vm, rc=rc)
+    WRITE (31,*) 'FISOC has just called ROMS run method.'
     
-print*,"get field data from OM"
+    print*,"get field data from OM"
 
-!    IF (PRESENT(OM_ExpFB)) THEN
-!       CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
-!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!            line=__LINE__, file=__FILE__)) &
-!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!    END IF
-
-print*,"put this in the ISM derived vars?"
-!use ISM timestep and depth and prev depth to populate rom iceshelfvar % DDDT
+    IF (PRESENT(OM_ExpFB)) THEN
+       CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
