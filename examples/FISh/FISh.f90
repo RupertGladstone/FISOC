@@ -19,7 +19,9 @@ module FISh_MOD
   !      domain length
   parameter (L = 200e3)
   
-  parameter (maxx = 5, tend = 10.0, dt = .1)
+  parameter (maxx = 5, tend = 10.0)
+!  parameter (dt = .1)
+  parameter (dt = 9.5129e-5)
   parameter (rhoi = 900., rhos = 1000., grav = 9.8)
   parameter (n = 3., m = 1./3.)
 
