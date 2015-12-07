@@ -205,11 +205,31 @@ https://github.com/bkgf/romsIceShelf
 
 ***add refs here and link to main ROMS web site
 
-When compiling ROMS for use with FISOC, It is essential to activate the option 
+It is assumed that users are familiar with a standard ROMS build process. 
+
+An example build script, buildFISOC.sh, incorporating modifcations 
+to run ROMS through FISOC, is provided in the top level FISOC directory.
+
+When compiling ROMS for use with FISOC, the following additional environment
+variables are useful:
+\begin{lstlisting}
+export ROMS_MAKE_SHAREDLIB=Yes
+export LIBDIR=/usr/local/lib
+export MY_CPP_FLAGS='' -DROMS4FISOC''
+\end{lstlisting}
+
+It is essential to activate the option 
 to compile the ROMS shared library, which 
 is done by setting the environment variable \$ROMS\_MAKE\_SHAREDLIB to any value. 
+
 The shared library will be installed in the location given by the 
  \$LIBDIR environment variable. 
+
+The -DROMS4FISOC flag activates preprocessor options to tell ROMS to use a 
+specific hard coded unit rather than outputting to screen.  This relies on the 
+same unit being hard coded in the FISOC ROMS wrapper, and results in the ROMS 
+messages being sent to file instead of printe to screen.
+
 By default ROMS will install the module files in the directory given by 
  \$SCRATCH\_DIR.  
 
@@ -475,7 +495,17 @@ not consistent with the number of component partitons (this example involves ROM
 20151119 112603.491 ERROR            PET0 src/FISOC_OM_Wrapper_ROMS.f90:120 Value unrecognized or out of range - Passing error in return code
 \end{lstlisting}
 
-
+Errors like the following can occur if a component wrapper attempts to access a field 
+that has not been created by FISOC, i.e. a field that is not in the list of
+required variables in the FISOC config file (Section~\ref{sec:config}) 
+(this example involves FISh):
+\begin{lstlisting}
+20151207 152613.483 ERROR            PET0 ESMCI_Container_F.C:165 ESMCI::Container::get() Invalid argument key does not exist
+20151207 152613.484 ERROR            PET0 ESMCI_Container_F.C:448 c_esmc_containergetfield() Invalid argument Internal subroutine call returned Error
+20151207 152613.484 ERROR            PET0 ESMF_Container.F90:589 ESMF_ContainerGetField() Invalid argument - Internal subroutine call returned Error
+20151207 152613.484 ERROR            PET0 ESMF_FieldBundle.F90:1456 ESMF_FieldBundleGetItem() Invalid argument - Internal subroutine call returned Error
+20151207 152613.484 ERROR            PET0 src/FISOC_ISM_Wrapper_FISh.f90:198 Invalid argument - Passing error in return code
+\end{lstlisting}
 
 
 
