@@ -479,6 +479,48 @@ not consistent with the number of component partitons (this example involves ROM
 
 
 
+\section{Post processing}
+
+It is expected that the OM and ISM components will output data in their usual formats, 
+and that this will form the basis for most output visualisation and post-processing.
+FISOC does however have the capcity to output both ISM and OM fields on the OM grid 
+in netcdf format.
+Scripts for visualising these outputs can be found in the FISOC_pp directory.
+These scripts require a recent python installation and the netcdf4-python module.
+
+***more about these scripts when they actually exist... so far just a brief sanity 
+check script exists...
+
+
+
+
+\subsection{Netcdf4-python installation notes}
+
+Depending on your python installation, you may need to run something like this
+before installing netcdf4-python:
+\begin{lstlisting}
+sudo apt-get install python-dev
+\end{lstlisting}
+You can clone or download the latest netcdf4-python code from the GitHub 
+repository:
+\begin{lstlisting}
+git clone git@github.com:Unidata/netcdf4-python.git 
+\end{lstlisting}
+Then build the netcdf4-python library like this:
+\begin{lstlisting}
+python setup.py build
+\end{lstlisting}
+A minor discrepancy between the python setup script and the way nc-config 
+retrieves relevant flags may lead to errors if mpi wrappers are used. 
+This issue should probably be considered a bug in nc-config. 
+More information (and a dirty fix) can be found here:
+\begin{lstlisting}
+https://github.com/Unidata/netcdf4-python/issues/491
+\end{lstlisting}
+
+
+
+
 
 
 \section{Adapting new components to run with  FISOC}
