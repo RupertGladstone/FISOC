@@ -485,7 +485,7 @@ It is expected that the OM and ISM components will output data in their usual fo
 and that this will form the basis for most output visualisation and post-processing.
 FISOC does however have the capcity to output both ISM and OM fields on the OM grid 
 in netcdf format.
-Scripts for visualising these outputs can be found in the FISOC_pp directory.
+Scripts for visualising these outputs can be found in the FISOC\_pp directory.
 These scripts require a recent python installation and the netcdf4-python module.
 
 ***more about these scripts when they actually exist... so far just a brief sanity 
@@ -506,10 +506,14 @@ repository:
 \begin{lstlisting}
 git clone git@github.com:Unidata/netcdf4-python.git 
 \end{lstlisting}
-Then build the netcdf4-python library like this:
+Then build and install the netcdf4-python library like this:
 \begin{lstlisting}
 python setup.py build
+python setup.py install
 \end{lstlisting}
+Install may require root privileges.
+You may need to restart your shell.  
+
 A minor discrepancy between the python setup script and the way nc-config 
 retrieves relevant flags may lead to errors if mpi wrappers are used. 
 This issue should probably be considered a bug in nc-config. 
