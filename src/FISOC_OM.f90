@@ -245,6 +245,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
 
+    CALL ESMF_VMBarrier(vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
     ! Decide how to call OM run wrapper depending on relevant alarms
     OM_output: IF (ESMF_AlarmIsRinging(alarm_OM_output, rc=rc)) THEN
        
@@ -254,7 +259,6 @@ CONTAINS
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        ISM_input: IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN
-
           CALL ESMF_StateGet(OM_ImpSt, "OM import fields", OM_ImpFB, rc=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
@@ -267,12 +271,20 @@ CONTAINS
           
           writeNCimp: IF (OM_writeNetcdf) THEN
              CALL ESMF_VMBarrier(vm, rc=rc)
+             IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+                  line=__LINE__, file=__FILE__)) &
+                  CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
              msg = "Writing NetCDF output from FISOC on ocean grid (OM import)"
              CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
                   line=__LINE__, file=__FILE__, rc=rc)
              WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_imp_t", advanceCount, ".nc"
              CALL FISOC_FB2NC(OutputFileName,OM_ImpFB)
           END IF writeNCimp
+
+          CALL ESMF_VMBarrier(vm, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
           
        ELSE
           CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB=OM_ExpFB,rc=rc)
