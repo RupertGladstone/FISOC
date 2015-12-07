@@ -198,6 +198,7 @@ CONTAINS
     INTEGER                    :: OM_dt_sec
     REAL(ESMF_KIND_R8)         :: OM_dt_sec_float
 
+print*,"start ROMS run wrapper"
 
     rc = ESMF_FAILURE
     
@@ -293,6 +294,8 @@ print*,"check for all the places where I use the netcdf writer... remove or use 
 
     rc = ESMF_SUCCESS
     
+print*,"end ROMS run wrapper"
+
   END SUBROUTINE FISOC_OM_Wrapper_Run
 
 

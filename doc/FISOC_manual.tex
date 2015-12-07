@@ -82,6 +82,9 @@ in the top level FISOC directory:
 make install
 \end{lstlisting}
 
+An example script to build and install FISOC, 'buildFISOCexample.sh', is available in the top 
+level FISOC directory.
+
 FISOC has been tested with GNU compilers on Linux Mint using OpenMPI. 
 
 
@@ -222,7 +225,7 @@ which are needed during compilation.
 
 ***add example paths here
 
-\section{Troubleshooting}
+\subsection{Troubleshooting}
 
 
 
@@ -456,7 +459,7 @@ mpirun -np 4 FISOC_caller
 \end{lstlisting}
 
 
-\section{Troubleshooting}
+\subsection{Troubleshooting}
 
 If the error messages to the screen are not helpful, remember to check whether useful 
 information has been logged.  By default this will be in files in the current directory 
@@ -619,6 +622,7 @@ cd ..
 # variables to specify the install location this make file 
 # will probably end up somewhere like this:
 export ESMFMKFILE="$ESMF_DIR/DEFAULTINSTALLDIR/lib/libO/Linux.gfortran.64.openmpi.default/esmf.mk"
+
 
 \end{lstlisting}
 

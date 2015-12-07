@@ -392,6 +392,11 @@ CONTAINS
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+          CALL ESMF_VMBarrier(vm, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+          
           CALL ESMF_cplCompRun(FISOC_coupler, &
                importState=OM_ExpSt, exportState=ISM_ImpSt, &
                clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
@@ -416,6 +421,11 @@ CONTAINS
           IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+          CALL ESMF_VMBarrier(vm, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
           CALL ESMF_cplCompRun(FISOC_coupler, &
                importState=ISM_ExpSt, exportState=OM_ImpSt, &
