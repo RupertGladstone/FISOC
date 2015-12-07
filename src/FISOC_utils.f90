@@ -688,8 +688,6 @@ CONTAINS
        NC_status=ESMF_FILESTATUS_REPLACE
        CALL  ESMF_FieldBundleWrite(fieldBundle, TRIM(filename),  overwrite=.FALSE., & 
             status=NC_status, iofmt=ESMF_IOFMT_NETCDF, rc=rc)
-print*,rc
-print*,ESMF_LOGERR_PASSTHRU
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
