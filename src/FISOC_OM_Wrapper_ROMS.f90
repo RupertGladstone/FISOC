@@ -198,7 +198,6 @@ CONTAINS
     INTEGER                    :: OM_dt_sec
     REAL(ESMF_KIND_R8)         :: OM_dt_sec_float
 
-print*,"start ROMS run wrapper"
 
     rc = ESMF_FAILURE
     
@@ -212,13 +211,12 @@ print*,"start ROMS run wrapper"
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-print*,"sendFieldDataToOM HERE!!!"
-!    IF (PRESENT(OM_ImpFB)) THEN       
-!       CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
-!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!            line=__LINE__, file=__FILE__)) &
-!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!    END IF
+    IF (PRESENT(OM_ImpFB)) THEN       
+       CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, OM_dt_sec, label='OM_dt_sec:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -226,14 +224,12 @@ print*,"sendFieldDataToOM HERE!!!"
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     OM_dt_sec_float = REAL(OM_dt_sec,ESMF_KIND_R8)
 
-    WRITE (31,*) 'FISOC is about to call ROMS run method.'
-    CALL ESMF_VMBarrier(vm, rc=rc)
+WRITE (31,*) 'FISOC is about to call ROMS run method.'
+CALL ESMF_VMBarrier(vm, rc=rc)
     CALL ROMS_run(OM_dt_sec_float)
-    CALL ESMF_VMBarrier(vm, rc=rc)
-    WRITE (31,*) 'FISOC has just called ROMS run method.'
+CALL ESMF_VMBarrier(vm, rc=rc)
+WRITE (31,*) 'FISOC has just called ROMS run method.'
     
-    print*,"get field data from OM"
-
     IF (PRESENT(OM_ExpFB)) THEN
        CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -285,17 +281,11 @@ print*,"move this stuff to subroutines"
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-print*,"check for all the places where I use the netcdf writer... remove or use a sensible netcdf file name"
     
-!    OM_dBdt_l0_ptr = 12345.6
-!       NULLIFY(OM_dBdt_l0_ptr)
     END IF
 
     rc = ESMF_SUCCESS
     
-print*,"end ROMS run wrapper"
-
   END SUBROUTINE FISOC_OM_Wrapper_Run
 
 
@@ -355,7 +345,6 @@ print*,"end ROMS run wrapper"
     TYPE(ESMF_VM),INTENT(IN)              :: vm
 
     INTEGER                               :: fieldCount, localPet, petCount
-    TYPE(ESMF_FIELD)                      :: FISOC_field
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
     CHARACTER(len=ESMF_MAXSTR)            :: fieldName
     REAL(ESMF_KIND_R8),POINTER            :: ptr(:,:)
@@ -367,41 +356,44 @@ print*,"end ROMS run wrapper"
 
     IF (Ngrids .ne. 1) THEN
        msg = "ERROR: not expecting multiple ROMS grids"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
     CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
-         line=__LINE__, file=__FILE__)) RETURN
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   
     ! get the tile position from the OM (a tile is a rectangular domain decomposition element)
     IstrR=BOUNDS(Ngrids)%IstrR(localPet)
     IendR=BOUNDS(Ngrids)%IendR(localPet)
     JstrR=BOUNDS(Ngrids)%JstrR(localPet)
     JendR=BOUNDS(Ngrids)%JendR(localPet)
-    
-!    ! get the tile (including halo) position from the OM
-!    LBi = BOUNDS(Ngrids)%LBi(localPet)
-!    UBi = BOUNDS(Ngrids)%UBi(localPet)
-!    LBj = BOUNDS(Ngrids)%LBj(localPet)
-!    UBj = BOUNDS(Ngrids)%UBj(localPet)
-    
+        
     ! get a list of fields and their names form the OM export field bundle
     fieldCount = 0
     CALL ESMF_FieldBundleGet(OM_ExpFB, fieldCount=fieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     ALLOCATE(fieldList(fieldCount))
     CALL ESMF_FieldBundleGet(OM_ExpFB, fieldList=fieldList, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     fieldLoop: DO nn = 1,fieldCount
        
        CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
-            line=__LINE__, file=__FILE__)) RETURN
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
-            line=__LINE__, file=__FILE__)) RETURN
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
               
 !       if (localPet == 1) then
 !          print*,"STUFF", nn, size(ptr),size(ptr(:,1)),size(ptr(1,:)),localPet
@@ -426,11 +418,10 @@ print*,"end ROMS run wrapper"
                 ptr(ii,jj) = ICESHELFVAR(1) % Tb(ii,jj)
              END DO
           END DO
-          !ICESHELFVAR(ng) % Tb(LBi:UBi,LBj:UBj)
           
        CASE DEFAULT
           msg = "ERROR: unknown variable"
-          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
                line=__LINE__, file=__FILE__, rc=rc)
           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
@@ -450,39 +441,102 @@ print*,"end ROMS run wrapper"
   !--------------------------------------------------------------------------------------
   SUBROUTINE sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc)
 
+    USE mod_iceshelfvar, ONLY : ICESHELFVAR
+    USE mod_param, ONLY       : BOUNDS, Ngrids
+
     TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: OM_ImpFB 
     TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
     TYPE(ESMF_VM),INTENT(IN)                 :: vm
     INTEGER,INTENT(OUT),OPTIONAL             :: rc
 
-    TYPE(ESMF_field)                         :: ISM_dTdz_l0, ISM_z_l0
-    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:,:), ISM_dTdz_l0_ptr(:,:)
- 
+    INTEGER                               :: fieldCount, localPet, petCount
+    TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
+    CHARACTER(len=ESMF_MAXSTR)            :: fieldName
+    REAL(ESMF_KIND_R8),POINTER            :: ptr(:,:)
+    INTEGER                               :: IstrR, IendR, JstrR, JendR ! tile start and end coords
+    INTEGER                               :: ii, jj, nn
 
-    ! Lets get pointers to the depth of the ice base and the temperature gradient.  These we 
-    ! get from the OM import state, which contains the ISM export fields on the ocean grid.
+
 
     rc = ESMF_FAILURE
 
-    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
+    IF (Ngrids .ne. 1) THEN
+       msg = "ERROR: not expecting multiple ROMS grids"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! get the tile position from the OM (a tile is a rectangular domain decomposition element)
+    IstrR=BOUNDS(Ngrids)%IstrR(localPet)
+    IendR=BOUNDS(Ngrids)%IendR(localPet)
+    JstrR=BOUNDS(Ngrids)%JstrR(localPet)
+    JendR=BOUNDS(Ngrids)%JendR(localPet)
+    
+    ! get a list of fields and their names form the OM export field bundle
+    fieldCount = 0
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldCount=fieldCount, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
-    CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(fieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldList=fieldList, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_dTdz_l0", field=ISM_dTdz_l0, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
-    CALL ESMF_FieldGet(field=ISM_dTdz_l0, localDe=0, farrayPtr=ISM_dTdz_l0_ptr, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
-    print*,"sendFieldDataToOM NYI"
+    fieldLoop: DO nn = 1,fieldCount
+
+       CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+
+       SELECT CASE (TRIM(ADJUSTL(fieldName)))
+          
+       CASE ('ISM_dddt')
+          DO jj = JstrR, JendR
+             DO ii = IstrR, IendR
+                ICESHELFVAR(1) % iceshelf_dddt(ii,jj) = ptr(ii,jj)
+             END DO
+          END DO
+             
+       CASE ('ISM_z_l0')
+          !ICESHELFVAR(1) % iceshelf_draft(ii,jj)
+          msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__, rc=rc)          
+
+       CASE('ISM_temperature_l0', 'ISM_temperature_l1', 'ISM_z_l1', 'ISM_velocity_l0', 'ISM_z_l0_previous', 'ISM_dTdz_l0')
+          msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__, rc=rc)          
+          
+       CASE DEFAULT
+          msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       END SELECT
+
+print*,'ROMS gets dddt from FISOC.  need to add dTdz and think further about draft.'
+
+       IF (ASSOCIATED(ptr)) THEN
+          NULLIFY(ptr)
+       END IF
+       
+    END DO fieldLoop
 
     rc = ESMF_SUCCESS
     
