@@ -278,7 +278,7 @@ CONTAINS
              CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
                   line=__LINE__, file=__FILE__, rc=rc)
              WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_imp_t", advanceCount, ".nc"
-             CALL FISOC_FB2NC(OutputFileName,OM_ImpFB)
+             CALL FISOC_FB2NC(OutputFileName,OM_ImpFB,FISOC_config)
           END IF writeNCimp
 
           CALL ESMF_VMBarrier(vm, rc=rc)
@@ -299,7 +299,7 @@ CONTAINS
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
                line=__LINE__, file=__FILE__, rc=rc)
           WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_exp_t", advanceCount, ".nc"
-          CALL FISOC_FB2NC(OutputFileName,OM_ExpFB)
+          CALL FISOC_FB2NC(OutputFileName,OM_ExpFB,FISOC_config)
        END IF writeNC
        
     ELSE
@@ -322,7 +322,7 @@ CONTAINS
              CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
                   line=__LINE__, file=__FILE__, rc=rc)
              WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_imp_t", advanceCount, ".nc"
-             CALL FISOC_FB2NC(OutputFileName,OM_ImpFB)
+             CALL FISOC_FB2NC(OutputFileName,OM_ImpFB,FISOC_config)
           END IF
 
        ELSE

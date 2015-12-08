@@ -675,14 +675,31 @@ CONTAINS
 
 
   !--------------------------------------------------------------------
-  SUBROUTINE FISOC_FB2NC(filename,fieldBundle)
+  SUBROUTINE FISOC_FB2NC(filename,fieldBundle,FISOC_config)
 
 
-    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: filename
-    TYPE(ESMF_FieldBundle),INTENT(IN)     :: fieldBundle
+    CHARACTER(len=ESMF_MAXSTR),INTENT(INOUT):: filename
+    TYPE(ESMF_FieldBundle),INTENT(IN)       :: fieldBundle
+    TYPE(ESMF_config),INTENT(INOUT)         :: FISOC_config
+    
+    TYPE(ESMF_FileStatus_Flag)              :: NC_status
+    INTEGER                                 :: rc
+    CHARACTER(len=ESMF_MAXSTR)              :: output_dir
 
-    TYPE(ESMF_FileStatus_Flag)            :: NC_status
-    INTEGER                               :: rc
+    CALL ESMF_ConfigGetAttribute(FISOC_config, output_dir, label='output_dir:', rc=rc)
+
+    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+       output_dir = "./"
+       msg = "WARNING: output directory not found, setting to current dir"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    ELSE
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    filename = TRIM(output_dir)//'/'//TRIM(filename)
 
     IF (ESMF_IO_NETCDF_PRESENT) THEN
        NC_status=ESMF_FILESTATUS_REPLACE
