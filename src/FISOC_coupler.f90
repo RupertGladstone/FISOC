@@ -505,7 +505,8 @@ CONTAINS
     IF (NumRouteHandleItems.EQ.1) THEN
        ISM2OM_HandleName = ISM_ExpSt_NameList(RouteHandleIndex)
     ELSE
-       msg = "Cant get route handle from ISM export state (wrong number of route handle items) "
+       WRITE (msg, "(A,I0)") &
+            "Cannot get route handle from ISM export state.  Wrong number of route handle items: ", NumRouteHandleItems
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -636,8 +637,9 @@ CONTAINS
     IF (NumRouteHandleItems.EQ.1) THEN
        OM2ISM_HandleName = OM_ExpSt_NameList(RouteHandleIndex)
     ELSE
-       msg = "Cant get route handle from OM export state (wrong number of route handle items) "
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       WRITE (msg, "(A,I0)") &
+            "Cannot get route handle from OM export state.  Wrong number of route handle items: ", NumRouteHandleItems
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
