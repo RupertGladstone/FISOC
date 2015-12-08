@@ -71,7 +71,7 @@ CONTAINS
     !--------------------------------------------------------------------------
     ! check that the FISh timestep is consistent with the FISOC ISM timestep
     !
-    FISh_dt = IDINT(dt) * IDINT(secpyr) ! FISh timestep in seconds
+    FISh_dt = INT(dt*secpyr) ! FISh timestep in seconds
 
     ! get the ISM timestep in seconds
     CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt, 'ISM_dt_sec',rc=rc) 
