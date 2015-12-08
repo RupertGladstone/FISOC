@@ -28,8 +28,7 @@ CONTAINS
     TYPE(ESMF_mesh),INTENT(OUT)           :: ISM_mesh
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
-    REAL(ESMF_KIND_R8)                    :: tol
-    INTEGER                               :: localPet, FISh_dt, ISM_dt
+    INTEGER                               :: localPet, FISh_dt, ISM_dt, tol
     LOGICAL                               :: verbose_coupling
 
     rc = ESMF_FAILURE
@@ -72,17 +71,20 @@ CONTAINS
     !--------------------------------------------------------------------------
     ! check that the FISh timestep is consistent with the FISOC ISM timestep
     !
-    FISh_dt = dt * secpyr ! FISh timestep in seconds
-    !
+    FISh_dt = IDINT(dt) * IDINT(secpyr) ! FISh timestep in seconds
+
     ! get the ISM timestep in seconds
     CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt, 'ISM_dt_sec',rc=rc) 
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    tol = 10.0 ! tolerance in seconds
+    tol = 10 ! tolerance in seconds
     !
     IF ( (FISh_dt.GT.(ISM_dt+tol)) .OR. (FISh_dt.LT.(ISM_dt-tol)) ) THEN
-       msg = "FATAL: FISh/ISM timestep inconsistency"
+       WRITE (msg, "(A,I0,A,I0,A)") &
+            "FATAL: FISh/ISM timestep inconsistency (", &
+            FISh_dt, " and ", ISM_dt, ")"
+
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
