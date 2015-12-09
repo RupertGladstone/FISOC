@@ -1,6 +1,7 @@
 
  # This is "Resource File" (.rc file), a type of configuration file, for use with ESMF.  
- # This .rc file contains configuration information for FISOC.
+ # This .rc file contains configuration information for FISOC. 
+ # See also FISOC manual and ESMF documentation.
  #
  # Syntax:
  # It contains a list of <label,value> pairs.
@@ -37,16 +38,12 @@
   OM_outputInterval:  1
   OM_dt_sec:          3153600
   dt_ratio:           1
-#  OM_outputInterval:  10512
-#  OM_dt_sec:          300
-#  dt_ratio:           10512
-# 3153600 (sec per month)
   start_year:         2010
   start_month:        1
   end_year:           2011
   end_month:          3
+  runLength_ISM_steps:10
 
   verbose_coupling:   .FALSE.
-!  verbose_coupling:   .TRUE.
 
 

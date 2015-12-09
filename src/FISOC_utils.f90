@@ -77,6 +77,8 @@ CONTAINS
     TYPE(ESMF_Clock),INTENT(INOUT)     :: FISOC_clock
     INTEGER,OPTIONAL,INTENT(OUT)       :: rc
     
+!TODO: get all alarms for this clock and destroy them first
+!
 !    CALL ESMF_AlarmDestroy(alarm_ISM, rc=rc)
 !    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
 !         line=__LINE__, file=__FILE__)) &
@@ -107,10 +109,11 @@ CONTAINS
 
     INTEGER                 :: ISM_dt_sec, OM_dt_sec, dt_ratio
     INTEGER                 :: start_year, end_year, start_month, end_month
-    INTEGER                 :: OM_outputInterval
-    TYPE(ESMF_TimeInterval) :: ISM_dt, OM_dt
+    INTEGER                 :: OM_outputInterval, runLength_ISM_steps, runLength_secs
+    TYPE(ESMF_TimeInterval) :: ISM_dt, OM_dt, runLength_timeInterval
     TYPE(ESMF_Time)         :: startTime, endTime
     TYPE(ESMF_Alarm)        :: alarm_OM, alarm_OM_output, alarm_ISM, alarm_ISM_exportAvailable
+    LOGICAL                 :: gotRunLength
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, dt_ratio, label='dt_ratio:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -137,16 +140,27 @@ CONTAINS
          line=__LINE__, file=__FILE__, rcToReturn=rc)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    CALL ESMF_ConfigGetAttribute(FISOC_config, end_month, label='end_month:', rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__, rcToReturn=rc)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
-    CALL ESMF_ConfigGetAttribute(FISOC_config, end_year, label='end_year:', rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__, rcToReturn=rc)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
+    CALL ESMF_ConfigGetAttribute(FISOC_config, runLength_ISM_steps, label='runLength_ISM_steps:', rc=rc)
+    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+       gotRunLength = .FALSE.
+    ELSE IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__, rcToReturn=rc)) THEN
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ELSE
+       gotRunLength = .TRUE.
+    END IF
+
+    IF (.NOT.gotRunLength) THEN
+       CALL ESMF_ConfigGetAttribute(FISOC_config, end_month, label='end_month:', rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       CALL ESMF_ConfigGetAttribute(FISOC_config, end_year, label='end_year:', rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
     CALL ESMF_ConfigGetAttribute(FISOC_config, OM_outputInterval, label='OM_outputInterval:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -154,7 +168,7 @@ CONTAINS
     
     IF (MOD(dt_ratio,OM_outputInterval).NE.0) THEN
        msg = "ERROR: dt_ratio/OM_outputInterval is required to be integer"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
@@ -174,10 +188,22 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    CALL ESMF_TimeSet(endTime, yy=end_year, mm=end_month, dd=1, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (gotRunLength) THEN
+       runLength_secs = runLength_ISM_steps * ISM_dt_sec
+       CALL ESMF_TimeIntervalSet(runLength_timeInterval, s=runLength_secs, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       endTime = startTime + runLength_timeInterval
+       msg = "used runLength_ISM_steps to set the end time"  
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+         line=__LINE__, file=__FILE__, rc=rc)       
+    ELSE
+       CALL ESMF_TimeSet(endTime, yy=end_year, mm=end_month, dd=1, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
     
     FISOC_clock = ESMF_ClockCreate(OM_dt, startTime, stopTime=endTime, &
          name="FISOC main clock", rc=rc)
