@@ -772,7 +772,11 @@ WRITE (31,*) 'FISOC has just called ROMS run method.'
                 do i2 = IstrU, IendR
                    ptrX(i2,j2) = GRID(ng)%lonp(i2,j2)
                    ptrY(i2,j2) = GRID(ng)%latp(i2,j2)
+#ifdef ROMS_MASKING
                    ptrM(i2,j2) = int(GRID(ng)%pmask(i2,j2))
+#else
+                   ptrM(i2,j2) = 0
+#endif
                    ptrA(i2,j2) = GRID(ng)%om_p(i2,j2)*GRID(ng)%on_p(i2,j2)
                 end do
              end do
@@ -787,7 +791,11 @@ WRITE (31,*) 'FISOC has just called ROMS run method.'
                 do i2 = IstrR, IendR
                    ptrX(i2,j2) = GRID(ng)%lonr(i2,j2)
                    ptrY(i2,j2) = GRID(ng)%latr(i2,j2)
+#ifdef ROMS_MASKING
                    ptrM(i2,j2) = int(GRID(ng)%rmask(i2,j2))
+#else
+                   ptrM(i2,j2) = 0
+#endif
                    ptrA(i2,j2) = GRID(ng)%om_r(i2,j2)*GRID(ng)%on_r(i2,j2)
                 end do
              end do
@@ -802,7 +810,11 @@ WRITE (31,*) 'FISOC has just called ROMS run method.'
                 do i2 = IstrU, IendU
                    ptrX(i2,j2) = GRID(ng)%lonu(i2,j2)
                    ptrY(i2,j2) = GRID(ng)%latu(i2,j2)
+#ifdef ROMS_MASKING
                    ptrM(i2,j2) = int(GRID(ng)%umask(i2,j2))
+#else
+                   ptrM(i2,j2) = 0
+#endif
                    ptrA(i2,j2) = GRID(ng)%om_u(i2,j2)*GRID(ng)%on_u(i2,j2)
                 end do
              end do
@@ -817,7 +829,11 @@ WRITE (31,*) 'FISOC has just called ROMS run method.'
                 do i2 = IstrV, IendV
                    ptrX(i2,j2) = GRID(ng)%lonv(i2,j2)
                    ptrY(i2,j2) = GRID(ng)%latv(i2,j2)
+#ifdef ROMS_MASKING
                    ptrM(i2,j2) = int(GRID(ng)%vmask(i2,j2))
+#else
+                   ptrM(i2,j2) = 0
+#endif
                    ptrA(i2,j2) = GRID(ng)%om_v(i2,j2)*GRID(ng)%on_v(i2,j2)
                 end do
              end do

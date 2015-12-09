@@ -7,7 +7,7 @@
 ################################################################################
 
 SRCDIR = src
-FFLAGS = -fbacktrace -g -O0
+FFLAGS += -fbacktrace -g -O0
 
 # check for presence of required env vars
 ifneq ($(origin ESMFMKFILE), environment)
@@ -26,12 +26,8 @@ endif
 # TODO: perhaps find something in esmfmkfile that can avoid the need to use this
 ifeq ($(origin FISOC_MPI), environment)
  ifeq "$(FISOC_MPI)" "yes"
-  FISOC_MPI_SYMBOL = -D FISOC_MPI
- else
-  FISOC_MPI_SYMBOL = 
+  CPPFLAGS += -D FISOC_MPI
  endif
-else
- FISOC_MPI_SYMBOL = 
 endif
 
 ifneq ($(origin FISOC_INSTALL_DIR), environment)
@@ -55,10 +51,7 @@ $(info )
 $(info FISOC will be installed in [${INSTALL_DIR}])
 $(info )
 $(info ESMFMKFILE        [${ESMFMKFILE}])
-$(info FISOC_MPI         [${FISOC_MPI}])
-#$(info FISOC_MPI_SYMBOL  [${FISOC_MPI_SYMBOL}])
-#$(info FISOC_INSTALL_DIR [${FISOC_INSTALL_DIR}])
-#$(info INSTALL_DIR       [${INSTALL_DIR}])
+$(info CPPFLAGS          [${CPPFLAGS}])
 $(info )
 $(info FISOC_ISM         [${FISOC_ISM}])
 $(info FISOC_ISM_LIBS    [${FISOC_ISM_LIBS}])
@@ -75,7 +68,7 @@ $(info )
 
 .SUFFIXES: .f90
 %.o : %.f90
-	$(ESMF_F90COMPILER) $(FFLAGS) $(FISOC_MPI_SYMBOL) -c $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS) $(ESMF_F90COMPILEFREENOCPP) -I$(FISOC_ISM_INCLUDE)  -I$(FISOC_OM_INCLUDE)  -cpp  -o $@  $<
+	$(ESMF_F90COMPILER) $(FFLAGS) -c $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS) $(ESMF_F90COMPILEFREENOCPP) -I$(FISOC_ISM_INCLUDE)  -I$(FISOC_OM_INCLUDE) $(CPPFLAGS) -cpp  -o $@  $<
 
 ################################################################################
 

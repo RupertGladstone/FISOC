@@ -22,6 +22,8 @@ export FISOC_OM_LIBS=""
 export FISOC_OM_INCLUDE="$HOME"
 export FISOC_OM_LIBPATH="$HOME"
 
+#export CPPFLAGS="-D ROMS_MASKING"
+
 #export FISOC_OM="ROMS"
 #export FISOC_OM_LIBS="-loceanM"
 #export FISOC_OM_INCLUDE="${MY_ROMS_DIR}/Build"
