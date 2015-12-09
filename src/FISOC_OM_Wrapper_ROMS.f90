@@ -268,7 +268,7 @@ WRITE (31,*) 'FISOC has just called ROMS run method.'
 
     END IF
 
-print*,"move this stuff to subroutines"
+!print*,"move this stuff to subroutines"
 
     IF (PRESENT(OM_ExpFB)) THEN       
        ! Lets get a pointer to the basal melt rate.  This we get from the OM export field bundle, which 
@@ -529,8 +529,6 @@ print*,"move this stuff to subroutines"
           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        END SELECT
-
-print*,'ROMS gets dddt from FISOC.  need to add dTdz and think further about draft.'
 
        IF (ASSOCIATED(ptr)) THEN
           NULLIFY(ptr)
