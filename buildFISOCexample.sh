@@ -13,6 +13,7 @@ export FISOC_ISM_LIBPATH="/usr/local/lib"
 export FISOC_ISM_INCLUDE="$HOME"
 
 #export FISOC_ISM="Elmer"
+#export FISOC_ISM_LIBS="-lelmersolver -lmatc -lfhuti -larpack -lparpack"
 #export FISOC_ISM_LIBS="-lelmersolver"
 #export FISOC_ISM_INCLUDE="$ELMER_HOME/share/elmersolver/include"
 #export FISOC_ISM_LIBPATH="$ELMER_HOME/lib/elmersolver/"
