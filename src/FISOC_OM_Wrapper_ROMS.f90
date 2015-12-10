@@ -501,39 +501,42 @@ WRITE (31,*) 'FISOC has just called ROMS run method.'
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+       IF (FISOC_ISM2OM(fieldName,FISOC_config,rc=rc)) THEN
 
-       SELECT CASE (TRIM(ADJUSTL(fieldName)))
-          
-       CASE ('ISM_dddt')
-          DO jj = JstrR, JendR
-             DO ii = IstrR, IendR
-                ICESHELFVAR(1) % iceshelf_dddt(ii,jj) = ptr(ii,jj)
-             END DO
-          END DO
+          SELECT CASE (TRIM(ADJUSTL(fieldName)))
              
-       CASE ('ISM_z_l0')
-          !ICESHELFVAR(1) % iceshelf_draft(ii,jj)
-          msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
-          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
-               line=__LINE__, file=__FILE__, rc=rc)          
+          CASE ('ISM_dddt')
+             DO jj = JstrR, JendR
+                DO ii = IstrR, IendR
+                   ICESHELFVAR(1) % iceshelf_dddt(ii,jj) = ptr(ii,jj)
+                END DO
+             END DO
+             
+          CASE ('ISM_z_l0')
+             !ICESHELFVAR(1) % iceshelf_draft(ii,jj)
+             msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+                  line=__LINE__, file=__FILE__, rc=rc)          
+             
+          CASE('ISM_temperature_l0', 'ISM_temperature_l1', 'ISM_z_l1', 'ISM_velocity_l0', 'ISM_z_l0_previous', 'ISM_dTdz_l0')
+             msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+                  line=__LINE__, file=__FILE__, rc=rc)          
+             
+          CASE DEFAULT
+             msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+                  line=__LINE__, file=__FILE__, rc=rc)
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-       CASE('ISM_temperature_l0', 'ISM_temperature_l1', 'ISM_z_l1', 'ISM_velocity_l0', 'ISM_z_l0_previous', 'ISM_dTdz_l0')
-          msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
-          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
-               line=__LINE__, file=__FILE__, rc=rc)          
+          END SELECT
           
-       CASE DEFAULT
-          msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
-          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-               line=__LINE__, file=__FILE__, rc=rc)
-          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          IF (ASSOCIATED(ptr)) THEN
+             NULLIFY(ptr)
+          END IF
 
-       END SELECT
-
-       IF (ASSOCIATED(ptr)) THEN
-          NULLIFY(ptr)
        END IF
-       
+
     END DO fieldLoop
 
     rc = ESMF_SUCCESS

@@ -10,7 +10,7 @@ MODULE FISOC_utils_MOD
   PUBLIC  FISOC_getStringListFromConfig, FISOC_populateFieldBundle, FISOC_ConfigDerivedAttribute, &
        FISOC_initCumulatorFB, FISOC_zeroBundle, FISOC_cumulateFB, FISOC_processCumulator, msg,    &
        FISOC_VM_MPI_Comm_dup, FISOC_FieldRegridStore, FISOC_FB2NC, FISOC_setClocks, & 
-       FISOC_destroyClocks
+       FISOC_destroyClocks, FISOC_ISM2OM!, FISOC_OM2ISM
 
   INTERFACE FISOC_populateFieldBundle
       MODULE PROCEDURE FISOC_populateFieldBundleOn2dGrid
@@ -26,7 +26,47 @@ MODULE FISOC_utils_MOD
 
 CONTAINS
 
-  
+
+
+  !------------------------------------------------------------------------------
+  LOGICAL FUNCTION FISOC_ISM2OM(fieldName,FISOC_config,rc)
+
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: fieldName
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM2OM_Vars(:)
+    CHARACTER(len=ESMF_MAXSTR)            :: label
+    INTEGER                               :: ii
+
+    rc = ESMF_FAILURE
+
+    label = 'ISM2OM_Vars:'
+    CALL FISOC_getStringListFromConfig(FISOC_config, label, ISM2OM_Vars,rc=rc)
+    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+       FISOC_ISM2OM = .TRUE. ! pass all vars if list is not present 
+       RETURN
+    ELSE IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) THEN
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    IF (SIZE(ISM2OM_Vars).EQ.0) THEN
+       FISOC_ISM2OM = .FALSE. ! pass no vars if list is empty 
+    ELSE
+       DO ii=1,SIZE(ISM2OM_Vars)
+          FISOC_ISM2OM = (TRIM(fieldName).EQ.TRIM(ISM2OM_Vars(ii)))
+       END DO
+    END IF
+
+    rc = ESMF_SUCCESS
+
+    RETURN
+
+  END FUNCTION  FISOC_ISM2OM
+
+
+
   !--------------------------------------------------------------------------------------
   ! use the ESMF VM to access the mpi communicator and return a duplicate
   SUBROUTINE FISOC_VM_MPI_Comm_dup(vm,mpic_dup,rc)
@@ -820,8 +860,8 @@ CONTAINS
     CALL ESMF_ConfigFindLabel(config,TRIM(label),rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
+         RETURN
+    
     ! how many items in list?
     listCount = 0
     DO WHILE (rc.EQ.0)
