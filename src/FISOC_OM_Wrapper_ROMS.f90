@@ -7,9 +7,12 @@
 MODULE FISOC_OM_Wrapper
 
   USE ESMF
+
   USE FISOC_utils_MOD
   USE FISOC_types_MOD
+
   USE ocean_control_mod
+  USE mod_scalars
 
   IMPLICIT NONE
 
@@ -184,14 +187,14 @@ CONTAINS
   
   
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB,OM_ImpFB,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB,OM_ImpFB,rc_local)
     
     TYPE(ESMF_config),INTENT(INOUT)                :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT),OPTIONAL  :: OM_ExpFB, OM_ImpFB 
     TYPE(ESMF_VM),INTENT(IN)                       :: vm
-    INTEGER,INTENT(OUT),OPTIONAL                   :: rc
+    INTEGER,INTENT(OUT),OPTIONAL                   :: rc_local
 
-    INTEGER                    :: localPet
+    INTEGER                    :: localPet, rc
     LOGICAL                    :: verbose_coupling
     TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_dBdt_l0
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)
@@ -199,7 +202,7 @@ CONTAINS
     REAL(ESMF_KIND_R8)         :: OM_dt_sec_float
 
 
-    rc = ESMF_FAILURE
+    rc_local = ESMF_FAILURE
     
     CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -224,11 +227,19 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     OM_dt_sec_float = REAL(OM_dt_sec,ESMF_KIND_R8)
 
-WRITE (31,*) 'FISOC is about to call ROMS run method.'
-CALL ESMF_VMBarrier(vm, rc=rc)
+    WRITE (31,*) 'FISOC is about to call ROMS run method.'
+    CALL ESMF_VMBarrier(vm, rc=rc)
     CALL ROMS_run(OM_dt_sec_float)
-CALL ESMF_VMBarrier(vm, rc=rc)
-WRITE (31,*) 'FISOC has just called ROMS run method.'
+    CALL ESMF_VMBarrier(vm, rc=rc)
+    WRITE (31,*) 'FISOC has just called ROMS run method.'
+    
+    IF (exit_flag.ne.NoError) THEN
+       write (msg, "(A,I0,A)") "WARNING: ROMS has returned non-safe exit_flag=", &
+            exit_flag,", see ROMS mod_scalars.f90 for exit flag meanings."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       RETURN
+    END IF
     
     IF (PRESENT(OM_ExpFB)) THEN
        CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
@@ -268,23 +279,7 @@ WRITE (31,*) 'FISOC has just called ROMS run method.'
 
     END IF
 
-!print*,"move this stuff to subroutines"
-
-    IF (PRESENT(OM_ExpFB)) THEN       
-       ! Lets get a pointer to the basal melt rate.  This we get from the OM export field bundle, which 
-       ! contains the OM variables to be exported to the ISM.
-       CALL ESMF_FieldBundleGet(OM_ExpFB, fieldName="OM_dBdt_l0", field=OM_dBdt_l0, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
-       CALL ESMF_FieldGet(field=OM_dBdt_l0, localDe=0, farrayPtr=OM_dBdt_l0_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
-    END IF
-
-    rc = ESMF_SUCCESS
+    rc_local = ESMF_SUCCESS
     
   END SUBROUTINE FISOC_OM_Wrapper_Run
 
