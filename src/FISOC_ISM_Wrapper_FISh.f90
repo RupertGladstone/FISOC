@@ -67,6 +67,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
+    CALL getFieldDataFromISM(ISM_ExpFB,FISOC_config,rc)
 
     !--------------------------------------------------------------------------
     ! check that the FISh timestep is consistent with the FISOC ISM timestep
@@ -137,14 +138,11 @@ CONTAINS
     INTEGER,INTENT(IN)     :: localPet
     INTEGER,INTENT(OUT),OPTIONAL :: rc
 
-    TYPE(ESMF_field)             :: OM_dBdt_l0, ISM_velocity_l0, ISM_z_l0, ISM_z_l1
-    REAL(ESMF_KIND_R8),POINTER   :: OM_dBdt_l0_ptr(:),ISM_velocity_l0_ptr(:),ISM_z_l0_ptr(:),ISM_z_l1_ptr(:)
+    TYPE(ESMF_field)             :: OM_dBdt_l0
+    REAL(ESMF_KIND_R8),POINTER   :: OM_dBdt_l0_ptr(:)
     LOGICAL                      :: verbose_coupling
 
-    rc = ESMF_FAILURE
-
-    NULLIFY(ISM_velocity_l0_ptr)
-    NULLIFY(ISM_z_l0_ptr)
+    NULLIFY(OM_dBdt_l0_ptr)
 
     ! query the FISOC config
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
@@ -176,40 +174,13 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        mb = OM_dBdt_l0_ptr(1:maxx)
+
+       NULLIFY(OM_dBdt_l0_ptr)
        
        ! now run the FISh model for one timestep
        CALL FISh_run()
        
-       ! access the ice shelf base depth from the ISM export field bundle and set it 
-       ! using the FISh variable hb (short for height at the base).
-       CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       ISM_z_l0_ptr(1:maxx)        = hb
-       ISM_z_l0_ptr(maxx+1:2*maxx) = hb
-       
-       ! access the ice shelf base velocity from the ISM export field bundle and set it 
-       ! using the FISh variable u.
-       CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_velocity_l0", field=ISM_velocity_l0, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-        
-       CALL ESMF_FieldGet(field=ISM_velocity_l0, localDe=0, farrayPtr=ISM_velocity_l0_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-       ISM_velocity_l0_ptr(1:maxx)        = u
-       ISM_velocity_l0_ptr(maxx+1:2*maxx) = u
-       
-       NULLIFY(ISM_velocity_l0_ptr)
-       NULLIFY(ISM_z_l0_ptr)
+       CALL getFieldDataFromISM(ISM_ExpFB,FISOC_config,rc)
        
     END IF
     
@@ -252,6 +223,55 @@ CONTAINS
   END SUBROUTINE FISOC_ISM_Wrapper_Finalize
 
 
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE getFieldDataFromISM(ISM_ExpFB,FISOC_config,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+
+    TYPE(ESMF_field)             :: ISM_velocity_l0, ISM_z_l0
+    REAL(ESMF_KIND_R8),POINTER   :: ISM_velocity_l0_ptr(:),ISM_z_l0_ptr(:)
+
+
+    NULLIFY(ISM_velocity_l0_ptr)
+    NULLIFY(ISM_z_l0_ptr)
+
+    ! access the ice shelf base depth from the ISM export field bundle and set it 
+    ! using the FISh variable hb (short for height at the base).
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ISM_z_l0_ptr(1:maxx)        = hb
+    ISM_z_l0_ptr(maxx+1:2*maxx) = hb
+    
+    ! access the ice shelf base velocity from the ISM export field bundle and set it 
+    ! using the FISh variable u.
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_velocity_l0", field=ISM_velocity_l0, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_FieldGet(field=ISM_velocity_l0, localDe=0, farrayPtr=ISM_velocity_l0_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    ISM_velocity_l0_ptr(1:maxx)        = u
+    ISM_velocity_l0_ptr(maxx+1:2*maxx) = u
+
+    
+    NULLIFY(ISM_velocity_l0_ptr)
+    NULLIFY(ISM_z_l0_ptr)
+
+  END SUBROUTINE getFieldDataFromISM
+
+  
   !--------------------------------------------------------------------------------------
   SUBROUTINE FISh2ESMF_mesh(ESMF_FIShMesh,rc)
     
