@@ -21,7 +21,8 @@ module FISh_MOD
   
   parameter (maxx = 5, tend = 10.0)
 !  parameter (dt = .1)
-  parameter (dt = 9.5129e-5)
+!  parameter (dt = 9.5129e-5)
+  parameter (dt = 1200/secpyr)
   parameter (rhoi = 900., rhos = 1000., grav = 9.8)
   parameter (n = 3., m = 1./3.)
 
@@ -60,13 +61,25 @@ contains
        if (x(i) > L/2.) then
           h(i) = h(1) - (x(i) - L / 2.) / 1.e2
        end if
-       h2(i) = h(i)
-       h0(i) = h2(i)
     enddo
+    h(maxx) = h(maxx-1) ! to avoid large adjustment during b.c. in first ts
+    h2 = h 
+    h0 = h2
     
     tl = nint(tend / dt) + 1
 
     tc = 0
+
+    do i=1,maxx
+       haf(i) = b(i) + h(i) * rhoi / rhos
+       if (haf(i)<0) then
+          hb(i) = (-rhoi) * h(i) / rhos
+       else
+          hb(i) = b(i)
+       end if
+    enddo
+
+    u = 0
 
   end subroutine FISh_initialize
 
@@ -177,8 +190,7 @@ contains
     do i=1,maxx
        h(i) = h2(i)
        totH = totH + h(i)
-    enddo
-    
+    enddo    
 
   end subroutine FISh_run
   !-------------- end of loop in time -------------
