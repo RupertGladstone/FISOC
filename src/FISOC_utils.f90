@@ -51,11 +51,36 @@ CONTAINS
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
-    IF (SIZE(ISM2OM_Vars).EQ.0) THEN
-       FISOC_ISM2OM = .FALSE. ! pass no vars if list is empty 
+    FISOC_ISM2OM = FISOC_listContains(fieldName,ISM2OM_Vars,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    rc = ESMF_SUCCESS
+
+    RETURN
+
+  END FUNCTION  FISOC_ISM2OM
+
+
+
+  !------------------------------------------------------------------------------
+  LOGICAL FUNCTION FISOC_listContains(itemName,list,rc)
+
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: itemName, list(:)
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+    INTEGER                               :: ii
+
+    rc = ESMF_FAILURE
+
+    IF (SIZE(list).EQ.0) THEN
+       FISOC_listContains = .FALSE. ! return false if list is empty 
     ELSE
-       DO ii=1,SIZE(ISM2OM_Vars)
-          FISOC_ISM2OM = (TRIM(fieldName).EQ.TRIM(ISM2OM_Vars(ii)))
+       FISOC_listContains = .FALSE.
+       DO ii=1,SIZE(list)
+          IF (TRIM(itemName).EQ.TRIM(list(ii))) THEN 
+             FISOC_listContains = .TRUE.
+          END IF
        END DO
     END IF
 
@@ -63,7 +88,7 @@ CONTAINS
 
     RETURN
 
-  END FUNCTION  FISOC_ISM2OM
+  END FUNCTION  FISOC_LISTCONTAINS
 
 
 
