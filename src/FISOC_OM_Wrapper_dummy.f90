@@ -131,19 +131,19 @@ CONTAINS
   
   
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB,OM_ImpFB,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB,OM_ImpFB,rc_local)
     
     TYPE(ESMF_config),INTENT(INOUT)                :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT),OPTIONAL  :: OM_ExpFB, OM_ImpFB 
     TYPE(ESMF_VM),INTENT(IN)                       :: vm
-    INTEGER,INTENT(OUT),OPTIONAL                   :: rc
+    INTEGER,INTENT(OUT),OPTIONAL                   :: rc_local
 
-    INTEGER                    :: localPet
+    INTEGER                    :: localPet, rc
     LOGICAL                    :: verbose_coupling
     TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_dBdt_l0
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)
 
-    rc = ESMF_FAILURE
+    rc_local = ESMF_FAILURE
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -217,7 +217,7 @@ CONTAINS
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
     
-    rc = ESMF_SUCCESS
+    rc_local = ESMF_SUCCESS
     
   END SUBROUTINE FISOC_OM_Wrapper_Run
 
