@@ -1,0 +1,12 @@
+To make the mesh:
+ElmerGrid 1 2 FISOC_Ex1.grd
+
+To copmile the geometry functions:
+elmerf90 FISOC_Elmer_geometries.f90 -o FISOC_Elmer_geometries.so
+
+To run in stand alone mode:
+
+To run through FISOC:
+
+
+***note where the geometry is defined in ROMS?
