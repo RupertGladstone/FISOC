@@ -17,7 +17,7 @@ module FISh_MOD
   parameter (fluxBC = 0)
   
   !      domain length
-  parameter (L = 200e3)
+  parameter (L = 500e3)
   
   parameter (maxx = 5, tend = 10.0)
 !  parameter (dt = .1)

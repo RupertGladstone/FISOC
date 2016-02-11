@@ -1,4 +1,65 @@
 
+Summary of FISOC examples
+
+Example 1.  Long thin Marine Ice Sheet.  To be run coupled with the ROMS 
+iceshelf2d case.  To test the coupling in an almost flowline like mode, 
+with no rotation in the ocean.  Same domain as the default FISh setup.
+
+
+Setting up the domain (this should probably go into the manual) should be 
+consistent between the ISM domain and the OM domain.  The domain is defined 
+by the components in their normal way, not by FISOC.
+
+In ROMS, the bathymmetry is represented by variable "h", which is typically 
+defined (at least for simple idealised cases) in analytical.f90. 
+Here is an example:
+
+  h(i,j)=20.0_r8+REAL(j,r8)*(depth/Esize)*(Esize/REAL(Mm(ng),r8))
+
+
+where Esize is domain length, depth is the maximum depth, and Mm is the 
+number of internal grid points in the ETA direction (this is the same as 
+the j direction I think).  So j/Mm is the fractional distance through the 
+domain, and the above formula boils down to a linear 
+bathymetry:
+
+h = 20 + j(depth/Esize)(Esize/Mm)
+h = 20 + depth*j/Mm
+
+Note that this means the bathymetry exceeds the maximum depth, a 
+contradiction in terms?
+
+
+
+IF (j.le.60) THEN
+  zice(i,j)=-h(i,j)+20_r8
+zice = -h +20
+
+ELSE
+  zice(i,j)=-(h(i,60)-atan(REAL(j-59,r8)/10) * (h(i,60)-300_r8)) + 20_r8
+zice = - h_60 - atan((j-59)/10) * (h_60-300) +20
+     = - h_60 - h_60 * atan(***) -300 atan(***)
+h_60 * (1-atan)
+
+j==60 corresponds to x_dist = 60*(Esize / Mm)
+dy = Esize / Mm
+
+Bathymmetry in this context means the depth in metres of the upper 
+surface of the solid earth (i.e. ocean floor or bedrock) below sea level, 
+positive downwards.
+
+
+
+
+
+
+
+
+
+
+
+
+
 Latest example (June 10th 2014) is in MISevolSetup4Elmer.  This contains 
 setup for 3D simulations, hopefully fairly generic.
 

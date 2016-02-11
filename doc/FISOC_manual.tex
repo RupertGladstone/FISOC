@@ -451,6 +451,9 @@ For example (it is assumed \$ELMER\_HOME was set during Elmer installation):
 export LD_LIBRARY_PATH="$FISOC_ISM_LIBPATH/:$LD_LIBRARY_PATH"
 \end{lstlisting}
 
+***something about parallelism in mesh
+
+
 
 \subsection{Running FISOC with ROMS}
 \label{sec:runningROMS}
@@ -690,6 +693,7 @@ export ESMF_NETCDF="split"
 export ESMF_NETCDF_INCLUDE="/usr/local/include"
 export ESMF_NETCDF_LIBPATH="/usr/local/lib"
 export ESMF_COMM="openmpi"
+export ESMF_PIO="internal"
                                                                                                               
 wget downloads.sourceforge.net/project/esmf/ESMF_6_3_0r/ESMF_6_3_0rp1/esmf_6_3_0rp1_src.tar.gz
 tar -xf esmf_6_3_0rp1_src.tar.gz
