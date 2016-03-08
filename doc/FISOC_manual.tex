@@ -195,40 +195,47 @@ export FISOC_ISM_LIBPATH="$ELMER_HOME/lib/"
 export FISOC_ISM_LIBS="-lelmersolver"
 \end{lstlisting}
 
+
+
+
+
 \subsubsection{ROMS}
 \label{sec:PreReqROMS}
 
 FISOC has been developed and tested with an ice shelf enabled version of ROMS. 
-This is branched from the Rutgers ROMS repository and is publicly available 
-through github: \\
-https://github.com/bkgf/romsIceShelf
+This is branched from the Rutgers ROMS repository.  Information about the Rutgers ROMS 
+can be found at \url{https://www.myroms.org/}.
 
-***add refs here and link to main ROMS web site
+Development of the ice shelf enabled version  is currently ongoing in a private repository 
+(please contact the developers if you need access to this).
+A public version of the ice shelf enabled version is also available through github: 
+\url{https://github.com/bkgf/romsIceShelf}.  
+Please use the "FISOC\_friendly" branch.
 
-It is assumed that users are familiar with a standard ROMS build process. 
+***I need to merge the deve version to the public version before releasing this!!!***
 
-An example build script, buildFISOC.sh, incorporating modifcations 
-to run ROMS through FISOC, is provided in the top level FISOC directory.
+Example build scripts can be found in the ROMS/Bin subdirectory of a git clone 
+from the repository mentioned above.
+It is now assumed that users are familiar with a standard ROMS build process. 
 
 When compiling ROMS for use with FISOC, the following additional environment
-variables are useful:
+variables are needed:
 \begin{lstlisting}
-export ROMS_MAKE_SHAREDLIB=Yes
-export LIBDIR=/usr/local/lib
-export MY_CPP_FLAGS='' -DROMS4FISOC''
+export MAKE_SHAREDLIB="Yes"
+export LIBDIR="/usr/local/lib"
+export MY_CPP_FLAGS=" -DFISOC"
 \end{lstlisting}
 
-It is essential to activate the option 
-to compile the ROMS shared library, which 
-is done by setting the environment variable \$ROMS\_MAKE\_SHAREDLIB to any value. 
+It is essential to activate the option to compile the ROMS shared library, which 
+is done by setting the environment variable MAKE\_SHAREDLIB to any value. 
 
 The shared library will be installed in the location given by the 
  \$LIBDIR environment variable. 
 
-The -DROMS4FISOC flag activates preprocessor options to tell ROMS to use a 
+The -DFISOC flag activates preprocessor options.  This includes telling ROMS to use a 
 specific hard coded unit rather than outputting to screen.  This relies on the 
 same unit being hard coded in the FISOC ROMS wrapper, and results in the ROMS 
-messages being sent to file instead of printe to screen.
+messages being sent to file instead of printed to screen.
 
 By default ROMS will install the module files in the directory given by 
  \$SCRATCH\_DIR.  
@@ -237,13 +244,20 @@ When compiling FISOC with ROMS, FISOC needs to know where to
 find the relevant ROMS libraries.  
 This can be done at FISOC compile time through the 
 \$FISOC\_OM
-environment variables.  
-Similarly to the ISM options, FISOC uses the variables \$FISOC\_OM\_LIBPATH and
- \$FISOC\_OM\_LIBS to locate the shared library.
-FISOC uses the  \$FISOC\_OM\_INCLUDE variable to locate the module files, 
-which are needed during compilation.
+environment variables.  For example:
 
-***add example paths here
+\begin{lstlisting}
+export MY_ROMS_DIR="/home/elmeruser/Source/ROMSIceShelf_devel"
+export FISOC_OM="ROMS"
+export FISOC_OM_LIBS="-loceanM"
+export FISOC_OM_INCLUDE="${MY_ROMS_DIR}/Build"
+export FISOC_OM_LIBPATH="/usr/local/lib"
+\end{lstlisting}
+
+
+
+
+
 
 \subsection{Troubleshooting}
 
@@ -535,10 +549,9 @@ before installing netcdf4-python:
 \begin{lstlisting}
 sudo apt-get install python-dev
 \end{lstlisting}
-More information about the netcdf4-python module can be found here:
-\begin{lstlisting}
-http://unidata.github.io/netcdf4-python/
-\end{lstlisting}
+More information about the netcdf4-python module can be found here:\\
+\url{http://unidata.github.io/netcdf4-python/}\\
+\\
 You can clone or download the latest netcdf4-python code from the GitHub 
 repository:
 \begin{lstlisting}
@@ -555,10 +568,8 @@ You may need to restart your shell.
 A minor discrepancy between the python setup script and the way nc-config 
 retrieves relevant flags may lead to errors if mpi wrappers are used. 
 This issue should probably be considered a bug in nc-config. 
-More information (and a dirty fix) can be found here:
-\begin{lstlisting}
-https://github.com/Unidata/netcdf4-python/issues/491
-\end{lstlisting}
+More information (and a dirty fix) can be found here:\\
+\url{https://github.com/Unidata/netcdf4-python/issues/491}\\
 
 
 
