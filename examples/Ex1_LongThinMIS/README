@@ -1,12 +1,30 @@
+
+Elmer/Ice example for coupling to ROMS through FISOC.  This is for a long thin idealised 
+domain, rather fjord-like.
+
+
 To make the mesh:
 ElmerGrid 1 2 FISOC_Ex1.grd
 
-To copmile the geometry functions:
+To partition the mesh for parallel runs:
+ElmerGrid 2 2 FISOC_Ex1 -partition 4 1 0 2
+
+
+To compile the geometry functions:
 elmerf90 FISOC_Elmer_geometries.f90 -o FISOC_Elmer_geometries.so
 
+
+Make directories for outputs:
+mkdir outputs
+mkdir VTUoutputs
+
+
 To run in stand alone mode:
+ElmerSolver FISOC_Ex1.sif 
+
+Or in parallel:
+mpirun -np 4 ElmerSolver 
 
 To run through FISOC:
+***
 
-
-***note where the geometry is defined in ROMS?
