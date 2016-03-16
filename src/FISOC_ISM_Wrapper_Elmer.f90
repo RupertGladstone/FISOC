@@ -46,13 +46,16 @@ CONTAINS
   SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,&
        FISOC_config,vm,rc)
 
-    TYPE(ESMF_config),INTENT(IN)          :: FISOC_config
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: ISM_ReqVarList(:)
     TYPE(ESMF_VM),INTENT(INOUT)           :: vm
 
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
     TYPE(ESMF_mesh),INTENT(OUT)           :: ISM_mesh
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
+
+    CHARACTER(len=ESMF_MAXSTR)            :: ISM_configFile_FISOC
+    CHARACTER(len=MAX_STRING_LEN)         :: ISM_configFile_Elmer
 
     TYPE(Mesh_t)                          :: Elmer_Mesh
 
@@ -70,10 +73,17 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
+    CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_configFile_FISOC, label='ISM_configFile:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ISM_configFile_Elmer = ""
+    ISM_configFile_Elmer = ISM_configFile_FISOC 
+
     CALL Initialise_Elmer_ParEnv(vm,rc=rc)
 
-    CALL ElmerSolver_init(Elmer_Mesh,.TRUE.) 
-    ! It is intended that ElmerSolver_init should return the mesh prior to extrusion 
+    CALL ElmerSolver_init(Elmer_Mesh,.TRUE.,ISM_configFile_Elmer) 
+    ! It is intended that ElmerSolver_init should return the mesh prior to Elmer's internal extrusion 
 
     CALL Elmer2ESMF_mesh(Elmer_mesh,ISM_mesh,vm,rc=rc)
 

@@ -13,7 +13,6 @@ ElmerGrid 2 2 FISOC_Ex1 -partition 4 1 0 2
 To compile the geometry functions:
 elmerf90 FISOC_Elmer_geometries.f90 -o FISOC_Elmer_geometries.so
 
-
 Make directories for outputs:
 mkdir outputs
 mkdir VTUoutputs
@@ -25,6 +24,24 @@ ElmerSolver FISOC_Ex1.sif
 Or in parallel:
 mpirun -np 4 ElmerSolver 
 
-To run through FISOC:
-***
+
+*** To run through FISOC ***
+
+Add the full path of the .sif to the FISOC config file, for example:
+  ISM_configFile:     /home/elmeruser/Source/FISOC/examples/Ex1_LongThinMIS/FISOC_Ex1.sif
+
+Put the compiled user functions where Elmer can find them, for example:
+cp FISOC_Elmer_geometries.so $ELMER_HOME/share/elmersolver/lib/
+
+Provide in the .sif the full path to directories needed at run time, e.g.
+...
+Header
+  Mesh DB "/home/elmeruser/Source/FISOC/examples/Ex1_LongThinMIS" "FISOC_Ex1"
+End
+...
+  Output File = "/home/elmeruser/Source/FISOC/examples/Ex1_LongThinMIS/"$name".result"
+...
+  Procedure = File "ResultOutputSolve" "ResultOutputSolver"
+  Output Directory = File "/home/elmeruser/Source/FISOC/examples/Ex1_LongThinMIS/VTUoutputs"
+...
 
