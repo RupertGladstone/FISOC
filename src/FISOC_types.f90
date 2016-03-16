@@ -8,5 +8,6 @@ MODULE FISOC_types_MOD
 
   REAL(ESMF_KIND_R8),PARAMETER :: FISOC_missingData = -99999999999.9
   INTEGER,PARAMETER            :: FISOC_mpic_missing = -99
+  INTEGER,PARAMETER            :: OM_outputUnit = 31, ISM_outputUnit = 32
 
 END MODULE FISOC_types_MOD

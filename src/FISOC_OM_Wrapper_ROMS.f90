@@ -67,7 +67,7 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    OPEN(unit=31, file=OM_stdoutFile, STATUS='REPLACE', ERR=101)
+    OPEN(unit=OM_outputUnit, file=OM_stdoutFile, STATUS='REPLACE', ERR=101)
     
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -136,7 +136,7 @@ CONTAINS
     RETURN
     
 101 msg = "OM failed to open stdoutFile"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
          line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
@@ -227,11 +227,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     OM_dt_sec_float = REAL(OM_dt_sec,ESMF_KIND_R8)
 
-    WRITE (31,*) 'FISOC is about to call ROMS run method.'
+    WRITE (OM_outputUnit,*) 'FISOC is about to call ROMS run method.'
     CALL ESMF_VMBarrier(vm, rc=rc)
     CALL ROMS_run(OM_dt_sec_float)
     CALL ESMF_VMBarrier(vm, rc=rc)
-    WRITE (31,*) 'FISOC has just called ROMS run method.'
+    WRITE (OM_outputUnit,*) 'FISOC has just called ROMS run method.'
     
     IF (exit_flag.ne.NoError) THEN
        write (msg, "(A,I0,A)") "WARNING: ROMS has returned non-safe exit_flag=", &
@@ -303,7 +303,7 @@ CONTAINS
 
     CALL ROMS_finalize
 
-    CLOSE(unit=31, ERR=102)
+    CLOSE(unit=OM_outputUnit, ERR=102)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
@@ -320,7 +320,7 @@ CONTAINS
     RETURN
     
 102 msg = "OM failed to close stdoutFile"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
          line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 

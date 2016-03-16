@@ -6,6 +6,7 @@ MODULE FISOC_ISM_Wrapper
   USE FISOC_types_MOD
   USE ElmerSolver_mod
   USE MainUtils
+  USE Messages, ONLY : MessageUnit
 
   IMPLICIT NONE
 
@@ -54,13 +55,12 @@ CONTAINS
     TYPE(ESMF_mesh),INTENT(OUT)           :: ISM_mesh
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
-    CHARACTER(len=ESMF_MAXSTR)            :: ISM_configFile_FISOC
+    CHARACTER(len=ESMF_MAXSTR)            :: ISM_configFile_FISOC, ISM_stdoutFile
     CHARACTER(len=MAX_STRING_LEN)         :: ISM_configFile_Elmer
 
     TYPE(Mesh_t)                          :: Elmer_Mesh
 
 ! TODO:
-! -get access to the sif
 ! -double check that the sif really does specify to extrude the mesh, and that the non-extruded mesh really is 2d.
 ! -do some consistency checks between elmer and fisoc config files: time stepping mainly
 ! -get elmer variables list, recieve esmf required variables list
@@ -68,17 +68,26 @@ CONTAINS
 ! -convert required variables to esmf format (a new subroutine fr this, to be called in init and run)
 ! -store required vars with mesh in export state (higher level wrapper can manage the states, here we just care about field bundles)
 
-! note: variables tobe input to Elmer (basal melt rate) should be defined (perhaps as exported vars) in the 
+! note: variables to be input to Elmer (basal melt rate) should be defined (perhaps as exported vars) in the 
 ! sif.  These also to be checked for their presence against a list of required vars from ESMF
 
     rc = ESMF_FAILURE
 
+    ! FISOC tells Elmer which .sif to use
     CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_configFile_FISOC, label='ISM_configFile:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     ISM_configFile_Elmer = ""
     ISM_configFile_Elmer = ISM_configFile_FISOC 
+
+    ! FISOC sets the unit for Elmer's standard messaging routines to use instead of stdout
+    CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_stdoutFile, label='ISM_stdoutFile:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    OPEN(unit=ISM_outputUnit, file=ISM_stdoutFile, STATUS='REPLACE', ERR=101)
+    MessageUnit = ISM_outputUnit
 
     CALL Initialise_Elmer_ParEnv(vm,rc=rc)
 
@@ -93,6 +102,13 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     rc = ESMF_SUCCESS
+
+    RETURN
+
+101 msg = "ISM failed to open stdoutFile"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+         line=__LINE__, file=__FILE__, rc=rc)
+    CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1
   
@@ -153,7 +169,16 @@ CONTAINS
 
     CALL ElmerSolver_finalize()
 
+    CLOSE(unit=ISM_outputUnit, ERR=102)
+
     rc = ESMF_SUCCESS
+
+    RETURN
+
+102 msg = "ISM failed to close stdoutFile"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+         line=__LINE__, file=__FILE__, rc=rc)
+    CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   END SUBROUTINE FISOC_ISM_Wrapper_Finalize
 

@@ -8,7 +8,7 @@ $A1 = 2.89165e-13*yearinsec*1.0e18
 $A2 = 2.42736e-02*yearinsec*1.0e18
 $gravity = -9.81*yearinsec^2
 $GLTolerance = 1.0e-5
-$name = "longThinMIS_S2"
+$name = "longThinMIS_test"
 $m = 1.0/3.0
 
 
@@ -428,8 +428,8 @@ Boundary Condition 1
 
   Normal-Tangential Velocity = Logical True
   Normal-Tangential Velocity Rotate = Logical False
-  Velocity 1 = Real 0.0
-!  Slip Coefficient 1 = Real 10.0
+!  Velocity 1 = Real 0.0
+  Slip Coefficient 1 = Real 10.0
   Slip Coefficient 2 = Real 0.00002
   Slip Coefficient 3 = Real 0.00002
 
@@ -443,8 +443,8 @@ Boundary Condition 2
 
   Normal-Tangential Velocity = Logical True
   Normal-Tangential Velocity Rotate = Logical False
-  Velocity 1 = Real 0.0
-!  Slip Coefficient 1 = Real 10.0
+!  Velocity 1 = Real 0.0
+  Slip Coefficient 1 = Real 10.0
   Slip Coefficient 2 = Real 0.00002
   Slip Coefficient 3 = Real 0.00002
 
