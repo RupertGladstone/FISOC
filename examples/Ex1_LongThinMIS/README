@@ -25,7 +25,15 @@ Or in parallel:
 mpirun -np 4 ElmerSolver 
 
 
+To clean this folder of output files:
+rm -rf FISOC_Ex1/*result*
+rm -rf VTUoutputs/*vtu
+
+
+
 *** To run through FISOC ***
+
+TODO: check any useful information here is represented also in the FISOC manual.
 
 Add the full path of the .sif to the FISOC config file, for example:
   ISM_configFile:     /home/elmeruser/Source/FISOC/examples/Ex1_LongThinMIS/FISOC_Ex1.sif
