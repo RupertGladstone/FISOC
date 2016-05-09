@@ -192,7 +192,7 @@ CONTAINS
     TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
     LOGICAL                :: verbose_coupling
     TYPE(ESMF_config)      :: FISOC_config
-    INTEGER                :: localPet
+!    INTEGER                :: localPet
     TYPE(ESMF_VM)          :: vm
 
     rc = ESMF_FAILURE
@@ -202,10 +202,10 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -229,7 +229,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
-    CALL FISOC_ISM_Wrapper_Run(FISOC_config,localPet,ISM_ImpFB,ISM_ExpFB,rc=rc)
+    CALL FISOC_ISM_Wrapper_Run(FISOC_config,vm,ISM_ExpFB,ISM_ImpFB,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
@@ -293,7 +293,6 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
 
-
     ! destroy ISM export fields
 
     CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
@@ -313,7 +312,7 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
+
     DO ii = 1,FieldCount
        
        CALL ESMF_FieldGet(field=ExpFieldList(ii),name=name, rc=rc)
@@ -321,10 +320,10 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        
-       CALL ESMF_VMBarrier(vm, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!       CALL ESMF_VMBarrier(vm, rc=rc)
+!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!            line=__LINE__, file=__FILE__)) &
+!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
        CALL ESMF_FieldDestroy(ExpFieldList(ii), rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -340,14 +339,13 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     
-
     ! destroy ISM import fields
     
     CALL ESMF_StateGet(ISM_ImpSt, "ISM import fields", ISM_ImpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-    
+
     ! ...how many fields?...
     CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldCount=FieldCount, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -373,10 +371,10 @@ CONTAINS
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END DO
     
-    CALL ESMF_MeshDestroy(ISM_mesh,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    CALL ESMF_MeshDestroy(ISM_mesh,rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     DEALLOCATE(ImpFieldList)
     
@@ -609,6 +607,9 @@ CONTAINS
 
     ISM_dt = REAL(ISM_dt_int,ESMF_KIND_R8)
     ISM_dddt_ptr = (ISM_z_l0_ptr - ISM_z_l0_previous_ptr) / ISM_dt
+
+    ! first time we set it to zero
+    WHERE (ISM_z_l0_previous_ptr .EQ. 0.0) ISM_dddt_ptr = 0.0
 
     NULLIFY(ISM_z_l0_previous_ptr)
     NULLIFY(ISM_z_l0_ptr)

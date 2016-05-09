@@ -131,21 +131,31 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Run(FISOC_config,localPet,ISM_ImpFB,ISM_ExpFB,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Run(FISOC_config,vm,ISM_ExpFB,ISM_ImpFB,rc)
 
     TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
-    TYPE(ESMF_config)      :: FISOC_config
-    INTEGER,INTENT(IN)     :: localPet
-    INTEGER,INTENT(OUT),OPTIONAL :: rc
+    TYPE(ESMF_config),INTENT(INOUT) :: FISOC_config
+    TYPE(ESMF_VM),INTENT(IN)        :: vm
+    INTEGER,INTENT(OUT),OPTIONAL    :: rc
 
+    INTEGER                      :: localPet
     TYPE(ESMF_field)             :: OM_dBdt_l0
     REAL(ESMF_KIND_R8),POINTER   :: OM_dBdt_l0_ptr(:)
     LOGICAL                      :: verbose_coupling
+
+!    TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
+!    CHARACTER(len=ESMF_MAXSTR)            :: fieldName
+!    INTEGER                               :: ii, fieldCount
 
     NULLIFY(OM_dBdt_l0_ptr)
 
     ! query the FISOC config
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -173,7 +183,9 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
        mb = OM_dBdt_l0_ptr(1:maxx)
+!print*,"mb",mb
 
        NULLIFY(OM_dBdt_l0_ptr)
        

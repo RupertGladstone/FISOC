@@ -39,6 +39,18 @@ MODULE FISOC_ISM_Wrapper
   INTEGER, PARAMETER :: ELMER_ELEMENT_HEXAHED_QUADRAT  = 820
   INTEGER, PARAMETER :: ELMER_ELEMENT_HEXAHED_QUADRAT2 = 827
 
+  ! These variable names are hard coded to match the names given in the Elmer/Ice .sif
+  ! The user must ensure the names correspond.
+  ! TODO: is this information in the manual?
+  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_dBdt_l0        = 'meltRate'
+  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_temperature_l0 = 'oceanTemperature'
+  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_temperature_l1 = 'oceanTemperature'
+  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_velocity_l0    = 'Velocity'
+  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l0           = 'Coordinate 3'
+  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l1           = 'Coordinate 3'
+
+  INTEGER  :: EI_numNodesAtBed
+
 CONTAINS
 
   !--------------------------------------------------------------------------------------
@@ -131,28 +143,64 @@ CONTAINS
   END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2
 
 
+
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Run(FISOC_config,localPet,ISM_ImpFB,ISM_ExpFB,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Run(FISOC_config,vm,ISM_ExpFB,ISM_ImpFB,rc)
 
     TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
     TYPE(ESMF_config)      :: FISOC_config
-    INTEGER,INTENT(IN)     :: localPet
+    TYPE(ESMF_VM)          :: vm
 
     INTEGER,INTENT(OUT),OPTIONAL :: rc
 
+    INTEGER                      :: localPet
     TYPE(ESMF_field)             :: OM_dBdt_l0, ISM_z_l0, ISM_z_l1
     REAL(ESMF_KIND_R8),POINTER   :: OM_dBdt_l0_ptr(:),ISM_z_l0_ptr(:),ISM_z_l1_ptr(:)
     LOGICAL                      :: verbose_coupling
 
     rc = ESMF_FAILURE
 
+! TODO:
+! make the interface to this have correspondingarguments to the OM side (e.g. pass vm not just localpet)
 ! make sure to run only one timestep
+! do some time step consistency checks
 
-! get hold of the elmer variables for receiving inputs, and convert them here from esmf to elmer type.
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    PRINT*,""
+    PRINT*,"******************************************************************************"
+    PRINT*,"************        ISM wrapper.  Run method.           **********************"
+    PRINT*,"******************************************************************************"
+    PRINT*,""
+
+
+    ! get hold of the elmer variables for receiving inputs, and convert them here from esmf to elmer type.
+    CALL sendFieldDataToISM(ISM_ImpFB,FISOC_config,vm,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+
+    WRITE (ISM_outputUnit,*) 'FISOC is about to call Elmer/Ice run method.'
+    CALL ESMF_VMBarrier(vm, rc=rc)
     CALL ElmerSolver_run()
-! get hold of list of required variables from Elmer and convert them here from elmer to esmf type.
+    CALL ESMF_VMBarrier(vm, rc=rc)
+    WRITE (ISM_outputUnit,*) 'FISOC has just called Elmer/Ice run method.'
 
+    ! get hold of list of required variables from Elmer and convert them here from elmer to esmf type.
+    CALL getFieldDataFromISM(ISM_ExpFB,FISOC_config,vm,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_ISM_Wrapper_Run
@@ -262,7 +310,6 @@ CONTAINS
     ALLOCATE(elementIDlist(numQuadElems+numTriElems))
     ALLOCATE(elemConn(4*numQuadElems+3*numTriElems))
 
-!print*,"ELMER MESH STUFF", numQuadElems, numTriElems
 
     numTotElems = numElementsByType(Elmer_mesh,(/ELMER_ELEMENT_QUADRIL_BILINEAR,ELMER_ELEMENT_QUADRIL_QUADRAT,&
          ELMER_ELEMENT_QUADRIL_QUADRAT2,ELMER_ELEMENT_QUADRIL_CUBIC,ELMER_ELEMENT_TRIANGLE_LINEAR,&
@@ -279,11 +326,12 @@ CONTAINS
 
     !for now we assume that all nodes are used.  may not always be true.
     numNodes =  Elmer_mesh % Nodes % NumberOfNodes 
+    EI_numNodesAtBed = numNodes
     ALLOCATE(nodeIds(numNodes))
     ALLOCATE(nodeCoords(numNodes*Elmer_mesh % MeshDim))
     ALLOCATE(nodeOwners(numNodes))
 
-    nodeOwners=0 ! everything on PET 0
+    nodeOwners=localPet
 
     nodeIds = (/(ii, ii=1, numNodes, 1)/)
 
@@ -304,7 +352,6 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
     
     DEALLOCATE(ESMF_elementTypeList)
     DEALLOCATE(elementIDlist)
@@ -437,6 +484,221 @@ CONTAINS
     rc = ESMF_SUCCESS
 
   END SUBROUTINE Initialise_Elmer_ParEnv
+  
+
+
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE sendFieldDataToISM(ISM_ImpFB,FISOC_config,vm,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: ISM_ImpFB 
+    TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
+    TYPE(ESMF_VM),INTENT(IN)                 :: vm
+    INTEGER,INTENT(OUT),OPTIONAL             :: rc
+
+
+    INTEGER                               :: fieldCount, localPet, petCount
+    TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
+    CHARACTER(len=ESMF_MAXSTR)            :: fieldName
+    REAL(ESMF_KIND_R8),POINTER            :: ptr(:)
+    INTEGER                               :: IstrR, IendR, JstrR, JendR ! tile start and end coords
+    INTEGER                               :: ii, jj, nn, numNodes
+    INTEGER,ALLOCATABLE                   :: nodeIds(:)
+    INTEGER,POINTER                       :: EI_fieldPerm(:)
+    REAL(KIND=dp),POINTER                 :: EI_fieldVals(:)
+    TYPE(Variable_t),POINTER              :: EI_field
+
+    rc = ESMF_FAILURE
+
+    CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    ! get a list of fields and their names from the ISM import field bundle
+    fieldCount = 0
+    CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldCount=fieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(fieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldList=fieldList, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    ! set up list of node ids.
+    ! TODO: resolve code duplication with elmer2esmf mesh routine for setting up nodeIds array (and partner routine to this one).
+!    numNodes =  CurrentModel % mesh % Nodes % NumberOfNodes 
+    numNodes = EI_numNodesAtBed
+    ALLOCATE(nodeIds(numNodes))
+    nodeIds = (/(ii, ii=1, numNodes, 1)/)
+
+    fieldLoop: DO nn = 1,fieldCount
+
+       ! access the FISOC version of the current field 
+       CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+
+       ! access the Elmer/Ice version of the current field
+       IF (FISOC_OM2ISM(fieldName,FISOC_config,rc=rc)) THEN
+
+          SELECT CASE (TRIM(ADJUSTL(fieldName)))
+              
+          CASE ('OM_dBdt_l0')
+
+             EI_field => VariableGet( CurrentModel % Mesh % Variables, &
+                  EIname_dBdt_l0, UnFoundFatal=.TRUE.)
+             EI_fieldVals => EI_field % Values
+             EI_fieldPerm => EI_field % Perm
+             DO ii = 1,numNodes
+                EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(ii)
+             END DO
+
+          CASE ('OM_temperature_l0')
+             EI_field => VariableGet( CurrentModel % Mesh % Variables, &
+                  EIname_temperature_l0, UnFoundFatal=.TRUE.)
+             EI_fieldVals => EI_field % Values
+             EI_fieldPerm => EI_field % Perm
+             DO ii = 1,numNodes
+                EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(ii)
+             END DO
+
+          CASE ('OM_turnips')
+             msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+                  line=__LINE__, file=__FILE__, rc=rc)          
+             
+          CASE DEFAULT
+             msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+                  line=__LINE__, file=__FILE__, rc=rc)
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+          END SELECT
+          
+          IF (ASSOCIATED(ptr)) THEN
+             NULLIFY(ptr)
+          END IF
+
+       END IF
+
+    END DO fieldLoop
+
+    DEALLOCATE(nodeIds)
+
+    rc = ESMF_SUCCESS
+    
+  END SUBROUTINE sendFieldDataToISM
+
+
+
+
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE getFieldDataFromISM(ISM_ExpFB,FISOC_config,vm,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: ISM_ExpFB 
+    TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
+    TYPE(ESMF_VM),INTENT(IN)                 :: vm
+    INTEGER,INTENT(OUT),OPTIONAL             :: rc
+
+
+    INTEGER                               :: fieldCount, localPet, petCount
+    TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
+    CHARACTER(len=ESMF_MAXSTR)            :: fieldName
+    REAL(ESMF_KIND_R8),POINTER            :: ptr(:)
+    INTEGER                               :: IstrR, IendR, JstrR, JendR ! tile start and end coords
+    INTEGER                               :: ii, jj, nn, numNodes
+    INTEGER,ALLOCATABLE                   :: nodeIds(:)
+    INTEGER,POINTER                       :: EI_fieldPerm(:)
+    REAL(KIND=dp),POINTER                 :: EI_fieldVals(:)
+    TYPE(Variable_t),POINTER              :: EI_field
+
+    rc = ESMF_FAILURE
+
+    CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    ! get a list of fields and their names from the ISM export field bundle
+    fieldCount = 0
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=fieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(fieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldList=fieldList, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    ! set up list of node ids.
+    ! TODO: resolve code duplication with elmer2esmf mesh routine for setting up nodeIds array (and partner routine to this one).
+!    numNodes =  CurrentModel % mesh % Nodes % NumberOfNodes 
+    numNodes = EI_numNodesAtBed
+    ALLOCATE(nodeIds(numNodes))
+    nodeIds = (/(ii, ii=1, numNodes, 1)/)
+
+    fieldLoop: DO nn = 1,fieldCount
+
+       ! access the FISOC version of the current field 
+       CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       ! access the Elmer/Ice version of the current field
+       SELECT CASE (TRIM(ADJUSTL(fieldName)))
+
+       CASE ('ISM_z_l0')
+          EI_field => VariableGet( CurrentModel % Mesh % Variables, &
+               EIname_z_l0, UnFoundFatal=.TRUE.)
+          EI_fieldVals => EI_field % Values
+
+          DO ii = 1,numNodes
+              ptr(ii) = EI_fieldVals(nodeIds(ii))
+          END DO
+          
+       CASE ('ISM_temperature_l0','ISM_temperature_l1','ISM_velocity_l0','ISM_z_l1','ISM_z_l0_previous')
+          msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__, rc=rc)          
+          
+       CASE ('ISM_dTdz_l0','ISM_dddt')
+          msg = "INFO: not exporting derived variable: "//TRIM(ADJUSTL(fieldName))
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)          
+          
+       CASE DEFAULT
+          msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          
+       END SELECT
+       
+       IF (ASSOCIATED(ptr)) THEN
+          NULLIFY(ptr)
+       END IF
+       
+    END DO fieldLoop
+    
+    DEALLOCATE(nodeIds)
+    
+    rc = ESMF_SUCCESS
+    
+  END SUBROUTINE getFieldDataFromISM
   
 END MODULE FISOC_ISM_Wrapper
 
