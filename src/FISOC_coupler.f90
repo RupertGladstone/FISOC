@@ -67,12 +67,13 @@ CONTAINS
     TYPE(ESMF_fieldBundle)        :: ISM_ExpFB, OM_ExpFB, OM_ImpFB
     TYPE(ESMF_grid)               :: OM_grid
     TYPE(ESMF_mesh)               :: ISM_mesh
-!    TYPE(ESMF_config)             :: config
+    TYPE(ESMF_config)             :: config
     CHARACTER(len=ESMF_MAXSTR)    :: fieldName
     INTEGER                       :: ISM_ExpFieldCount, OM_ExpFieldCount, ii
     TYPE(ESMF_Field),ALLOCATABLE  :: ISM_ExpFieldList(:), OM_ImpFieldList(:), OM_ExpFieldList(:)
     TYPE(ESMF_RouteHandle)        :: ISM2OM_regridRouteHandle
     TYPE(ESMF_TypeKind_Flag)      :: fieldTypeKind
+    TYPE(ESMF_VM)                 :: vm
 
 
 !    type(ESMF_CoordSys_Flag) :: IMS_mesh_coordSys
@@ -85,6 +86,12 @@ CONTAINS
 !    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
 !         line=__LINE__, file=__FILE__)) &
 !         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+!    TYPE(ESMF_VM)                 :: vm
+    CALL ESMF_cplCompGet(FISOC_coupler, vm=vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Extract ISM field bundle for regridding...
     CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
@@ -185,13 +192,14 @@ CONTAINS
 !    print*,dimCount
 
     ! Create a route handle to add to the state object.  This will be used for regridding.
-    CALL FISOC_FieldRegridStore(ISM_ExpFieldList(1), OM_ExpFieldList(1), &
+    CALL FISOC_FieldRegridStore(vm, ISM_ExpFieldList(1), OM_ExpFieldList(1), &
          regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
          routehandle=ISM2OM_regridRouteHandle, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
 
 !    CALL ESMF_FieldRegridStore(ISM_ExpFieldList(1), OM_ExpFieldList(1), &
 !         regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
@@ -229,6 +237,7 @@ CONTAINS
     ! import fields, then add the bundle to the OM import state 
 
     ALLOCATE(OM_ImpFieldList(ISM_ExpFieldCount))
+
 
 
     loop_over_fields: DO ii = 1,ISM_ExpFieldCount 
@@ -278,6 +287,7 @@ CONTAINS
 
     rc = ESMF_SUCCESS
 
+
   END SUBROUTINE FISOC_coupler_init_phase1
 
 
@@ -300,6 +310,7 @@ CONTAINS
     TYPE(ESMF_Field),ALLOCATABLE  :: ISM_ExpFieldList(:), ISM_ImpFieldList(:), OM_ExpFieldList(:)
     TYPE(ESMF_RouteHandle)        :: OM2ISM_regridRouteHandle
     TYPE(ESMF_TypeKind_Flag)      :: fieldTypeKind
+    TYPE(ESMF_VM)                 :: vm
 
 
     rc = ESMF_FAILURE
@@ -308,6 +319,11 @@ CONTAINS
 !    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
 !         line=__LINE__, file=__FILE__)) &
 !         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_cplCompGet(FISOC_coupler, vm=vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Extract OM field bundle for regridding...
     CALL ESMF_StateGet(OM_ExpSt, "OM export fields", OM_ExpFB, rc=rc)
@@ -381,7 +397,7 @@ CONTAINS
 
 
     ! Create a route handle to add to the state object.  This will be used for regridding.
-    CALL FISOC_FieldRegridStore(OM_ExpFieldList(1), ISM_ExpFieldList(1), &
+    CALL FISOC_FieldRegridStore(vm,OM_ExpFieldList(1), ISM_ExpFieldList(1), &
          regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
          routehandle=OM2ISM_regridRouteHandle, rc=rc)
@@ -481,6 +497,8 @@ CONTAINS
     TYPE(ESMF_RouteHandle)        :: ISM2OM_regridRouteHandle
     TYPE(ESMF_TypeKind_Flag)      :: fieldTypeKind
 
+    REAL(ESMF_KIND_R8),POINTER            :: optr(:,:),iptr(:)
+    INTEGER                        :: nn
 
     rc = ESMF_FAILURE
 
@@ -574,6 +592,17 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+!CALL ESMF_FieldGet(ISM_ExpFieldList(ii), farrayPtr=iptr, rc=rc)
+!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!     line=__LINE__, file=__FILE__)) &
+!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!print*,fieldName,SIZE(iptr(:))
+!do nn = 1,SIZE(iptr(:))
+!iptr(nn) = 10.0 * nn
+!end do
+!print*,iptr(:)
+!nullify(iptr)
+
        CALL ESMF_FieldRegrid(ISM_ExpFieldList(ii),OM_ImpFieldList(ii), &
             routehandle=ISM2OM_regridRouteHandle, zeroregion= ESMF_REGION_TOTAL, &
             checkflag=.TRUE.,rc=rc)
@@ -581,6 +610,14 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        
+!CALL ESMF_FieldGet(OM_ImpFieldList(ii), farrayPtr=optr, rc=rc)
+!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!     line=__LINE__, file=__FILE__)) &
+!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!print*,fieldName
+!print*,optr
+!nullify(optr)
+
        msg = "Regridded field "//fieldName
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
@@ -612,8 +649,10 @@ CONTAINS
     TYPE(ESMF_Field),ALLOCATABLE  :: ISM_ImpFieldList(:), OM_ExpFieldList(:)
     TYPE(ESMF_RouteHandle)        :: OM2ISM_regridRouteHandle
     TYPE(ESMF_TypeKind_Flag)      :: fieldTypeKind
-
-
+    
+    REAL(ESMF_KIND_R8),POINTER            :: optr(:,:),iptr(:)
+    INTEGER                        :: nn
+    
     rc = ESMF_FAILURE
 
     CALL ESMF_cplCompGet(FISOC_coupler, config=config, rc=rc)
@@ -706,6 +745,20 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+!CALL ESMF_FieldGet(OM_ExpFieldList(ii), farrayPtr=optr, rc=rc)
+!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!     line=__LINE__, file=__FILE__)) &
+!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!optr = 20.0
+!DO nn = 1,SIZE(optr(1,:))
+!print*,""
+!print*,fieldName,SIZE(optr(:,1))
+!print*,optr(:,2)
+!print*,optr(:,99)
+
+!END DO
+!nullify(optr)
+
        CALL ESMF_FieldRegrid(OM_ExpFieldList(ii),ISM_ImpFieldList(ii), &
             routehandle=OM2ISM_regridRouteHandle, zeroregion= ESMF_REGION_TOTAL, &
             checkflag=.TRUE.,rc=rc)
@@ -713,6 +766,14 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        
+!CALL ESMF_FieldGet(ISM_ImpFieldList(ii), farrayPtr=iptr, rc=rc)
+!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!     line=__LINE__, file=__FILE__)) &
+!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!print*,fieldName
+!print*,iptr
+!nullify(iptr)
+
        msg = "Regridded field "//fieldName
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
