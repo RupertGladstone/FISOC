@@ -558,7 +558,7 @@ CONTAINS
              EI_fieldVals => EI_field % Values
              EI_fieldPerm => EI_field % Perm
              DO ii = 1,numNodes
-                EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(ii)
+                EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(ii) * FISOC_secPerYear
              END DO
 
           CASE ('OM_temperature_l0')
