@@ -335,6 +335,7 @@ CONTAINS
        
     END IF OM_output
     
+
     ! cumulate the outputs if we have new outputs from the OM this step
     OM_cumulate: IF (ESMF_AlarmIsRinging(alarm_OM_output)) THEN
        CALL ESMF_StateGet(OM_ExpSt, "OM export field cumulator", OM_ExpFBcum, rc=rc)
@@ -357,6 +358,21 @@ CONTAINS
        
     END IF OM_cumulate
     
+
+    ! turn off alarms relating to data exchange and cumulating
+    IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN
+       CALL ESMF_AlarmRingerOff(alarm_ISM_exportAvailable, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
+    END IF    
+    IF (ESMF_AlarmIsRinging(alarm_OM_output, rc=rc)) THEN
+       CALL ESMF_AlarmRingerOff(alarm_OM_output, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+    END IF
+
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_OM_run

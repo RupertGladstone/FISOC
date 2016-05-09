@@ -406,6 +406,11 @@ CONTAINS
           IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+          CALL ESMF_AlarmRingerOff(alarm_OM, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
        END IF
        
        IF (ESMF_AlarmIsRinging(alarm_ISM, rc=rc)) THEN
@@ -437,6 +442,10 @@ CONTAINS
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+          CALL ESMF_AlarmRingerOff(alarm_ISM, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
        END IF
 
        CALL ESMF_ClockAdvance(FISOC_clock, rc=rc)   
@@ -534,7 +543,7 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
+
     CALL ESMF_GridCompFinalize(FISOC_ISM, &
          importState=ISM_ImpSt, exportState=ISM_ExpSt, &
          clock=FISOC_clock, phase=1, rc=rc, userRc=urc)

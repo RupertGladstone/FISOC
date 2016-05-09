@@ -39,6 +39,11 @@ MODULE FISOC_OM_Wrapper
   integer, parameter :: Idot    = 2
   integer, parameter :: Iupoint = 3
   integer, parameter :: Ivpoint = 4
+
+  ! These switches correspond to ROMS preprocessor directives.  See also 
+  ! ROMS/Include/iceshelf2d.h in ROMS repository.
+  LOGICAL, PARAMETER :: ROMS_MASKING = .FALSE.
+  LOGICAL, PARAMETER :: ROMS_SPHERICAL = .FALSE.
   
 CONTAINS
   
@@ -189,6 +194,8 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB,OM_ImpFB,rc_local)
     
+    use mod_grid , only : GRID
+
     TYPE(ESMF_config),INTENT(INOUT)                :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT),OPTIONAL  :: OM_ExpFB, OM_ImpFB 
     TYPE(ESMF_VM),INTENT(IN)                       :: vm
@@ -764,77 +771,122 @@ CONTAINS
           !
           if (ii == Idot) then
              if (verbose_coupling) then
-                write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
-                     lbound(GRID(ng)%lonp, dim=1), ubound(GRID(ng)%lonp, dim=1),     &
-                     lbound(GRID(ng)%lonp, dim=2), ubound(GRID(ng)%lonp, dim=2)
+                IF (ROMS_SPHERICAL) THEN
+                   write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),  &
+                        lbound(GRID(ng)%lonp, dim=1), ubound(GRID(ng)%lonp, dim=1),     &
+                        lbound(GRID(ng)%lonp, dim=2), ubound(GRID(ng)%lonp, dim=2)
+                ELSE
+                   write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),  &
+                        lbound(GRID(ng)%xp, dim=1), ubound(GRID(ng)%xp, dim=1),         &
+                        lbound(GRID(ng)%xp, dim=2), ubound(GRID(ng)%xp, dim=2)
+                END IF
              end if
              !
              do j2 = JstrV, JendR
                 do i2 = IstrU, IendR
-                   ptrX(i2,j2) = GRID(ng)%lonp(i2,j2)
-                   ptrY(i2,j2) = GRID(ng)%latp(i2,j2)
-#ifdef ROMS_MASKING
-                   ptrM(i2,j2) = int(GRID(ng)%pmask(i2,j2))
-#else
-                   ptrM(i2,j2) = 0
-#endif
+                   IF (ROMS_SPHERICAL) THEN
+                      ptrX(i2,j2) = GRID(ng)%lonp(i2,j2)
+                      ptrY(i2,j2) = GRID(ng)%latp(i2,j2)
+                   ELSE
+                      ptrX(i2,j2) = GRID(ng)%xp(i2,j2)
+                      ptrY(i2,j2) = GRID(ng)%yp(i2,j2)
+                   END IF
+                   IF (ROMS_MASKING) THEN
+                      ptrM(i2,j2) = int(GRID(ng)%pmask(i2,j2))
+                   ELSE
+                      ptrM(i2,j2) = 0
+                   END IF
                    ptrA(i2,j2) = GRID(ng)%om_p(i2,j2)*GRID(ng)%on_p(i2,j2)
                 end do
              end do
           else if (ii == Icross) then
              if (verbose_coupling) then
-                write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
-                     lbound(GRID(ng)%lonr, dim=1), ubound(GRID(ng)%lonr, dim=1),     &
-                     lbound(GRID(ng)%lonr, dim=2), ubound(GRID(ng)%lonr, dim=2)
+                IF (ROMS_SPHERICAL) THEN
+                   write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),  &
+                        lbound(GRID(ng)%lonr, dim=1), ubound(GRID(ng)%lonr, dim=1),     &
+                        lbound(GRID(ng)%lonr, dim=2), ubound(GRID(ng)%lonr, dim=2)
+                ELSE
+                   write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),  &
+                        lbound(GRID(ng)%xr, dim=1), ubound(GRID(ng)%xr, dim=1),     &
+                        lbound(GRID(ng)%xr, dim=2), ubound(GRID(ng)%xr, dim=2)
+                END IF
              end if
              !
              do j2 = JstrR, JendR
                 do i2 = IstrR, IendR
-                   ptrX(i2,j2) = GRID(ng)%lonr(i2,j2)
-                   ptrY(i2,j2) = GRID(ng)%latr(i2,j2)
-#ifdef ROMS_MASKING
-                   ptrM(i2,j2) = int(GRID(ng)%rmask(i2,j2))
-#else
-                   ptrM(i2,j2) = 0
-#endif
+                   IF (ROMS_SPHERICAL) THEN
+                      ptrX(i2,j2) = GRID(ng)%lonr(i2,j2)
+                      ptrY(i2,j2) = GRID(ng)%latr(i2,j2)
+                   ELSE
+                      ptrX(i2,j2) = GRID(ng)%xr(i2,j2)
+                      ptrY(i2,j2) = GRID(ng)%yr(i2,j2)
+                   END IF
+                   IF (ROMS_MASKING) THEN
+                      ptrM(i2,j2) = int(GRID(ng)%rmask(i2,j2))
+                   ELSE
+                      ptrM(i2,j2) = 0
+                   END IF
                    ptrA(i2,j2) = GRID(ng)%om_r(i2,j2)*GRID(ng)%on_r(i2,j2)
                 end do
              end do
           else if (ii == Iupoint) then
              if (verbose_coupling) then
-                write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
-                     lbound(GRID(ng)%lonu, dim=1), ubound(GRID(ng)%lonu, dim=1),     &
-                     lbound(GRID(ng)%lonu, dim=2), ubound(GRID(ng)%lonu, dim=2)
+                IF (ROMS_SPHERICAL) THEN
+                   write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
+                        lbound(GRID(ng)%lonu, dim=1), ubound(GRID(ng)%lonu, dim=1),     &
+                        lbound(GRID(ng)%lonu, dim=2), ubound(GRID(ng)%lonu, dim=2)
+                ELSE
+                   write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
+                        lbound(GRID(ng)%xu, dim=1), ubound(GRID(ng)%xu, dim=1),     &
+                        lbound(GRID(ng)%xu, dim=2), ubound(GRID(ng)%xu, dim=2)
+                END IF
              end if
              !
              do j2 = JstrU, JendU
                 do i2 = IstrU, IendU
-                   ptrX(i2,j2) = GRID(ng)%lonu(i2,j2)
-                   ptrY(i2,j2) = GRID(ng)%latu(i2,j2)
-#ifdef ROMS_MASKING
-                   ptrM(i2,j2) = int(GRID(ng)%umask(i2,j2))
-#else
-                   ptrM(i2,j2) = 0
-#endif
+                   IF (ROMS_SPHERICAL) THEN
+                      ptrX(i2,j2) = GRID(ng)%lonu(i2,j2)
+                      ptrY(i2,j2) = GRID(ng)%latu(i2,j2)
+                   ELSE
+                      ptrX(i2,j2) = GRID(ng)%xu(i2,j2)
+                      ptrY(i2,j2) = GRID(ng)%yu(i2,j2)
+                   END IF
+                   IF (ROMS_MASKING) THEN
+                      ptrM(i2,j2) = int(GRID(ng)%umask(i2,j2))
+                   ELSE
+                      ptrM(i2,j2) = 0
+                   END IF
                    ptrA(i2,j2) = GRID(ng)%om_u(i2,j2)*GRID(ng)%on_u(i2,j2)
                 end do
              end do
           else if (ii == Ivpoint) then
              if (verbose_coupling) then
-                write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
-                     lbound(GRID(ng)%lonv, dim=1), ubound(GRID(ng)%lonv, dim=1),     &
-                     lbound(GRID(ng)%lonv, dim=2), ubound(GRID(ng)%lonv, dim=2)
-             end if
-             !
+                IF (ROMS_SPHERICAL) THEN
+                   write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
+                        lbound(GRID(ng)%lonv, dim=1), ubound(GRID(ng)%lonv, dim=1), &
+                        lbound(GRID(ng)%lonv, dim=2), ubound(GRID(ng)%lonv, dim=2)
+                ELSE
+                   write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
+                        lbound(GRID(ng)%xv, dim=1), ubound(GRID(ng)%xv, dim=1), &
+                        lbound(GRID(ng)%xv, dim=2), ubound(GRID(ng)%xv, dim=2)
+                END IF
+                
+                end if
+                !
              do j2 = JstrV, JendV
                 do i2 = IstrV, IendV
-                   ptrX(i2,j2) = GRID(ng)%lonv(i2,j2)
-                   ptrY(i2,j2) = GRID(ng)%latv(i2,j2)
-#ifdef ROMS_MASKING
-                   ptrM(i2,j2) = int(GRID(ng)%vmask(i2,j2))
-#else
-                   ptrM(i2,j2) = 0
-#endif
+                   IF (ROMS_SPHERICAL) THEN
+                      ptrX(i2,j2) = GRID(ng)%lonv(i2,j2)
+                      ptrY(i2,j2) = GRID(ng)%latv(i2,j2)
+                   ELSE
+                      ptrX(i2,j2) = GRID(ng)%xv(i2,j2)
+                      ptrY(i2,j2) = GRID(ng)%yv(i2,j2)
+                   END IF
+                   IF (ROMS_MASKING) THEN
+                      ptrM(i2,j2) = int(GRID(ng)%vmask(i2,j2))
+                   ELSE
+                      ptrM(i2,j2) = 0
+                   END IF
                    ptrA(i2,j2) = GRID(ng)%om_v(i2,j2)*GRID(ng)%on_v(i2,j2)
                 end do
              end do
@@ -869,7 +921,7 @@ CONTAINS
           !-----------------------------------------------------------------------
           !     Nullify pointers 
           !-----------------------------------------------------------------------
-          !
+
           if (associated(ptrX)) then
              nullify(ptrX)
           end if
