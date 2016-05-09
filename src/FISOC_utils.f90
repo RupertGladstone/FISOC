@@ -10,7 +10,7 @@ MODULE FISOC_utils_MOD
   PUBLIC  FISOC_getStringListFromConfig, FISOC_populateFieldBundle, FISOC_ConfigDerivedAttribute, &
        FISOC_initCumulatorFB, FISOC_zeroBundle, FISOC_cumulateFB, FISOC_processCumulator, msg,    &
        FISOC_VM_MPI_Comm_dup, FISOC_FieldRegridStore, FISOC_FB2NC, FISOC_setClocks, & 
-       FISOC_destroyClocks, FISOC_ISM2OM!, FISOC_OM2ISM
+       FISOC_destroyClocks, FISOC_ISM2OM, FISOC_OM2ISM
 
   INTERFACE FISOC_populateFieldBundle
       MODULE PROCEDURE FISOC_populateFieldBundleOn2dGrid
@@ -29,6 +29,9 @@ CONTAINS
 
 
   !------------------------------------------------------------------------------
+  ! 
+  ! check whether user wants this variable (fieldname) to be passed from the ISM 
+  ! to the OM.
   LOGICAL FUNCTION FISOC_ISM2OM(fieldName,FISOC_config,rc)
 
     CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: fieldName
@@ -44,6 +47,9 @@ CONTAINS
     label = 'ISM2OM_Vars:'
     CALL FISOC_getStringListFromConfig(FISOC_config, label, ISM2OM_Vars,rc=rc)
     IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+       msg = "ISM2OM_vars not found in FISOC config file, trying to pass all available vars"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+            line=__LINE__, file=__FILE__, rc=rc)          
        FISOC_ISM2OM = .TRUE. ! pass all vars if list is not present 
        RETURN
     ELSE IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -61,6 +67,48 @@ CONTAINS
     RETURN
 
   END FUNCTION  FISOC_ISM2OM
+
+
+  !------------------------------------------------------------------------------
+  ! 
+  ! check whether user wants this variable (fieldname) to be passed from the OM 
+  ! to the ISM.
+  ! ***TODO:resolve code duplication between this and ism2omroutine
+  LOGICAL FUNCTION FISOC_OM2ISM(fieldName,FISOC_config,rc)
+
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: fieldName
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: OM2ISM_Vars(:)
+    CHARACTER(len=ESMF_MAXSTR)            :: label
+    INTEGER                               :: ii
+
+    rc = ESMF_FAILURE
+
+    label = 'OM2ISM_Vars:'
+    CALL FISOC_getStringListFromConfig(FISOC_config, label, OM2ISM_Vars,rc=rc)
+    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+       msg = "OM2ISM_vars not found in FISOC config file, trying to pass all available vars"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+            line=__LINE__, file=__FILE__, rc=rc)          
+       FISOC_OM2ISM = .TRUE. ! pass all vars if list is not present 
+       RETURN
+    ELSE IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) THEN
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    FISOC_OM2ISM = FISOC_listContains(fieldName,OM2ISM_Vars,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    rc = ESMF_SUCCESS
+
+    RETURN
+
+  END FUNCTION  FISOC_OM2ISM
 
 
 
@@ -931,7 +979,6 @@ CONTAINS
     CHARACTER(len=ESMF_MAXSTR)              :: output_dir
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, output_dir, label='output_dir:', rc=rc)
-
     IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
        output_dir = "./"
        msg = "WARNING: output directory not found, setting to current dir"
@@ -952,6 +999,9 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+       msg = "FB2NC: written netcdf file"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     ELSE
        msg = "ERROR: trying to write NetCDF output but NetCDF "// &
             "not present in this ESMF build."
@@ -971,9 +1021,10 @@ CONTAINS
   ! data before calling ESMF_FieldRegridStore and writes it back in 
   ! afterwards.
   !
-  SUBROUTINE FISOC_FieldRegridStore(InField, OutField, regridmethod, &
+  SUBROUTINE FISOC_FieldRegridStore(vm, InField, OutField, regridmethod, &
        unmappedaction, routeHandle, rc)
 
+    TYPE(ESMF_VM),INTENT(IN)                          :: vm
     TYPE(ESMF_Field),INTENT(INOUT)                    :: InField, OutField
     TYPE(ESMF_RegridMethod_Flag),INTENT(IN),OPTIONAL  :: regridmethod
     TYPE(ESMF_UnmappedAction_Flag),INTENT(IN),OPTIONAL:: unmappedaction
@@ -1043,6 +1094,8 @@ CONTAINS
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END SELECT
     
+    CALL ESMF_VMBarrier(vm, rc=rc)
+
     ! create the routehandle for regridding
     CALL ESMF_FieldRegridStore(InField, OutField, regridmethod=regridmethod, &
          unmappedaction=unmappedaction, routehandle=routeHandle, rc=rc)
