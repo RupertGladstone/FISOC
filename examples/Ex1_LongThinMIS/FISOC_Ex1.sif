@@ -10,7 +10,7 @@ $gravity = -9.81*yearinsec^2
 $GLTolerance = 1.0e-5
 $name = "longThinMIS_FISOC"
 $m = 1.0/3.0
-$dt = 1.0/365.0
+$dt = 0.2*365.0/365.0
 
 !--------------------------------------------------------
 Header
@@ -32,11 +32,11 @@ Simulation
   Simulation Type ="Transient"
   Timestepping Method = "BDF"
   BDF Order = 1
-  Timestep Intervals = 1
+  Timestep Intervals = 50000
   Timestep Sizes = Real $dt
   Steady State Min Iterations = 1
   Steady State Max Iterations = 1
-  Output Intervals = 1
+  Output Intervals = 250
   Initialize Dirichlet Conditions = Logical False
   Output File = "$name".result"
 !  Post File = $name".vtu"

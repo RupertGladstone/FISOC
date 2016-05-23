@@ -6,8 +6,10 @@ domain, rather fjord-like.
 To make the mesh:
 ElmerGrid 1 2 FISOC_Ex1.grd
 
-To partition the mesh for parallel runs:
-ElmerGrid 2 2 FISOC_Ex1 -partition 4 1 0 2
+To partition the mesh for parallel runs (4 partitions):
+ElmerGrid 2 2 FISOC_Ex1 -partition 1 4 0 2
+or (30 partitions):
+ElmerGrid 2 2 FISOC_Ex1 -partition 2 15 0 2
 
 
 To compile the geometry functions:
