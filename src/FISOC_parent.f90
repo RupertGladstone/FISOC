@@ -188,6 +188,9 @@ CONTAINS
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
+    msg = "FISOC parent calling OM init phase 1"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_GridCompInitialize(FISOC_OM, &
          importState=OM_ImpSt, exportState=OM_ExpSt, &
          clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
@@ -198,6 +201,9 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    msg = "FISOC parent calling ISM init phase 1"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_GridCompInitialize(FISOC_ISM, &
          importState=ISM_ImpSt, exportState=ISM_ExpSt, &
          clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
@@ -213,6 +219,9 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     
+    msg = "FISOC parent calling coupler init phase 1"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_cplCompInitialize(FISOC_coupler, &
          importState=ISM_ExpSt, exportState=OM_ImpSt, &
          clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
@@ -223,6 +232,9 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    msg = "FISOC parent calling OM init phase 2"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_GridCompInitialize(FISOC_OM, &
          importState=OM_ImpSt, exportState=OM_ExpSt, &
          clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
@@ -237,7 +249,10 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-    
+
+    msg = "FISOC parent calling coupler init phase 2"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_cplCompInitialize(FISOC_coupler, &
          importState=OM_ExpSt, exportState=ISM_ImpSt, &
          clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
@@ -248,6 +263,9 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    msg = "FISOC parent calling ISM init phase 2"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_GridCompInitialize(FISOC_ISM, &
          importState=ISM_ImpSt, exportState=ISM_ExpSt, &
          clock=FISOC_clock, phase=2, rc=rc, userRc=urc)

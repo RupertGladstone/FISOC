@@ -49,7 +49,11 @@ MODULE FISOC_ISM_Wrapper
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l0           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l1           = 'Coordinate 3'
 
-  INTEGER  :: EI_numNodesAtBed
+  INTEGER  :: EI_numNodesAtBed ! how many nodes on the curret PET at the lower surface of the mesh
+
+  ! global node numbering reference (Elmer uses local node numbering).  We must add this number 
+  ! to the node id whenever converting from Elmer node ids to ESMF node ids.  Same for element id.
+  INTEGER  :: EI_firstNodeThisPET, EI_firstElemThisPET
 
 CONTAINS
 
@@ -113,6 +117,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    ! get hold of list of required variables from Elmer and convert them here from elmer to esmf type.
+    CALL getFieldDataFromISM(ISM_ExpFB,FISOC_config,vm,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     rc = ESMF_SUCCESS
 
     RETURN
@@ -127,16 +137,48 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,vm,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,ISM_ExpFB,FISOC_config,vm,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ImpFB
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ImpFB, ISM_ExpFB
     TYPE(ESMF_VM),INTENT(IN)              :: vm
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
-    LOGICAL                               :: verbose_coupling
+    LOGICAL                      :: verbose_coupling
+    INTEGER                      :: localpet
 
     rc = ESMF_FAILURE
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL sendFieldDataToISM(ISM_ImpFB,FISOC_config,vm,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       PRINT*,""
+       PRINT*,"******************************************************************************"
+       PRINT*,"**********      OM wrapper.  Init phase 2 method.        *********************"
+       PRINT*,"******************************************************************************"
+       PRINT*,""
+       PRINT*,"Here we have access to the initialised ISM fields, just in case the OM needs "
+       PRINT*,"to know about these in order to complete its initialisation."
+       PRINT*,""
+    END IF
+
+    CALL getFieldDataFromISM(ISM_ExpFB,FISOC_config,vm,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     rc = ESMF_SUCCESS
     
@@ -175,12 +217,13 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    PRINT*,""
-    PRINT*,"******************************************************************************"
-    PRINT*,"************        ISM wrapper.  Run method.           **********************"
-    PRINT*,"******************************************************************************"
-    PRINT*,""
-
+    IF (verbose_coupling) THEN
+       PRINT*,""
+       PRINT*,"******************************************************************************"
+       PRINT*,"************        ISM wrapper.  Run method.           **********************"
+       PRINT*,"******************************************************************************"
+       PRINT*,""
+    END IF
 
     ! get hold of the elmer variables for receiving inputs, and convert them here from esmf to elmer type.
     CALL sendFieldDataToISM(ISM_ImpFB,FISOC_config,vm,rc=rc)
@@ -231,139 +274,75 @@ CONTAINS
   END SUBROUTINE FISOC_ISM_Wrapper_Finalize
 
 
+
   !------------------------------------------------------------------------------
   !
-  ! Convert an Elmer mesh to ESMF structures 
+  ! Elmer/Ice partitions have local node ids (i.e. node ids start at 1 for each
+  ! partition).  But ESMF needs global node ids. So here we calculate a starting 
+  ! id for each partition.
   !
-  ! Note: this subroutine expects to recieve a 2D Elmer mesh containing triangles 
-  ! or and quads.
+  ! Same for elements.
   !
-  SUBROUTINE Elmer2ESMF_mesh(Elmer_mesh,ESMF_ElmerMesh,vm,rc)
+  ! In this function an "item" refers to a node or element
+  ! 
+  INTEGER FUNCTION firstItemThisPET(numItems,vm)
 
-    TYPE(ESMF_mesh),INTENT(INOUT)    :: ESMF_ElmerMesh
-    TYPE(Mesh_t),INTENT(IN)          :: Elmer_Mesh
-    TYPE(ESMF_VM),INTENT(IN)         :: vm
-    INTEGER,INTENT(OUT),OPTIONAL     :: rc
+    TYPE(ESMF_VM),INTENT(IN)   :: vm
+    INTEGER, INTENT(IN)        :: numItems
 
-    INTEGER                          :: ii, nodeIndex
-    CHARACTER(len=ESMF_MAXSTR)       :: subroutineName = "Elmer2ESMF_mesh"
-    INTEGER,ALLOCATABLE              :: ESMF_elementTypeList(:),elementIDlist(:)
+    INTEGER                    :: localPET, PETcount, ii, rc
+    INTEGER, ALLOCATABLE       :: firstItemID(:)
+    INTEGER, ALLOCATABLE       :: numItemsAllPETS(:), numItemsArr(:)
 
-    ! ESMF mesh vars
-    INTEGER,ALLOCATABLE              :: nodeOwners(:)
-    INTEGER,ALLOCATABLE              :: elemConn(:), nodeIds(:)
-    REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
-    INTEGER                          :: numNodes, numQuadElems, numTriElems, numTotElems
-    INTEGER                          :: localPet, petCount
 
-    rc = ESMF_FAILURE
-
-    msg = "Elmer to ESMF mesh format conversion"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-         line=__LINE__, file=__FILE__)
-
-    CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
+    CALL ESMF_VMGet(vm, localPet=localPET, petCount=PETcount, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
          line=__LINE__, file=__FILE__)) RETURN
 
-    ! some basic sanity checks
-    IF (Elmer_mesh % MeshDim.NE.2) THEN
-       msg = "Elmer mesh dimension not equal to 2"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
-    IF (.NOT.ASSOCIATED(Elmer_mesh % Elements)) THEN
-       msg = "Elmer mesh elements not associated"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
-    IF (.NOT.ASSOCIATED(Elmer_mesh % Nodes)) THEN
-       msg = "Elmer mesh nodes not associated"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
-    IF (SIZE(Elmer_mesh % Elements).NE.Elmer_mesh % NumberOfBulkElements + Elmer_mesh % NumberOfBoundaryElements) THEN
-       msg = "Elmer mesh number of elements inconsistency"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
-    IF (SIZE(Elmer_mesh % Nodes % x) .NE. Elmer_mesh % Nodes % NumberOfNodes) THEN
-       msg = "Elmer mesh number of nodes inconsistency"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
+    ALLOCATE(firstItemID(PETcount))
+    ALLOCATE(numItemsAllPETS(PETcount))
+    ALLOCATE(numItemsArr(1))
+    numItemsArr = numItems
 
-    ! count the numbers of triangles and quadrilaterals in the Elmer mesh, as these are the element types 
-    ! we intend to use. Note: this code could be made more efficient if we find it takes up much time. 
-    numTriElems = numElementsByType(Elmer_mesh,(/ELMER_ELEMENT_TRIANGLE_LINEAR,ELMER_ELEMENT_TRIANGLE_QUADRAT,&
-         ELMER_ELEMENT_TRIANGLE_CUBIC/))
-
-    numQuadElems = numElementsByType(Elmer_mesh,(/ELMER_ELEMENT_QUADRIL_BILINEAR,ELMER_ELEMENT_QUADRIL_QUADRAT,&
-         ELMER_ELEMENT_QUADRIL_QUADRAT2,ELMER_ELEMENT_QUADRIL_CUBIC/))
-
-    ALLOCATE(ESMF_elementTypeList(numQuadElems+numTriElems))
-    ALLOCATE(elementIDlist(numQuadElems+numTriElems))
-    ALLOCATE(elemConn(4*numQuadElems+3*numTriElems))
-
-
-    numTotElems = numElementsByType(Elmer_mesh,(/ELMER_ELEMENT_QUADRIL_BILINEAR,ELMER_ELEMENT_QUADRIL_QUADRAT,&
-         ELMER_ELEMENT_QUADRIL_QUADRAT2,ELMER_ELEMENT_QUADRIL_CUBIC,ELMER_ELEMENT_TRIANGLE_LINEAR,&
-         ELMER_ELEMENT_TRIANGLE_QUADRAT,ELMER_ELEMENT_TRIANGLE_CUBIC/), &
-         ESMF_elementTypeList=ESMF_elementTypeList,elementIDlist=elementIDlist, &
-         elemConn = elemConn)
-
-    IF (numTotElems .NE. numQuadElems+numTriElems) THEN
-       msg = "Elmer mesh total number of viable elements inconsistency"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
-
-    !for now we assume that all nodes are used.  may not always be true.
-    numNodes =  Elmer_mesh % Nodes % NumberOfNodes 
-    EI_numNodesAtBed = numNodes
-    ALLOCATE(nodeIds(numNodes))
-    ALLOCATE(nodeCoords(numNodes*Elmer_mesh % MeshDim))
-    ALLOCATE(nodeOwners(numNodes))
-
-    nodeOwners=localPet
-
-    nodeIds = (/(ii, ii=1, numNodes, 1)/)
-
-    ! loop over nodes to get coords
-    DO ii = 1,numNodes
-       nodeIndex = (ii-1)*Elmer_mesh%MeshDim+1
-       nodeCoords(nodeIndex) = Elmer_mesh % Nodes % x(ii)
-       nodeIndex = (ii-1)*Elmer_mesh%MeshDim+2
-       nodeCoords(nodeIndex) = Elmer_mesh % Nodes % y(ii)
-    END DO
-
-    ! Create Mesh structure in 1 step
-    ESMF_ElmerMesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
-         nodeIds=nodeIds, nodeCoords=nodeCoords, &
-         nodeOwners=nodeOwners, elementIds=elementIDlist,&
-         elementTypes=ESMF_elementTypeList, elementConn=elemConn, &
-         rc=rc)
+    CALL ESMF_VMBarrier(vm, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    DEALLOCATE(ESMF_elementTypeList)
-    DEALLOCATE(elementIDlist)
-    DEALLOCATE(elemConn)
-    DEALLOCATE(nodeIds)
-    DEALLOCATE(nodeCoords)
-    DEALLOCATE(nodeOwners)
+    ! gather the number of items for each PET to PET zero
+    CALL ESMF_VMGather(vm, sendData=numItemsArr, recvData=numItemsAllPETS, count=1, rootPet=0, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    rc = ESMF_SUCCESS
- 
-  END SUBROUTINE Elmer2ESMF_mesh
+    IF (localPET.EQ.0) THEN
+       firstItemID(1) = 1 ! first item id on first PET 
+       
+       ! the starting item for each PET should be the total number of items 
+       ! on all previous items plus 1.
+       DO ii = 2, PETcount
+          firstItemID(ii) = firstItemID(ii-1) + numItemsAllPETS(ii-1)
+       END DO
 
+    END IF
+       
+    CALL ESMF_VMBroadcast(vm, bcstData=firstItemID, count=PETcount, rootPet=0, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_VMBarrier(vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    firstItemThisPET = firstItemID(localPET+1)
+
+    DEALLOCATE(firstItemID)
+    DEALLOCATE(numItemsAllPETS)
+    DEALLOCATE(numItemsArr)
+
+  END FUNCTION firstItemThisPET
 
   !------------------------------------------------------------------------------
   INTEGER FUNCTION numElementsByType(Elmer_mesh,typeList,ESMF_elementTypeList,elementIDlist,elemConn)
@@ -387,6 +366,8 @@ CONTAINS
 !             IF (PRESENT(maxNodes)) THEN
 !                maxNodes = MAX(getNumNodes(Elmer_mesh % Elements(ii) % TYPE % ElementCode),maxNodes)
 !             END IF
+
+             ! convert element type codes from Elmer to ESMF
              IF (PRESENT(ESMF_elementTypeList)) THEN
                 ESMF_elementTypeList(ii) = get_ESMF_elementType(Elmer_mesh % Elements(ii) % TYPE % ElementCode)
              END IF
@@ -500,7 +481,6 @@ CONTAINS
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
     CHARACTER(len=ESMF_MAXSTR)            :: fieldName
     REAL(ESMF_KIND_R8),POINTER            :: ptr(:)
-    INTEGER                               :: IstrR, IendR, JstrR, JendR ! tile start and end coords
     INTEGER                               :: ii, jj, nn, numNodes
     INTEGER,ALLOCATABLE                   :: nodeIds(:)
     INTEGER,POINTER                       :: EI_fieldPerm(:)
@@ -558,6 +538,7 @@ CONTAINS
              EI_fieldVals => EI_field % Values
              EI_fieldPerm => EI_field % Perm
              DO ii = 1,numNodes
+!                EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(EI_firstNodeThisPET+ii-1) * FISOC_secPerYear
                 EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(ii) * FISOC_secPerYear
              END DO
 
@@ -567,6 +548,7 @@ CONTAINS
              EI_fieldVals => EI_field % Values
              EI_fieldPerm => EI_field % Perm
              DO ii = 1,numNodes
+!                EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(EI_firstNodeThisPET+ii-1)
                 EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(ii)
              END DO
 
@@ -613,7 +595,6 @@ CONTAINS
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
     CHARACTER(len=ESMF_MAXSTR)            :: fieldName
     REAL(ESMF_KIND_R8),POINTER            :: ptr(:)
-    INTEGER                               :: IstrR, IendR, JstrR, JendR ! tile start and end coords
     INTEGER                               :: ii, jj, nn, numNodes
     INTEGER,ALLOCATABLE                   :: nodeIds(:)
     INTEGER,POINTER                       :: EI_fieldPerm(:)
@@ -653,10 +634,13 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+
        CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
 
        ! access the Elmer/Ice version of the current field
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
@@ -665,8 +649,8 @@ CONTAINS
           EI_field => VariableGet( CurrentModel % Mesh % Variables, &
                EIname_z_l0, UnFoundFatal=.TRUE.)
           EI_fieldVals => EI_field % Values
-
           DO ii = 1,numNodes
+!              ptr(EI_firstNodeThisPET+ii-1) = EI_fieldVals(nodeIds(ii))
               ptr(ii) = EI_fieldVals(nodeIds(ii))
           END DO
           
@@ -700,5 +684,151 @@ CONTAINS
     
   END SUBROUTINE getFieldDataFromISM
   
+  !------------------------------------------------------------------------------
+  !
+  ! Convert an Elmer mesh to ESMF structures 
+  !
+  ! Note: this subroutine expects to recieve a 2D Elmer mesh containing triangles 
+  ! or and quads.
+  !
+  SUBROUTINE Elmer2ESMF_mesh(Elmer_mesh,ESMF_ElmerMesh,vm,rc)
+
+    TYPE(ESMF_mesh),INTENT(INOUT)    :: ESMF_ElmerMesh
+    TYPE(Mesh_t),INTENT(IN)          :: Elmer_Mesh
+    TYPE(ESMF_VM),INTENT(IN)         :: vm
+    INTEGER,INTENT(OUT),OPTIONAL     :: rc
+
+    INTEGER                          :: ii, nodeIndex
+    CHARACTER(len=ESMF_MAXSTR)       :: subroutineName = "Elmer2ESMF_mesh"
+    INTEGER,ALLOCATABLE              :: ESMF_elementTypeList(:),elementIDlist(:),elementIDlist_global(:)
+    INTEGER,ALLOCATABLE              :: nodeOwners(:)
+    INTEGER,ALLOCATABLE              :: elemConn(:), nodeIds(:), nodeIds_global(:)
+    REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
+    INTEGER                          :: numNodes, numQuadElems, numTriElems, numTotElems
+    INTEGER                          :: localPet, petCount, numElems
+
+    rc = ESMF_FAILURE
+
+    msg = "Elmer to ESMF mesh format conversion"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+         line=__LINE__, file=__FILE__)
+
+    CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) RETURN
+
+    ! some basic sanity checks
+    IF (Elmer_mesh % MeshDim.NE.2) THEN
+       msg = "Elmer mesh dimension not equal to 2"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    IF (.NOT.ASSOCIATED(Elmer_mesh % Elements)) THEN
+       msg = "Elmer mesh elements not associated"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    IF (.NOT.ASSOCIATED(Elmer_mesh % Nodes)) THEN
+       msg = "Elmer mesh nodes not associated"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    IF (SIZE(Elmer_mesh % Elements).NE.Elmer_mesh % NumberOfBulkElements + Elmer_mesh % NumberOfBoundaryElements) THEN
+       msg = "Elmer mesh number of elements inconsistency"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    IF (SIZE(Elmer_mesh % Nodes % x) .NE. Elmer_mesh % Nodes % NumberOfNodes) THEN
+       msg = "Elmer mesh number of nodes inconsistency"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+
+    ! count the numbers of triangles and quadrilaterals in the Elmer mesh, as these are the element types 
+    ! we intend to use. Note: this code could be made more efficient if we find it takes up much time. 
+    numTriElems = numElementsByType(Elmer_mesh,(/ELMER_ELEMENT_TRIANGLE_LINEAR,ELMER_ELEMENT_TRIANGLE_QUADRAT,&
+         ELMER_ELEMENT_TRIANGLE_CUBIC/))
+
+    numQuadElems = numElementsByType(Elmer_mesh,(/ELMER_ELEMENT_QUADRIL_BILINEAR,ELMER_ELEMENT_QUADRIL_QUADRAT,&
+         ELMER_ELEMENT_QUADRIL_QUADRAT2,ELMER_ELEMENT_QUADRIL_CUBIC/))
+
+
+    ! Use number of elements and ndoes on this PET, and some collective functions, to assign  
+    ! global element and node identifiers.
+    ! For now we assume that all nodes are used.  May not always be true.
+    numNodes            = Elmer_mesh % Nodes % NumberOfNodes 
+    numElems            = numQuadElems+numTriElems
+    EI_numNodesAtBed    = numNodes
+    EI_firstNodeThisPET = firstItemThisPET(numNodes,vm)
+    EI_firstElemThisPET = firstItemThisPET(numElems,vm)
+
+    ALLOCATE(nodeIds(numNodes))
+    ALLOCATE(nodeIds_global(numNodes))
+    ALLOCATE(nodeCoords(numNodes*Elmer_mesh % MeshDim))
+    ALLOCATE(nodeOwners(numNodes))
+
+    ALLOCATE(ESMF_elementTypeList(numElems))
+    ALLOCATE(elementIDlist(numElems))
+    ALLOCATE(elementIDlist_global(numElems))
+
+    ALLOCATE(elemConn(4*numQuadElems+3*numTriElems))
+
+    nodeOwners=localPet
+
+    numTotElems = numElementsByType(Elmer_mesh,(/ELMER_ELEMENT_QUADRIL_BILINEAR,ELMER_ELEMENT_QUADRIL_QUADRAT,&
+         ELMER_ELEMENT_QUADRIL_QUADRAT2,ELMER_ELEMENT_QUADRIL_CUBIC,ELMER_ELEMENT_TRIANGLE_LINEAR,&
+         ELMER_ELEMENT_TRIANGLE_QUADRAT,ELMER_ELEMENT_TRIANGLE_CUBIC/), &
+         ESMF_elementTypeList=ESMF_elementTypeList,elementIDlist=elementIDlist, &
+         elemConn = elemConn)
+
+    IF (numTotElems .NE. numQuadElems+numTriElems) THEN
+       msg = "Elmer mesh total number of viable elements inconsistency"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    nodeIds        = (/(ii, ii=1, numNodes, 1)/)
+    nodeIds_global = (/(ii, ii=EI_firstNodeThisPET, EI_firstNodeThisPET+numNodes-1, 1)/)
+
+
+    ! loop over nodes to get coords
+    DO ii = 1,numNodes
+       nodeIndex = (ii-1)*Elmer_mesh%MeshDim+1
+       nodeCoords(nodeIndex) = Elmer_mesh % Nodes % x(ii)
+       nodeIndex = (ii-1)*Elmer_mesh%MeshDim+2
+       nodeCoords(nodeIndex) = Elmer_mesh % Nodes % y(ii)
+    END DO
+
+    ! Create Mesh structure in 1 step
+    ESMF_ElmerMesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
+         nodeIds=nodeIds_global, nodeCoords=nodeCoords, &
+         nodeOwners=nodeOwners, elementIds=elementIDlist,&
+         elementTypes=ESMF_elementTypeList, elementConn=elemConn, &
+         rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    DEALLOCATE(ESMF_elementTypeList)
+    DEALLOCATE(elementIDlist)
+    DEALLOCATE(elementIDlist_global)
+    DEALLOCATE(elemConn)
+    DEALLOCATE(nodeIds)
+    DEALLOCATE(nodeIds_global)
+    DEALLOCATE(nodeCoords)
+    DEALLOCATE(nodeOwners)
+
+    rc = ESMF_SUCCESS
+ 
+  END SUBROUTINE Elmer2ESMF_mesh
+
+
 END MODULE FISOC_ISM_Wrapper
 

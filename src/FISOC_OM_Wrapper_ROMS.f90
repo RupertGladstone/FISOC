@@ -62,7 +62,7 @@ CONTAINS
     INTEGER                               :: mpic ! mpi comm, duplicate from the OM VM
     CHARACTER(len=ESMF_MAXSTR)            :: label
     TYPE(ESMF_staggerLoc),ALLOCATABLE     :: OM_ReqVars_stagger(:)
-    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: OM_ReqVarList(:),FISOC_OM_ReqVarList(:)
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: OM_ReqVarList(:)
     CHARACTER(len=ESMF_MAXSTR)            :: OM_configFile, OM_stdoutFile
     LOGICAL                               :: verbose_coupling, first
 
@@ -106,15 +106,15 @@ CONTAINS
     
     ! extract a list of required ocean variables from the configuration object
     label = 'FISOC_OM_ReqVars:' ! the FISOC names for the vars
-    CALL FISOC_getStringListFromConfig(FISOC_config, label, FISOC_OM_ReqVarList,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    label = 'OM_ReqVars:' ! the OM names for the vars
     CALL FISOC_getStringListFromConfig(FISOC_config, label, OM_ReqVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    label = 'OM_ReqVars:' ! the OM names for the vars
+!    CALL FISOC_getStringListFromConfig(FISOC_config, label, OM_ReqVarList,rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     label = 'OM_ReqVars_stagger:' ! the OM names for stagger locations corresponding to the vars
     ALLOCATE(OM_ReqVars_stagger(SIZE(OM_ReqVarList)))
     CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_ReqVars_stagger, label, rc=rc)
@@ -128,7 +128,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL FISOC_populateFieldBundle(FISOC_OM_ReqVarList,OM_ExpFB,OM_grid,init_value=FISOC_missingData,fieldStagger=OM_ReqVars_stagger,rc=rc)
+    CALL FISOC_populateFieldBundle(OM_ReqVarList,OM_ExpFB,OM_grid,init_value=FISOC_missingData,fieldStagger=OM_ReqVars_stagger,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -158,13 +158,8 @@ CONTAINS
 
     LOGICAL                      :: verbose_coupling
     INTEGER                      :: localpet
-    TYPE(ESMF_field)             :: ISM_temperature_l0
-    REAL(ESMF_KIND_R8),POINTER   :: ISM_temperature_l0_ptr(:,:)
-    CHARACTER(len=ESMF_MAXSTR)   :: nameList(10)
 
     rc = ESMF_FAILURE
-
-    NULLIFY(ISM_temperature_l0_ptr)
 
     CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -172,6 +167,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -187,7 +187,11 @@ CONTAINS
        PRINT*,""
     END IF
 
-    
+    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
   END SUBROUTINE FISOC_OM_Wrapper_Init_Phase2
   
   

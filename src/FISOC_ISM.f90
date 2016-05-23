@@ -147,7 +147,7 @@ CONTAINS
     INTEGER, INTENT(OUT)   :: rc
 
     TYPE(ESMF_config)      :: FISOC_config
-    TYPE(ESMF_fieldbundle) :: ISM_ImpFB
+    TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
     TYPE(ESMF_VM)          :: vm
 
     rc = ESMF_FAILURE
@@ -157,17 +157,17 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
     CALL ESMF_StateGet(ISM_ImpSt, "ISM import fields", ISM_ImpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
-    CALL FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,vm,rc=rc)
+    CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+    CALL FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,ISM_ExpFB,FISOC_config,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
