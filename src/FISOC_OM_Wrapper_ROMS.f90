@@ -156,7 +156,7 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
     TYPE(ESMF_VM),INTENT(IN)              :: vm
 
-    LOGICAL                      :: verbose_coupling
+    LOGICAL                      :: verbose_coupling, OM_initCavityFromISM
     INTEGER                      :: localpet
 
     rc = ESMF_FAILURE
@@ -167,6 +167,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_initCavityFromISM, label='OM_initCavityFromISM:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -187,9 +192,16 @@ CONTAINS
        PRINT*,""
     END IF
 
+    IF (OM_initCavityFromISM) THEN
+       CALL CavityReset(OM_ImpFB,localPet,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) & 
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
     CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
+         line=__LINE__, file=__FILE__)) & 
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   END SUBROUTINE FISOC_OM_Wrapper_Init_Phase2
@@ -339,6 +351,55 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
+  ! Use the cavity from the ISM first stage initialisation to set the OM cavity
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE CavityReset(OM_ImpFB,localPet,rc)
+
+    USE mod_param, ONLY : BOUNDS, Ngrids
+    USE mod_grid , ONLY : GRID
+
+    INTEGER,INTENT(IN)                    :: localPet
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB 
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+
+    TYPE(ESMF_FIELD)                      :: ISM_z_l0
+    REAL(ESMF_KIND_R8),POINTER            :: ptr(:,:)
+    INTEGER                               :: JstrT, IstrT, ii, jj
+
+    rc = ESMF_FAILURE
+
+    IF (Ngrids.GT.1) THEN
+       msg = "ERROR: ROMS has nested grids, FISOC cannot yet handle this"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldname='ISM_z_l0', field=ISM_z_l0, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldGet(ISM_z_l0, farrayPtr=ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    JstrT = BOUNDS(1) % JstrT (localPet)     
+    IstrT = BOUNDS(1) % IstrT (localPet)     
+
+    DO ii = 1,IstrT
+       DO jj = 1, JstrT
+          GRID(1) % zice (ii, jj) = ptr (ii, jj)
+       END DO
+    END DO
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE CavityReset
+
+
+  !--------------------------------------------------------------------------------------
   ! update the fields in the ocean export field bundle from the OM
   !--------------------------------------------------------------------------------------
   SUBROUTINE getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc)
@@ -464,8 +525,6 @@ CONTAINS
     REAL(ESMF_KIND_R8),POINTER            :: ptr(:,:)
     INTEGER                               :: IstrR, IendR, JstrR, JendR ! tile start and end coords
     INTEGER                               :: ii, jj, nn
-
-
 
     rc = ESMF_FAILURE
 
