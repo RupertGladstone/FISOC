@@ -14,9 +14,10 @@ ElmerGrid 2 2 FISOC_Ex1 -partition 2 15 0 2
 
 An alternative mesh (unstructured triangles instead of regular quads) can be made using 
 the .geo file and gmsh (edit lc in the geo file for element size):
+(Note: on Taito first do module load gmsh)
+module load gmsh
 gmsh FISOC_Ex1.geo -1 -2
 ElmerGrid 14 2 FISOC_Ex1.msh 
-
 
 To compile the geometry functions:
 elmerf90 FISOC_Elmer_geometries.f90 -o FISOC_Elmer_geometries.so
@@ -45,7 +46,14 @@ module load elmer-env
 
 a batch script is needed, for example:
 #!/bin/bash -l
-#SBATCH -J FISOC_Ex1                                                                                                                                                                                                                         #SBATCH -o output.txt                                                                                                                                                                                                                        #SBATCH -e errors.txt                                                                                                                                                                                                                        #SBATCH --mem-per-cpu=1000                                                                                                                                                                                                                   #SBATCH -t 72:00:00                                                                                                                                                                                                                          #SBATCH -n 16                                                                                                                                                                                                                                #SBATCH -p parallel                                                                                                                                                                                                                          module load elmer-env
+#SBATCH -J FISOC_Ex1
+#SBATCH -o output.txt
+#SBATCH -e errors.txt
+#SBATCH --mem-per-cpu=1000
+#SBATCH -t 72:00:00
+#SBATCH -n 16
+#SBATCH -p parallel
+module load elmer-env
 srun ElmerSolver_mpi
 
 batch script to be submitted with sbatch.
