@@ -33,6 +33,19 @@ rm -rf VTUoutputs/*vtu
 
 
 
+*** running on Taito (or CSC machines) ***
+before using elmergrid or elmerf90:
+module load elmer-env
+
+a batch script is needed, for example:
+#!/bin/bash -l
+#SBATCH -J FISOC_Ex1                                                                                                                                                                                                                         #SBATCH -o output.txt                                                                                                                                                                                                                        #SBATCH -e errors.txt                                                                                                                                                                                                                        #SBATCH --mem-per-cpu=1000                                                                                                                                                                                                                   #SBATCH -t 72:00:00                                                                                                                                                                                                                          #SBATCH -n 16                                                                                                                                                                                                                                #SBATCH -p parallel                                                                                                                                                                                                                          module load elmer-env
+srun ElmerSolver_mpi
+
+batch script to be submitted with sbatch.
+
+
+
 *** To run through FISOC ***
 
 TODO: check any useful information here is represented also in the FISOC manual.

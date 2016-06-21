@@ -8,14 +8,30 @@ $A1 = 2.89165e-13*yearinsec*1.0e18
 $A2 = 2.42736e-02*yearinsec*1.0e18
 $gravity = -9.81*yearinsec^2
 $GLTolerance = 1.0e-5
-$name = "longThinMIS_FISOC"
+$name = "longThinMIS_FISOC_cav"
 $m = 1.0/3.0
 $dt = 0.2*365.0/365.0
+$BWT = 1000.0            ! a guide thickness for the back wall
+
 
 !--------------------------------------------------------
 Header
-  Mesh DB "/home/elmeruser/Source/FISOC/examples/Ex1_LongThinMIS" "FISOC_Ex1"
+!  Mesh DB "/home/elmeruser/Source/FISOC/examples/Ex1_LongThinMIS" "FISOC_Ex1"
+  Mesh DB "/homeappl/home/gladston/Source/FISOC/examples/Ex1_LongThinMIS" "FISOC_Ex1"
 End
+
+
+! Set a backwall pressure condition to encourage a thickness 
+! close to the hard coded value BWT.
+$function back_pressure(z,dpth) import BWT, rhoi, gravity { \
+  _back_pressure = 0.0 ;\
+  if (z < BWT) { \
+     _back_pressure = rhoi * gravity * (BWT - z); \
+  } \
+  if ((BWT-z) > dpth) { \
+     _back_pressure = rhoi * gravity * dpth; \
+  } \
+}
 
 !--------------------------------------------------------
 Constants
@@ -36,7 +52,7 @@ Simulation
   Timestep Sizes = Real $dt
   Steady State Min Iterations = 1
   Steady State Max Iterations = 1
-  Output Intervals = 250
+  Output Intervals = 50
   Initialize Dirichlet Conditions = Logical False
   Output File = "$name".result"
 !  Post File = $name".vtu"
@@ -286,9 +302,9 @@ Solver 9
   !-----------------------------------------------------------------------
   Flow Solver Name = String "Flow Solution"
   ! no default value anymore for "Stress Variable Name"
-  Stress Variable Name = String "Sigma"
+  Stress Variable Name = String "Stress"
   !-----------------------------------------------------------------------
-  Exported Variable 1 = "Sigma"  ! [Sxx, Syy, Szz, Sxy] in 2D
+  Exported Variable 1 = "Stress" ! [Sxx, Syy, Szz, Sxy] in 2D
                                  ! [Sxx, Syy, Szz, Sxy, Syz, Szx] in 3D
   Exported Variable 1 DOFs = 6   ! 4 in 2D, 6 in 3D
 
@@ -406,7 +422,8 @@ Solver 16
   Save Geometry Ids = Logical True
   Output File Name = File $name"."
   Output Format = String "vtu"
-  Output Directory = File "/home/elmeruser/Source/FISOC/examples/Ex1_LongThinMIS/VTUoutputs"
+  Output Directory = File "VTUoutputs"
+!  Output Directory = File "/home/elmeruser/Source/FISOC/examples/Ex1_LongThinMIS/VTUoutputs"
   Vtu Format = Logical True
 End
 
@@ -440,8 +457,8 @@ Boundary Condition 1
   Normal-Tangential Velocity Rotate = Logical False
 !  Velocity 1 = Real 0.0
   Slip Coefficient 1 = Real 10.0
-  Slip Coefficient 2 = Real 0.00002
-  Slip Coefficient 3 = Real 0.00002
+  Slip Coefficient 2 = Real 0.000025
+  Slip Coefficient 3 = Real 0.000025
 
   External Pressure = Variable depth
     Real MATC "1.0 * rhoi * gravity * tx"
@@ -455,8 +472,8 @@ Boundary Condition 2
   Normal-Tangential Velocity Rotate = Logical False
 !  Velocity 1 = Real 0.0
   Slip Coefficient 1 = Real 10.0
-  Slip Coefficient 2 = Real 0.00002
-  Slip Coefficient 3 = Real 0.00002
+  Slip Coefficient 2 = Real 0.000025
+  Slip Coefficient 3 = Real 0.000025
 
   External Pressure = Variable depth
     Real MATC "1.0 * rhoi * gravity * tx"
@@ -467,13 +484,18 @@ Boundary Condition 3
   Target Boundaries(1)  = 1
   Normal-Tangential Velocity = Logical True
   Normal-Tangential Velocity Rotate = Logical False
-  Slip Coefficient 1 = Real 0.2
-  Slip Coefficient 2 = Real 0.000001
-  Slip Coefficient 3 = Real 0.000001
+!  Slip Coefficient 1 = Real 0.0001
+!  Slip Coefficient 2 = Real 0.000001
+!  Slip Coefficient 3 = Real 0.000001
 !  Velocity 1 = Real 0.0
-  External Pressure = Variable depth
-    Real MATC "1.0 * rhoi * gravity * tx"
+  External Pressure = Variable Coordinate 3, Depth
+    Real MATC "back_pressure(tx(0),tx(1))"
+!  External Pressure = Variable depth
+!    Real MATC "1.0 * rhoi * gravity * tx"
 End
+
+
+
 
 Boundary Condition 4
   Name = "calving_front"
@@ -515,14 +537,24 @@ Boundary Condition 5
 !  Weertman Exponent = Real 1.0
 !  Weertman Linear Velocity = Real 1.0
 
-  Sliding Law = String Budd
-  Budd Friction Coefficient = Real $0.02/1000.0
-  Budd Velocity Exponent = Real $m
-  Budd Zab Exponent = Real 1.0
-  Budd Linear Velocity = Real 0.1
-  Budd Ocean Density = Real $rhow
-  Budd Gravity = Real $gravity
-  Budd Floatation = Logical True
+  Flow Force BC = Logical True
+  
+  !! Parameters needed for the Coulomb Friction Law
+  Sliding Law = String Coulomb
+  Friction Law Sliding Coefficient = Real 10e5       ! 4.1613e5  
+  Friction Law Post-Peak Exponent  = Real 1.0        !(q=1)
+  Friction Law Maximum Value = Real 0.1              !(C=1)
+  Friction Law PowerLaw Exponent = Real 3.0          !(m = n = 3 Glen's law) 
+  Friction Law Linear Velocity = Real 0.01    
+
+!  Sliding Law = String Budd
+!  Budd Friction Coefficient = Real $0.02/1000.0
+!  Budd Velocity Exponent = Real $m
+!  Budd Zab Exponent = Real 1.0
+!  Budd Linear Velocity = Real 0.1
+!  Budd Ocean Density = Real $rhow
+!  Budd Gravity = Real $gravity
+!  Budd Floatation = Logical False
 
   External Pressure = Variable Coordinate 3
     Real Procedure "ElmerIceUSF" "SeaPressure"
@@ -542,12 +574,6 @@ Boundary Condition 6
   Body Id = 3
   Depth = Real 0.0
 End
-
-!how many nodes on side boundary? how many nodes on bottom boundary?  then work out which boundary the overlap nodes are on.  Then change if need be.  We want the overlap nodes on the bottom boundary I think.
-
-!chekc order of solvers for MIS on wiki
-
-!tolerance for grounded mask?  can we get lift off if we reduce it?
 
 !What does this do?
 !  Normal-Tangential Velocity Rotate = Logical False
