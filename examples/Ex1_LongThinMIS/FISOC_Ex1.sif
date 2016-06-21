@@ -275,7 +275,8 @@ Solver 8
   Equation = "Navier-Stokes"
   Exported Variable 1 = Flow Solution Loads[Stress Vector:3 CEQ Residual:1]
   Calculate Loads = Logical True
-  Stabilization Method = String Bubbles
+!  Stabilization Method = String Bubbles
+  Stabilization Method = String Stabilized
   Flow Model = Stokes
   Linear System Solver = Direct
 !  Linear System Direct Method = umfpack
@@ -338,7 +339,8 @@ Solver 10
   Nonlinear System Min Iterations = 2
   Nonlinear System Convergence Tolerance = 1.0e-06
   Steady State Convergence Tolerance = 1.0e-4
-  Stabilization Method = Bubbles
+!  Stabilization Method = Bubbles
+  Stabilization Method = Stabilized
   Flow Solution Name = String "Flow Solution"
   Use Accumulation = Logical True
 !  Normal Flux = Logical False
@@ -365,7 +367,8 @@ Solver 11
   Nonlinear System Min Iterations = 2
   Nonlinear System Convergence Tolerance = 1.0e-06
   Steady State Convergence Tolerance = 1.0e-4
-  Stabilization Method = Bubbles
+!  Stabilization Method = Bubbles
+  Stabilization Method = Stabilized
   Flow Solution Name = String "Flow Solution"
   Use Accumulation = Logical True
   Normal Flux = Logical False
@@ -450,7 +453,7 @@ End
 !--------------------------------------------------------
 
 Boundary Condition 1
-  Name = "sidewall y=yMin"
+  Name = "sidewall"
   Target Boundaries(1)  = 2
 
   Normal-Tangential Velocity = Logical True
@@ -465,7 +468,7 @@ Boundary Condition 1
 End
 
 Boundary Condition 2
-  Name = "sidewall y=yMax"
+  Name = "sidewall"
   Target Boundaries(1)  = 4
 
   Normal-Tangential Velocity = Logical True
