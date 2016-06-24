@@ -25,7 +25,6 @@
 #  FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dTdz_l0 ISM_dddt  
   FISOC_ISM_ReqVars:  ISM_z_l0
   FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dddt  
-#  ISM_ReqVars:        
   ISM2OM_vars:        
   ISM_stdoutFile:     EI_out
 
@@ -37,7 +36,6 @@
   FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0
 #  FISOC_OM_DerVars:   
   OM_ReqVars_stagger: CENTER CENTER
-#  OM_ReqVars:         sst sst
   OM2ISM_vars:        
   OM_initCavityFromISM: .FALSE.
 
