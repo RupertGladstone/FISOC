@@ -1,0 +1,62 @@
+
+ # This is "Resource File" (.rc file), a type of configuration file, for use with ESMF.  
+ # This .rc file contains configuration information for FISOC.
+ #
+ # Syntax:
+ # It contains a list of <label,value> pairs.
+ # The colon after the label is required. 
+ # 
+ # Further notes:
+ # Although FISOC uses <label, value> pairs, the values after the label can also be a list.
+ # Multiple types are allowed.
+ # For example:
+ #  my_file_names:         jan87.dat jan88.dat jan89.dat  # all strings
+ #  constants:             3.1415   25                    # float and integer
+ #
+ # Or, the data can be located in a table using the following syntax:
+ #  my_table_name::
+ #   1000     3000     263.0
+ #    925     3000     263.0
+ #    300     3000     295.8
+ #  ::
+
+  ISM_configFile:     /home/elmeruser/Source/FISOC/examples/Ex1_LongThinMIS/FISOC_Ex1.sif
+#  FISOC_ISM_ReqVars:  ISM_temperature_l0 ISM_temperature_l1 ISM_velocity_l0 ISM_z_l0 ISM_z_l1
+#  FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dTdz_l0 ISM_dddt  
+  FISOC_ISM_ReqVars:  ISM_z_l0
+  FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dddt  
+#  ISM_ReqVars:        
+  ISM2OM_vars:        
+  ISM_stdoutFile:     EI_out
+
+  OM_configFile:      /home/elmeruser/Source/ROMSIceShelf_devel/ROMS/External/ocean_iceshelf2d.in
+  FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0
+#  FISOC_OM_DerVars:   
+  OM_ReqVars_stagger: CENTER CENTER
+#  OM_ReqVars:         sst sst
+  OM_writeNetcdf:     .TRUE.
+  OM_stdoutFile:      ROMS_out
+  OM2ISM_vars:        
+  OM_initCavityFromISM: .TRUE.
+
+  output_dir:         FISOC_NCoutputs
+
+  OM_outputInterval:  1
+#  OM_outputInterval:  10512
+#  OM_dt_sec:          3153600  # 3153600 (sec per month) 86400 sec per day
+  OM_dt_sec:          300
+#  OM_dt_sec:          3000
+  dt_ratio:           288 # ISM dt ... 288 * 300 = 86400 sec = one day.  2880 means 10 days
+#  dt_ratio:           10512
+  start_year:         2010
+  start_month:        1
+#  end_year:           2010
+#  end_month:          2
+  runLength_ISM_steps: 100
+
+# 288 ocn steps of 300 sec per day
+
+  verbose_coupling:   .FALSE.
+!   verbose_coupling:   .TRUE.
+
+
