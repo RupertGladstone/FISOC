@@ -5,6 +5,7 @@
 \usepackage{listings}
 \usepackage{color}
 \usepackage{hyperref}
+\usepackage[margin=1.0in]{geometry}
 
 
 \definecolor{dkgreen}{rgb}{0,0.6,0}
@@ -32,7 +33,7 @@
 
 \title{Framework for Ice Sheet - Ocean Coupled modelling (FISOC) Manual}
 \author{Rupert Gladstone (RupertGladstone1972@gmail.com) \and Lenneke Jong \and Ben Galton-Fenzi}
-\date{Version 0.2, April 2016}
+%\date{Version 0.2, April 2016}
 \maketitle
 
 \newpage 
@@ -70,7 +71,7 @@ into the FISOC framework (Section~\ref{sec:FISOC_SDG}).
 \label{sec:FISOC_install}
 
 FISOC can be obtained by emailing a request to the author.  It is maintained and developed in a 
-private GitHub repository.  We intend to make this public in 2016.
+private GitHub repository.  We intend to make this public late 2016 or early 2017.
 
 FISOC has a simple build process.  The Makefile in the top level FISOC directory contains the 
 hard coded dependencies needed to build FISOC code.  The Makefile refers to certain 
@@ -352,7 +353,11 @@ To be calculated from ISM vars by hard coded routines in FISOC\_OM.        \\
 Switch for dumping the OM import and export variables to NetCDF file.
 Defaults to .TRUE.                                                         \\
 \vspace{6pt}
-
+\textbf{OM\_initCavityFromISM:}  [LOGICAL] [optional]                      \\
+Switch to allow the OM to overwrite its cavity geometry with ISM\_z\_l0 
+during the second phase of initialisation.
+Defaults to .FALSE.                                                        \\
+\vspace{6pt}
 
 \textbf{OM\_outputInterval:} [INTEGER][optional]                           \\
 FISOC collects OM output once every OM\_outputInterval OM timesteps. 
@@ -375,7 +380,9 @@ End year and month define the finish time of the coupled simulation.       \\
 \textbf{end\_month:}         [INTEGER][required]                           \\
 \vspace{6pt}
 \textbf{verbose\_coupling:}  [LOGICAL][required]                           \\
-Print FISOC comments to screen (a log file will be written independently of the settings of this value).\\
+If true, some run time information is printed to the screen.  A log file is always 
+written, but writing to the log during timestepping is suppressed when 
+verbose\_coupling is false.\\
 \end{flushleft}
 
 \subsubsection{FISOC variables}
@@ -415,7 +422,8 @@ OM\_temperature\_l0   & Ocean temperature at the ice ocean           &   \\
                       & guessing the ice temperature at the interface&   \\
 \end{tabular}
 \end{center}
-\caption{FISOC standard variables and typical units.}
+\caption{FISOC standard variables and typical units.  
+  Note that heights relative to sea level are always positive upward.}
 \label{tab:vars}
 \end{table}
 
@@ -532,17 +540,18 @@ It is expected that the OM and ISM components will output data in their usual fo
 and that this will form the basis for most output visualisation and post-processing.
 FISOC does however have the capcity to output both ISM and OM fields on the OM grid 
 in netcdf format.
-Scripts for visualising these outputs can be found in the FISOC\_pp directory.
-These scripts require a recent python installation and the netcdf4-python module.
 
-***more about these scripts when they actually exist... so far just a brief sanity 
-check script exists...
+Scripts for visualising these outputs may be developed at some point, but no firm 
+plans exist.  If/when developed, they will be located in the FISOC\_pp directory.
+There is currently an inflexible script and unfriendly script used as a sanity 
+check during development.
+
+The script requires a recent python installation and the netcdf4-python module.
 
 
 
 
 \subsection{Netcdf4-python installation notes}
-
 
 Depending on your python installation, you may need to run something like this
 before installing netcdf4-python:
@@ -576,36 +585,52 @@ More information (and a dirty fix) can be found here:\\
 
 
 
-\section{Adapting new components to run with  FISOC}
+\section{FISOC development and incorporating new components}
 \label{sec:FISOC_SDG}
 
 Any new OM or ISM component to be used with FISOC must first be ESMF compliant.  This basically 
 means that it should have an initialise, run and finalise routine. 
 
-FISOC is designed such that the only code developments for new components should be made to the 
-model-specific wrappers: FISOC\_OM\_Wrapper\_XXX.f90 and FISOC\_ISM\_Wrapper\_XXX.f90, where 
+FISOC is designed such that the only code developments for new components should be the creation 
+of model-specific wrappers: FISOC\_OM\_Wrapper\_XXX.f90 or FISOC\_ISM\_Wrapper\_XXX.f90, where 
 XXX should be replaced by the component's name.
 
 If it is found that changes to other aspects of the FISOC code are required, this should be 
-implemented in collaboration with the FISOC lead developers.
+implemented in collaboration with the FISOC core developers.
 
-If you wish to submit your new model-specific wrapper to the FISOC repository, please contact 
-the FISOC lead developers.
+If you write a new model-specific wrapper you are encouraged to submit it to the FISOC repository.
+Please contact the FISOC developers or submit a pull request through github.
+
 
 
 \subsection{Coding practices}
 
-New code should ideally be in Fortran 90 modules.  
-All moules should contain the ``implicit none'' statement at the top (immediately after any 
+A new component wrapper  should be in a Fortran 90 module.  
+All modules should contain the ``implicit none'' statement at the top (immediately after any 
 ``USE'' statements).  This property will be inherited by all procedures in the module.
 
-Modules should ideally have the private attribute, with only required procedures being 
+FISOC modules have the private attribute, with only required procedures being 
 made public. 
-
 New model-specific wrapper modules should ensure that the initialise, run and finalise 
 subroutines are public. 
+
 When writing new wrapper modules, the existing wrapper modules may be used as a template, 
 providing examples of the required interfaces.
+Once the FISOC code base stabilises we may provide a full description of the required interface 
+here, but for now adapting an existing wrapper module is advised.
+
+
+\subsubsection{Error handling}
+
+ESMF provides defensive error handling, with error codes and error messages passed up the 
+call stack. 
+FISOC implements ``fail fast'' error handling, with errors generally being considered 
+fatal. 
+Exceptions to this may be made where it is safe to do so (e.g. where a default value can be 
+used in the event of  failure to find a config parameter).
+All calls to ESMF routines have return codes checked immediately, and errors logged.
+If components (OM or ISM) provide a return code or  error code, 
+this should be checked by the component wrapper.
 
 
 \subsection{Configuration options}
@@ -625,11 +650,15 @@ used in the coupling without requiring developments to any code other than the n
 The config object can be passed to the wrapper and accessed directly. 
 
 
-\subsection{ISM wrapper}
+%\subsection{ISM wrapper}
 
-\subsection{OM wrapper}
+%\subsection{OM wrapper}
 
-\section{Future developments}
+%\section{Future developments}
+
+
+
+\clearpage
 
 \appendix
 

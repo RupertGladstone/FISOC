@@ -30,16 +30,17 @@
   ISM_stdoutFile:     EI_out
 
   OM_configFile:      /home/elmeruser/Source/ROMSIceShelf_devel/ROMS/External/ocean_iceshelf2d.in
+  OM_stdoutFile:      /home/elmeruser/Source/FISOC/ROMS_stdout.asc
+  OM_writeNetcdf:     .TRUE.
+  output_dir:         /home/elmeruser/Source/FISOC/FISOC_pp
+
   FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0
 #  FISOC_OM_DerVars:   
   OM_ReqVars_stagger: CENTER CENTER
 #  OM_ReqVars:         sst sst
-  OM_writeNetcdf:     .TRUE.
-  OM_stdoutFile:      ROMS_out
   OM2ISM_vars:        
-  OM_initCavityFromISM: .TRUE.
+  OM_initCavityFromISM: .FALSE.
 
-  output_dir:         FISOC_NCoutputs
 
   OM_outputInterval:  1
 #  OM_outputInterval:  10512

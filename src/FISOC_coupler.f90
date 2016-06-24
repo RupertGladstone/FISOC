@@ -74,21 +74,25 @@ CONTAINS
     TYPE(ESMF_RouteHandle)        :: ISM2OM_regridRouteHandle
     TYPE(ESMF_TypeKind_Flag)      :: fieldTypeKind
     TYPE(ESMF_VM)                 :: vm
+    LOGICAL                       :: verbose_coupling
+    TYPE(ESMF_config)             :: FISOC_config
 
 
-!    type(ESMF_CoordSys_Flag) :: IMS_mesh_coordSys
-!    integer :: dimCount, parametricDim, spatialDim
 
     rc = ESMF_FAILURE
 
-!    ! access to config may be required
-!    CALL ESMF_cplCompGet(FISOC_coupler, config=config, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ! access to config may be required
+    CALL ESMF_cplCompGet(FISOC_coupler, config=FISOC_config, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!    TYPE(ESMF_VM)                 :: vm
     CALL ESMF_cplCompGet(FISOC_coupler, vm=vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -112,11 +116,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    msg = "coupler extracted ISM fields from ISM export state"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-       line=__LINE__, file=__FILE__, rc=rc)
-
-
+    IF (verbose_coupling) THEN
+       msg = "coupler extracted ISM fields from ISM export state"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
+    
     ! Extract OM export field bundle just to get grid for regridding...
     CALL ESMF_StateGet(OM_ImpSt, "OM export fields", OM_ExpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -136,20 +141,22 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    msg = "coupler extracted OM fields from OM import state"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-       line=__LINE__, file=__FILE__, rc=rc)
-
+    IF (verbose_coupling) THEN
+       msg = "coupler extracted OM fields from OM import state"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
+       
     IF (SIZE(OM_ExpFieldList).LT.1) THEN
        msg = "OM field list less than length 1"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
     
     IF (SIZE(ISM_ExpFieldList).LT.1) THEN
        msg = "ISM field list less than length 1"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
@@ -497,12 +504,19 @@ CONTAINS
     TYPE(ESMF_RouteHandle)        :: ISM2OM_regridRouteHandle
     TYPE(ESMF_TypeKind_Flag)      :: fieldTypeKind
 
-    REAL(ESMF_KIND_R8),POINTER            :: optr(:,:),iptr(:)
-    INTEGER                        :: nn
+    REAL(ESMF_KIND_R8),POINTER    :: optr(:,:),iptr(:)
+    INTEGER                       :: nn
+    LOGICAL                       :: verbose_coupling
+    TYPE(ESMF_config)             :: FISOC_config
 
     rc = ESMF_FAILURE
 
-    CALL ESMF_cplCompGet(FISOC_coupler, config=config, rc=rc)
+    CALL ESMF_cplCompGet(FISOC_coupler, config=FISOC_config, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -555,13 +569,15 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    msg = "coupler extracted ISM fields from ISM export state"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-       line=__LINE__, file=__FILE__, rc=rc)
+    IF (verbose_coupling) THEN
+       msg = "coupler extracted ISM fields from ISM export state"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
 
     IF (SIZE(ISM_ExpFieldList).LT.1) THEN
        msg = "ISM field list less than length 1"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
@@ -618,15 +634,19 @@ CONTAINS
 !print*,optr
 !nullify(optr)
 
-       msg = "Regridded field "//fieldName
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__, rc=rc)
+       IF (verbose_coupling) THEN
+          msg = "Regridded field "//fieldName
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+       END IF
 
     END DO loop_over_fields
 
-    msg = "Regriding complete. Regridded fields stored in OM import state"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-         line=__LINE__, file=__FILE__, rc=rc)
+    IF (verbose_coupling) THEN
+       msg = "Regriding complete. Regridded fields stored in OM import state"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
 
     rc = ESMF_SUCCESS
 
@@ -650,12 +670,19 @@ CONTAINS
     TYPE(ESMF_RouteHandle)        :: OM2ISM_regridRouteHandle
     TYPE(ESMF_TypeKind_Flag)      :: fieldTypeKind
     
-    REAL(ESMF_KIND_R8),POINTER            :: optr(:,:),iptr(:)
-    INTEGER                        :: nn
-    
+    REAL(ESMF_KIND_R8),POINTER    :: optr(:,:),iptr(:)
+    INTEGER                       :: nn
+    LOGICAL                       :: verbose_coupling, OM_writeNetcdf
+    TYPE(ESMF_config)             :: FISOC_config
+
     rc = ESMF_FAILURE
 
-    CALL ESMF_cplCompGet(FISOC_coupler, config=config, rc=rc)
+    CALL ESMF_cplCompGet(FISOC_coupler, config=FISOC_config, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -708,13 +735,15 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    msg = "coupler extracted OM fields from OM export state"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-       line=__LINE__, file=__FILE__, rc=rc)
-
+    IF (verbose_coupling) THEN
+       msg = "coupler extracted OM fields from OM export state"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
+    
     IF (SIZE(OM_ExpFieldList).LT.1) THEN
        msg = "OM field list less than length 1"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
@@ -774,15 +803,19 @@ CONTAINS
 !print*,iptr
 !nullify(iptr)
 
-       msg = "Regridded field "//fieldName
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__, rc=rc)
+       IF (verbose_coupling) THEN
+          msg = "Regridded field "//fieldName
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)          
+       END IF
 
     END DO loop_over_fields
 
-    msg = "Regriding complete. Regridded fields stored in ISM import state"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-         line=__LINE__, file=__FILE__, rc=rc)
+    IF (verbose_coupling) THEN
+       msg = "Regriding complete. Regridded fields stored in ISM import state"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
 
     rc = ESMF_SUCCESS
     
