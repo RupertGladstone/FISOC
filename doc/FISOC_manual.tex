@@ -6,7 +6,7 @@
 \usepackage{color}
 \usepackage{hyperref}
 \usepackage[margin=1.0in]{geometry}
-
+\usepackage{graphicx}
 
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
@@ -100,7 +100,12 @@ Variables listed as optional here may be mandatory for configuratons other than
 These environment variables are not used at run time, only during 
 the compilation/installation of FISOC.
 
+
 \begin{flushleft}
+\textbf{ESMFMKFILE}                                \\ 
+Required.                                          \\
+Tells FISOC where to find key ESMF information.    \\
+\vspace{6pt}
 \textbf{FISOC\_INSTALL\_DIR}                       \\ 
 Optional.                                          \\
 Determines where FISOC\_caller will be installed. Defaults to \$HOME/bin. 
@@ -160,6 +165,8 @@ ESMF must be available (\url{https://www.earthsystemcog.org/projects/esmf/}).
 ESMF should have been built with NetCDF and MPI 
 (see also notes in Appendix~\ref{app:A}).
 
+More specifically, NetCDF4 in parallel should be used (this is not the same as PnetCDF).
+
 %For example, environment variables like these may be used for the ESMF build
 %\begin{lstlisting}
 %export ESMF_NETCDF="split"
@@ -170,6 +177,7 @@ ESMF should have been built with NetCDF and MPI
 Viable ISM and OM components must be available for any physically meaningful simulations
 (the build may be tested using ``dummy'' components).  
 See Sections~\ref{sec:PreReqElmer} and \ref{sec:PreReqROMS}.
+
 
 \subsubsection{Elmer/Ice}
 \label{sec:PreReqElmer}
@@ -260,7 +268,7 @@ export FISOC_OM_LIBPATH="/usr/local/lib"
 
 
 
-\subsection{Troubleshooting}
+%\subsection{Troubleshooting}
 
 
 
@@ -277,6 +285,15 @@ example, from one ISM to another).
 Beyond choice of components, all run time choices are made in the FISOC\_config.rc file
 (Section~\ref{sec:config}), 
 or through component specific initialisation.
+
+For example, you can run FISOC in serial like this:
+\begin{lstlisting}
+FISOC_caller
+\end{lstlisting}
+You can run FISOC in parallel like this (depending on your system):
+\begin{lstlisting}
+mpirun -np 4 FISOC_caller
+\end{lstlisting}
 
 In the first instance a dummy coupler can be run be setting both environment variables FISOC\_ISM and 
 FISOC\_OM to ``dummy'' at compile time.  This can help to test the compilation, and was used during development, 
@@ -473,6 +490,12 @@ export LD_LIBRARY_PATH="$FISOC_ISM_LIBPATH/:$LD_LIBRARY_PATH"
 
 ***something about parallelism in mesh
 
+\subsection{Troubleshooting}
+
+Note that DMUMPS error codes, should they occur, can be found in the MUMPS user guide.
+http://mumps.enseeiht.fr/doc/userguide\_5.0.1.pdf
+
+***add links to elmerice wiki and elmer forum.
 
 
 \subsection{Running FISOC with ROMS}
@@ -618,12 +641,15 @@ More information (and a dirty fix) can be found here:\\
 \section{FISOC development and incorporating new components}
 \label{sec:FISOC_SDG}
 
-Any new OM or ISM component to be used with FISOC must first be ESMF compliant.  This basically 
-means that it should have an initialise, run and finalise routine. 
-
 FISOC is designed such that the only code developments for new components should be the creation 
 of model-specific wrappers: FISOC\_OM\_Wrapper\_XXX.f90 or FISOC\_ISM\_Wrapper\_XXX.f90, where 
 XXX should be replaced by the component's name.
+
+Any new OM or ISM component to be used with FISOC must first be ESMF compliant.  This basically 
+means that it should have an initialise, run and finalise routine, and that the developer can 
+provide the component's grid and variables in ESMF compatible formats through the new wrapper.
+The ESMF web site provides furtehr documentation.
+https://www.earthsystemcog.org/projects/esmf/
 
 If it is found that changes to other aspects of the FISOC code are required, this should be 
 implemented in collaboration with the FISOC core developers.
@@ -631,6 +657,22 @@ implemented in collaboration with the FISOC core developers.
 If you write a new model-specific wrapper you are encouraged to submit it to the FISOC repository.
 Please contact the FISOC developers or submit a pull request through github.
 
+The FISOC code structures are summarised in Figure~\ref{fig:codeStruct}.
+ 
+***update the picture
+
+***add description here or perhaps self evident?
+
+***add section on getting help with FISOC? emphasize try component on its own first.  dont ask FISOC devs if the problem is entirely in one component.
+
+\begin{figure}[t]
+  \vspace*{2mm}
+  \begin{center}
+    \includegraphics[width=17cm]{FISOC_structure.pdf}
+  \end{center}
+  \caption{FISOC code and data structures.}
+  \label{fig:codeStruct}
+\end{figure}
 
 
 \subsection{Coding practices}
