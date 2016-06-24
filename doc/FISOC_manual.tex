@@ -344,8 +344,12 @@ List of variables derived by FISOC from the OM vars.
 To be calculated from ISM vars by hard coded routines in FISOC\_OM.        \\
 \vspace{6pt}
 \textbf{OM\_writeNetcdf:}   [LOGICAL] [optional]                           \\
-Switch for dumping the OM import and export variables to NetCDF file.
+Switch for dumping the OM import and export variables to NetCDF files.
 Defaults to .TRUE.                                                         \\
+\vspace{6pt}
+\textbf{output\_dir:}  [STRING] [optional]                                 \\
+Path to directory (must already exist) to which to write the NetCDF files. 
+Defaults to current directory.                                             \\
 \vspace{6pt}
 \textbf{OM\_initCavityFromISM:}  [LOGICAL] [optional]                      \\
 Switch to allow the OM to overwrite its cavity geometry with ISM\_z\_l0 
@@ -496,6 +500,38 @@ This could be launched with
 \begin{lstlisting}
 mpirun -np 4 FISOC_caller
 \end{lstlisting}
+
+\subsubsection{ROMS preprocessor directives}
+Some aspects of the ROMS configuration are controlled through preprocessor directives.  
+ROMS must be recompiled if these are changed.  
+For example, there is a file located somewhere like 
+\begin{lstlisting}
+ROMS/Include/iceshelf2d.h
+\end{lstlisting}
+This file contains statements like this:
+\begin{lstlisting}
+#define ICESHELF
+#ifdef ICESHELF
+# undef ICESHELF_2EQN_VBC
+# define ICESHELF_3EQN_VBC
+# undef ICESHELF_TEOS10
+# undef ICESHELF_MORPH
+# define LIMIT_ICESTRESS
+#endif
+\end{lstlisting}
+In some cases changes are needed to be made to FISOC corresponding with these settings. 
+These are made to the hard coded values of variables defined at the head of the ROMS 
+wrapper module, contained in the file FISOC\_OM\_Wrapper\_ROMS.F90, with the 
+parameter  attribute. 
+Currently the following are in use, and further additions may be made as required.
+\begin{lstlisting}                                                                                           
+  LOGICAL, PARAMETER :: ROMS_MASKING = .FALSE.
+  LOGICAL, PARAMETER :: ROMS_SPHERICAL = .FALSE.
+\end{lstlisting}
+If these values need to be changed FISOC will of course need to be compiled again.
+
+
+
 
 
 \subsection{Troubleshooting}
