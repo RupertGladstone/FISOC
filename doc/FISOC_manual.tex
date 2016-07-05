@@ -64,6 +64,10 @@ This manual describes how to use FISOC with an ISM and OM for which it has been
 developed (Section~\ref{sec:FISOC_SUG}) and also how to build additional ISM or OM components 
 into the FISOC framework (Section~\ref{sec:FISOC_SDG}).
 
+A number of web links are given at various points in this document.  
+The links were correct at the time they were added. 
+Please contact the authors if any of these are found to be out of date. 
+
 
 
 
@@ -490,12 +494,10 @@ export LD_LIBRARY_PATH="$FISOC_ISM_LIBPATH/:$LD_LIBRARY_PATH"
 
 ***something about parallelism in mesh
 
-\subsection{Troubleshooting}
-
-Note that DMUMPS error codes, should they occur, can be found in the MUMPS user guide.
-http://mumps.enseeiht.fr/doc/userguide\_5.0.1.pdf
-
 ***add links to elmerice wiki and elmer forum.
+
+
+
 
 
 \subsection{Running FISOC with ROMS}
@@ -508,8 +510,9 @@ export LD_LIBRARY_PATH="$FISOC_OM_LIBPATH/:$LD_LIBRARY_PATH"
 \end{lstlisting}
 
 ROMS writes a lot of information to the screen when run alone.  
-When run through FISOC this is redirected to a file named 
-\textbf{OM\_stdoutFile}, which must be provided in the FISOC config file 
+When run through FISOC this is redirected to a text file. 
+The file name is given by \textbf{OM\_stdoutFile}, 
+which must be provided in the FISOC config file 
 whenever ROMS is used.
 
 The number of processes to launch FISOC with must be consistent with the number of 
@@ -519,10 +522,15 @@ Ntile parameters.  For example, the following gives 4 partitions
       NtileI == 1                               ! I-direction partition
       NtileJ == 4                               ! J-direction partition
 \end{lstlisting}
-This could be launched with
-\begin{lstlisting}
-mpirun -np 4 FISOC_caller
-\end{lstlisting}
+%This could be launched with
+%\begin{lstlisting}
+%mpirun -np 4 FISOC_caller
+%\end{lstlisting}
+
+Some of the ROMS configuration information is in a .dat file.
+The name of this file is given in the ROMS configuration file, the .in file.
+When running ROMS through FISOC, the full path of the .dat file must be 
+given in the .in file.
 
 \subsubsection{ROMS preprocessor directives}
 Some aspects of the ROMS configuration are controlled through preprocessor directives.  
@@ -562,6 +570,13 @@ If these values need to be changed FISOC will of course need to be compiled agai
 If the error messages to the screen are not helpful, remember to check whether useful 
 information has been logged.  By default this will be in files in the current directory 
 with names like PETX.FISOC.Log (where X is a process number).
+
+A segmentation fault has been known to occurr in the case of an incorrect path to the ROMS 
+configuration file (the .in file). 
+
+Note that DMUMPS error codes, should they occur, can be found in the MUMPS user guide.
+MUMPS is often used by Elmer/Ice.
+http://mumps.enseeiht.fr/doc/userguide\_5.0.1.pdf
 
 Errors like the following can ocurr (in the log files) when the number of processes is 
 not consistent with the number of component partitons (this example involves ROMS):
