@@ -39,6 +39,8 @@ MODULE FISOC_ISM_Wrapper
   INTEGER, PARAMETER :: ELMER_ELEMENT_HEXAHED_QUADRAT  = 820
   INTEGER, PARAMETER :: ELMER_ELEMENT_HEXAHED_QUADRAT2 = 827
 
+  REAL(ESMF_KIND_R8), PARAMETER :: Elmer_secpyr = 365.25_dp*24.0_dp*60.0_dp*60.0_dp
+
   ! These variable names are hard coded to match the names given in the Elmer/Ice .sif
   ! The user must ensure the names correspond.
   ! TODO: is this information in the manual?
@@ -54,6 +56,7 @@ MODULE FISOC_ISM_Wrapper
   ! global node numbering reference (Elmer uses local node numbering).  We must add this number 
   ! to the node id whenever converting from Elmer node ids to ESMF node ids.  Same for element id.
   INTEGER  :: EI_firstNodeThisPET, EI_firstElemThisPET
+
 
 CONTAINS
 
@@ -75,6 +78,8 @@ CONTAINS
     CHARACTER(len=MAX_STRING_LEN)         :: ISM_configFile_Elmer
 
     TYPE(Mesh_t)                          :: Elmer_Mesh
+    REAL(ESMF_KIND_R8)                    :: Elmer_dt, FISOC_ISM_dt
+    INTEGER                               :: localpet
 
 ! TODO:
 ! -double check that the sif really does specify to extrude the mesh, and that the non-extruded mesh really is 2d.
@@ -88,6 +93,11 @@ CONTAINS
 ! sif.  These also to be checked for their presence against a list of required vars from ESMF
 
     rc = ESMF_FAILURE
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! FISOC tells Elmer which .sif to use
     CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_configFile_FISOC, label='ISM_configFile:', rc=rc)
@@ -109,6 +119,16 @@ CONTAINS
 
     CALL ElmerSolver_init(Elmer_Mesh,.TRUE.,ISM_configFile_Elmer) 
     ! It is intended that ElmerSolver_init should return the mesh prior to Elmer's internal extrusion 
+    
+    IF (localpet.EQ.0) THEN
+       IF ( .NOT.TimeStepConsistent(FISOC_config) ) THEN
+          WRITE (msg, "(A,I0,A,I0,A)") &
+               "FATAL: Elmer/FISOC timestep inconsistency"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+    END IF
 
     CALL Elmer2ESMF_mesh(Elmer_mesh,ISM_mesh,vm,rc=rc)
 
@@ -135,6 +155,48 @@ CONTAINS
   END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1
   
 
+  !--------------------------------------------------------------------------------------
+  ! Get the Elmer timestep (assume it is in units of years) and convert it to seconds.
+  ! This should match the FISOM ISM timestep.
+  !
+  ! An additional check is that only one timestep should be run per call to Elmer run.
+  !
+  LOGICAL FUNCTION TimeStepConsistent(FISOC_config)
+
+    TYPE(ESMF_config),INTENT(INOUT)  :: FISOC_config
+
+    REAL(ESMF_KIND_R8)    :: Elmer_dt
+    INTEGER               :: ISM_dt_sec, Elmer_dt_sec, tol, Elmer_nt, rc
+
+    TimeStepConsistent = .TRUE.
+
+    Elmer_dt = ListGetConstReal( CurrentModel % Simulation, 'Timestep Sizes' )
+    Elmer_dt_sec = INT(Elmer_secpyr * Elmer_dt)
+
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt_sec, 'ISM_dt_sec',rc=rc) 
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    tol = 10 ! tolerance in seconds
+    IF ( (Elmer_dt_sec.GT.(ISM_dt_sec+tol)) .OR. (Elmer_dt_sec.LT.(ISM_dt_sec-tol)) ) THEN
+       TimeStepConsistent = .FALSE.
+       WRITE (msg, "(A,I0,A,I0,A)") &
+            "WARNING: Elmer/FISOC timestep inconsistency (", &
+            Elmer_dt_sec, " and ", ISM_dt_sec, ")"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+            line=__LINE__, file=__FILE__, rc=rc)          
+    END IF
+       
+    Elmer_nt = ListGetInteger( CurrentModel % Simulation, 'Timestep Intervals' )
+    IF ( Elmer_nt.NE.1) THEN
+       msg = "ERROR: Elmer/Ice .sif must set Timestep Intervals to 1"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    
+  END FUNCTION TimeStepConsistent
 
   !--------------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,ISM_ExpFB,FISOC_config,vm,rc)
