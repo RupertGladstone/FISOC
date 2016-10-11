@@ -10,14 +10,15 @@ PROGRAM TestNodeOrderingCode
   REAL,ALLOCATABLE      :: NodeCoords(:,:)
   REAL                  :: ProjectionVector(3)
 
-  NumNodes = 4
+  NumNodes = 3
   !ALLOCATE(NodeCoords(3,NumNodes))
   ALLOCATE(NodeCoords(NumNodes,3))
   ALLOCATE(NodeIds(NumNodes))
   ALLOCATE(OrderedNodeIds(NumNodes))
   Direction=ANTI_CLOCKWISE
+  Direction=CLOCKWISE
   !NodeIds = (/10, 12, 13/)
-  NodeIds = (/9, 12, 13, 20/)
+  NodeIds = (/9, 12, 13/)
   ProjectionVector = (/1, 0, 0/)
   !Direction=1
 
@@ -27,10 +28,22 @@ PROGRAM TestNodeOrderingCode
 !       0, 0, 3 & !/), SHAPE(NodeCoords))
 !     ,-1, 0,-1/), SHAPE(NodeCoords))
 
+!  NodeCoords = RESHAPE( (/ &
+!   1.0,  1.0,  1.0,  1.0, &
+!  +1.0, +0.8, -1.4, -1.2, &
+!  +1.0, +1.0, -0.9, -1.0 /), SHAPE(NodeCoords))
+
   NodeCoords = RESHAPE( (/ &
-   1.0,  1.0,  1.0,  1.0, &
-  +1.0, +0.8, -1.4, -1.2, &
-  +1.0, +1.0, -0.9, -1.0 /), SHAPE(NodeCoords))
+   1.0,  1.0,  1.0,  &
+  +1.0, +0.8, -1.4,  &
+  +1.0, +1.0, -0.9  /), SHAPE(NodeCoords))
+
+print*,NodeCoords(4,1:3)
+
+!  NodeCoords = RESHAPE( (/ &
+!   1.0,  1.0,  1.0,  1.0, &
+!  +1.0, +0.8, -1.4, -1.2, &
+!  +1.0, +1.0, -0.9, -1.0 /), SHAPE(NodeCoords))
 
   !write(*,*) NodeCoords
 
@@ -43,52 +56,60 @@ PROGRAM TestNodeOrderingCode
 
 CONTAINS
 
-  
-  SUBROUTINE NodeOrdering(Direction, ProjectionVector, NodeIds, NodeCoords, OrderedNodeIds,n)
+  !----------------------------------------------------------------------------------------------
+  ! Node ordering routine.  Determines node ordering for triangular and quadrilateral elements.
+  !
+  ! The ProjectionVector defines the normal to a plane on which to project the node coords.
+  ! This plane is assumed to pass through the origin.
+  ! It is assumed that the ProjectionVector is a unit vector. TODO: add a check for this
+  !  
+  SUBROUTINE NodeOrdering(Direction, ProjectionVector, NodeIds, NodeCoords, OrderedNodeIds,nn)
 
-    integer,intent(in)      :: n !!! NumNodes, length of NodeIds
+    INTEGER,INTENT(IN)      :: nn !!! NumNodes, length of NodeIds
     INTEGER,INTENT(IN)      :: Direction   ! The direction of desired ordering
-    REAL,INTENT(IN)         :: NodeCoords(n,3)
+    REAL,INTENT(IN)         :: NodeCoords(nn,3)
     REAL,INTENT(IN)         :: ProjectionVector(3)
-    INTEGER,INTENT(IN)      :: NodeIds(n)
-    INTEGER,INTENT(OUT)     :: OrderedNodeIds(n)
+    INTEGER,INTENT(IN)      :: NodeIds(nn)
+    INTEGER,INTENT(OUT)     :: OrderedNodeIds(nn)
     
     !Print*,"First node has id ",NodeIds(1)," and cooords ",NodeCoords(1:3,1)
     !Print*,"Second node has id ",NodeIds(2)," and cooords ",NodeCoords(1:3,2)
     !Print*,"etc..."
     !OrderedNodeIds = (/10, 13, 12/)
 
-    integer::sz,i,j
-    real,allocatable::theta(:),phi(:),lambda(:),projectedNodes(:,:)
-    real,dimension(3)::crs,mcrs
-    real d
-    integer sect1len,sect2len,sect3len,sect1(99),sect2(99),sect3(99)
-    real ang1(99),ang2(99),ang3(99)
+    integer          :: sz,ii,jj
+    real,allocatable :: theta(:),phi(:),lambda(:),projectedNodes(:,:)
+    real,dimension(3):: crs,mcrs
+    real             :: dd
+    integer          :: sect1len,sect2len,sect3len,sect1(99),sect2(99),sect3(99)
+    real             :: ang1(99),ang2(99),ang3(99)
 
     !write(*,"('NodeID :',3I4)") NodeIds
     !write(*,*) NodeCoords
     !sz=size(NodeIds)
 
-    allocate(projectedNodes(n,3))
-    allocate(theta(n))
-    allocate(phi(n))    
-    allocate(lambda(n))
+    ALLOCATE(projectedNodes(nn,3))
+    ALLOCATE(theta(nn))
+    ALLOCATE(phi(nn))    
+    ALLOCATE(lambda(nn))
 
-    do i=1,n
-      call dot(NodeCoords(i,:),ProjectionVector,d) !!! d is result of dot product
-      projectedNodes(i,:)=NodeCoords(i,:)-d*ProjectionVector 
-      !!! d*ProjectionVector is projected node_i on ProjectionVector
-      !!! projectedNodes(i,:) is projected node_i on the plane whose normal vector is ProjectionVector
-    enddo
+    ! The dot product of the NodeCoord vector and the ProjectionVector gives the magnitude of 
+    ! the component of the NodeCoord vector normal to the plane. 
+    ! This dot_product*ProjectionVector is node i projected on the ProjectionVector.
+    ! projectedNodes(i,:) is node i projected on the plane whose normal vector is ProjectionVector
+    ! and which passes trhrough the origin.
+    DO ii=1,nn
+       projectedNodes(ii,:) = NodeCoords(ii,:) - dot(NodeCoords(ii,:),ProjectionVector) * ProjectionVector 
+    END DO
 
     call cross( ProjectionVector, projectedNodes(1,:), crs )
     mcrs=-1*crs; !!! crs is first_node x ProjectionVector('x' means cross product)
     !!! mcrs is minus crs
 
-    do i=1,n
-      call angle( projectedNodes(i,:), projectedNodes(1,:), theta(i) )
-      call angle( projectedNodes(i,:), crs,                 phi(i) )
-      call angle( projectedNodes(i,:), mcrs,                lambda(i) )
+    do ii=1,nn
+       call angle( projectedNodes(ii,:), projectedNodes(1,:), theta(ii) )
+       call angle( projectedNodes(ii,:), crs,                 phi(ii) )
+       call angle( projectedNodes(ii,:), mcrs,                lambda(ii) )
     enddo
 
     write(*,"( 'theta:' ,4F10.3 )") theta
@@ -100,23 +121,23 @@ CONTAINS
     sect2len=1
     sect3len=1
 
-    do i=2,n
-      if( theta(i).ge.0 .and. phi(i).ge.0 )then
+    do ii=2,nn
+      if( theta(ii).ge.0 .and. phi(ii).ge.0 )then
 
-        sect1( sect1len )=i
-        ang1 ( sect1len )=theta(i)
+        sect1( sect1len )=ii
+        ang1 ( sect1len )=theta(ii)
         sect1len=sect1len+1
 
-      else if( theta(i).ge.0 .and. lambda(i).ge.0 )then
+      else if( theta(ii).ge.0 .and. lambda(ii).ge.0 )then
 
-        sect3( sect3len )=i
-        ang3 ( sect3len )=lambda(i)
+        sect3( sect3len )=ii
+        ang3 ( sect3len )=lambda(ii)
         sect3len=sect3len+1
 
       else
 
-        sect2( sect2len )=i
-        ang2 ( sect2len )=phi(i)
+        sect2( sect2len )=ii
+        ang2 ( sect2len )=phi(ii)
         sect2len=sect2len+1
 
       endif
@@ -129,53 +150,64 @@ CONTAINS
 
     !!! Get the array of ordered node IDs.
     OrderedNodeIds(1)=NodeIds(1)
-    j=2
+    jj=2
     if(sect1len.ge.2)then
-      do i=1,sect1len-1
-        OrderedNodeIds(j)=NodeIds( sect1(i) )
-        !write(*,"( 'Id(',I2,')=',I4 )") sect1(i), NodeIds( sect1(i) )
-        write(*,"( 'Sector1 : ',I2 )") sect1(i)
-        j=j+1
+      do ii=1,sect1len-1
+        OrderedNodeIds(jj)=NodeIds( sect1(ii) )
+        !write(*,"( 'Id(',I2,')=',I4 )") sect1(i), NodeIds( sect1(ii) )
+        write(*,"( 'Sector1 : ',I2 )") sect1(ii)
+        jj=jj+1
       enddo
     endif
 
     if(sect2len.ge.2)then
-      do i=1,sect2len-1
-        OrderedNodeIds(j)=NodeIds( sect2(i) )
-        !write(*,"( 'Id(',I2,')=',I4 )") sect2(i), NodeIds( sect2(i) )
-        write(*,"( 'Sector2 : ',I2 )") sect2(i)
-        j=j+1
+      do ii=1,sect2len-1
+        OrderedNodeIds(jj)=NodeIds( sect2(ii) )
+        !write(*,"( 'Id(',I2,')=',I4 )") sect2(ii), NodeIds( sect2(ii) )
+        write(*,"( 'Sector2 : ',I2 )") sect2(ii)
+        jj=jj+1
       enddo
     endif
 
     if(sect3len.ge.2)then
-      do i=1,sect3len-1
-        OrderedNodeIds(j)=NodeIds( sect3(i) )
-        !write(*,"( 'Id(',I2,')=',I4 )") sect3(i), NodeIds( sect3(i) )
-        write(*,"( 'Sector3 : ',I2 )") sect3(i)
-        j=j+1
+      do ii=1,sect3len-1
+        OrderedNodeIds(jj)=NodeIds( sect3(ii) )
+        !write(*,"( 'Id(',I2,')=',I4 )") sect3(ii), NodeIds( sect3(ii) )
+        write(*,"( 'Sector3 : ',I2 )") sect3(ii)
+        jj=jj+1
       enddo
     endif
 
 
     !!! Here we get the order of clockwise. If we want anti-clockwise, flip it!
-    if(Direction.ne.1)then !!! Direction == 1, is clockwise
-      call flip(OrderedNodeIds(2:n),n-1)
-    endif
+!    if(Direction.ne.1)then !!! Direction == 1, is clockwise
+!      call flip(OrderedNodeIds(2:n),n-1)
+!    endif
 
-
+    SELECT CASE (Direction)
+    CASE (CLOCKWISE)
+    CASE (ANTI_CLOCKWISE)
+      CALL flip(OrderedNodeIds(2:nn),nn-1)
+    CASE DEFAULT
+       PRINT*,"Direction not recognised, add fatal call here"
+    END SELECT
+    
   END SUBROUTINE NodeOrdering
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  SUBROUTINE dot(u,v,r)
+  function func(i) result(j)
+    integer, intent(in) :: i ! input
+    integer             :: j ! output
+    j = i**2 + i**3
+  end function func
+  
+  REAL FUNCTION dot(u,v)
     real,intent(in)::u(3)
     real,intent(in)::v(3)    
-    real,intent(out)::r
-    !write(*,*) u
-    r=u(1)*v(1)+u(2)*v(2)+u(3)*v(3)
-  END SUBROUTINE dot
-  
+
+    dot=u(1)*v(1)+u(2)*v(2)+u(3)*v(3)
+  END FUNCTION dot
 
   SUBROUTINE cross(u,v,r)
     real,intent(in)::u(3)
@@ -195,9 +227,8 @@ CONTAINS
 
     len1=sqrt( u(1)**2 + u(2)**2 + u(3)**2 )
     len2=sqrt( v(1)**2 + v(2)**2 + v(3)**2 )
-    call dot(u,v,d)
+    d = dot(u,v)
     r=d/(len1*len2)
-    !r=d
   END SUBROUTINE angle
 
 
