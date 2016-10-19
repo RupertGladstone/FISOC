@@ -27,6 +27,9 @@
   FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dddt  
   ISM2OM_vars:        
   ISM_stdoutFile:     EI_out
+  ISM_ProjVector:     0. 0. -1.
+  ISM_BodyID:         2
+  
 
   OM_configFile:      /home/elmeruser/Source/ROMSIceShelf_devel/ROMS/External/ocean_iceshelf2d.in
   OM_stdoutFile:      /home/elmeruser/Source/FISOC/ROMS_stdout.asc

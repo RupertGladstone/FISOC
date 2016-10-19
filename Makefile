@@ -7,7 +7,7 @@
 ################################################################################
 
 SRCDIR = src
-FFLAGS += -fbacktrace -g -O0
+FFLAGS += -fbacktrace -g -O0 -fbounds-check #-Wall
 
 # check for presence of required env vars
 ifneq ($(origin ESMFMKFILE), environment)

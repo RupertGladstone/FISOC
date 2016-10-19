@@ -2,30 +2,47 @@
 MODULE FISOC_utils_MOD
 
   USE ESMF
+  USE FISOC_types_MOD
 
   IMPLICIT NONE
 
   PRIVATE
 
-  PUBLIC  FISOC_getStringListFromConfig, FISOC_populateFieldBundle, FISOC_ConfigDerivedAttribute, &
+  PUBLIC   FISOC_getListFromConfig, FISOC_populateFieldBundle, FISOC_ConfigDerivedAttribute, &
        FISOC_initCumulatorFB, FISOC_zeroBundle, FISOC_cumulateFB, FISOC_processCumulator, msg,    &
        FISOC_VM_MPI_Comm_dup, FISOC_FieldRegridStore, FISOC_FB2NC, FISOC_setClocks, & 
-       FISOC_destroyClocks, FISOC_ISM2OM, FISOC_OM2ISM
+       FISOC_destroyClocks, FISOC_ISM2OM, FISOC_OM2ISM, FISOC_shrink, FISOC_VMAllGather
+  
+  INTERFACE FISOC_VMAllGather 
+     MODULE PROCEDURE FISOC_VMAllGather_Int   
+     MODULE PROCEDURE FISOC_VMAllGather_Real
+  END INTERFACE FISOC_VMAllGather
+  
+  INTERFACE FISOC_shrink
+     MODULE PROCEDURE FISOC_shrinkInt
+     MODULE PROCEDURE FISOC_shrinkReal
+  END INTERFACE FISOC_shrink
 
+  INTERFACE FISOC_getListFromConfig
+     MODULE PROCEDURE FISOC_getRealListFromConfig 
+     MODULE PROCEDURE FISOC_getIntegerListFromConfig 
+     MODULE PROCEDURE FISOC_getStringListFromConfig
+  END INTERFACE FISOC_getListFromConfig
+  
   INTERFACE FISOC_populateFieldBundle
-      MODULE PROCEDURE FISOC_populateFieldBundleOn2dGrid
-      MODULE PROCEDURE FISOC_populateFieldBundleOnMesh
+     MODULE PROCEDURE FISOC_populateFieldBundleOn2dGrid
+     MODULE PROCEDURE FISOC_populateFieldBundleOnMesh
   END INTERFACE FISOC_populateFieldBundle
-
+  
   INTERFACE FISOC_ConfigDerivedAttribute
-      MODULE PROCEDURE FISOC_ConfigDerivedAttributeInteger
-      MODULE PROCEDURE FISOC_ConfigDerivedAttributeStaggerLocArray
-  END INTERFACE 
-
+     MODULE PROCEDURE FISOC_ConfigDerivedAttributeInteger
+     MODULE PROCEDURE FISOC_ConfigDerivedAttributeStaggerLocArray
+  END INTERFACE FISOC_ConfigDerivedAttribute
+  
   CHARACTER(len=ESMF_MAXSTR) :: msg
-
+  
 CONTAINS
-
+  
 
 
   !------------------------------------------------------------------------------
@@ -965,6 +982,113 @@ CONTAINS
   END SUBROUTINE FISOC_getStringListFromConfig
 
 
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE FISOC_getIntegerListFromConfig(config,label,IntegerList,rc)
+
+    INTEGER,ALLOCATABLE,INTENT(INOUT)    :: IntegerList(:)
+
+    TYPE(ESMF_config),INTENT(INOUT)      :: config
+
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN):: label
+    INTEGER,INTENT(OUT),OPTIONAL         :: rc
+
+    CHARACTER(len=ESMF_MAXSTR)           :: dummyInteger
+    INTEGER                              :: listCount,ii
+
+    rc = ESMF_FAILURE
+
+    ! point config to start of list 
+    CALL ESMF_ConfigFindLabel(config,TRIM(label),rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         RETURN
+    
+    ! how many items in list?
+    listCount = 0
+    DO WHILE (rc.EQ.0)
+       CALL ESMF_ConfigGetAttribute(config, dummyInteger,rc=rc) 
+       IF  (rc.EQ.ESMF_RC_NOT_FOUND) EXIT
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       listCount = listCount + 1
+    END DO
+
+    ALLOCATE(IntegerList(listCount))
+
+    ! go back to the start of the list
+    CALL ESMF_ConfigFindLabel(config, TRIM(label),rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! retrieve list items
+    DO ii = 1,listCount
+       CALL ESMF_ConfigGetAttribute(config, IntegerList(ii),rc=rc) 
+       IF  (rc.EQ.ESMF_RC_NOT_FOUND) EXIT
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END DO
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_getIntegerListFromConfig
+
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE FISOC_getRealListFromConfig(config,label,RealList,rc)
+
+    REAL(ESMF_KIND_R8),ALLOCATABLE,INTENT(INOUT) :: RealList(:)
+
+    TYPE(ESMF_config),INTENT(INOUT)      :: config
+
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN):: label
+    INTEGER,INTENT(OUT),OPTIONAL         :: rc
+
+    CHARACTER(len=ESMF_MAXSTR)           :: dummyReal
+    INTEGER                              :: listCount,ii
+
+    rc = ESMF_FAILURE
+
+    ! point config to start of list 
+    CALL ESMF_ConfigFindLabel(config,TRIM(label),rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         RETURN
+    
+    ! how many items in list?
+    listCount = 0
+    DO WHILE (rc.EQ.0)
+       CALL ESMF_ConfigGetAttribute(config, dummyReal,rc=rc) 
+       IF  (rc.EQ.ESMF_RC_NOT_FOUND) EXIT
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       listCount = listCount + 1
+    END DO
+
+    ALLOCATE(RealList(listCount))
+
+    ! go back to the start of the list
+    CALL ESMF_ConfigFindLabel(config, TRIM(label),rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! retrieve list items
+    DO ii = 1,listCount
+       CALL ESMF_ConfigGetAttribute(config, RealList(ii),rc=rc) 
+       IF  (rc.EQ.ESMF_RC_NOT_FOUND) EXIT
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END DO
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_getRealListFromConfig
+
+
 
   !--------------------------------------------------------------------
   SUBROUTINE FISOC_FB2NC(filename,fieldBundle,FISOC_config)
@@ -1129,5 +1253,214 @@ CONTAINS
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_FieldRegridStore
+
+
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE FISOC_shrinkInt(arrayIn,ignoreVal)
+    
+    INTEGER,INTENT(INOUT),ALLOCATABLE :: arrayIn(:)
+    INTEGER,INTENT(IN)                :: ignoreVal
+
+    INTEGER,ALLOCATABLE               :: holder(:) ! temporary holding array
+    INTEGER :: ii,numIgnores,nn
+
+    numIgnores = 0
+    DO ii = 1,SIZE(arrayIn)
+       IF ( arrayIn(ii) .EQ. ignoreVal ) numIgnores = numIgnores + 1
+    END DO
+
+    IF ( numIgnores .GT. SIZE(arrayIn) ) THEN
+       msg= "FATAL: too many ignored vals in FISOC_shrinkInt"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    ! populate the temporary holding array
+    ALLOCATE(holder(SIZE(arrayIn) - numIgnores))
+
+    holder = ignoreVal
+    nn = 0
+    DO ii = 1,SIZE(arrayIn)
+       IF ( arrayIn(ii) .NE. ignoreVal ) THEN
+          nn = nn+1
+          holder(nn) = arrayIn(ii)
+       END IF
+    END DO
+
+    ! now we can resize the input array and use the temporary holding 
+    ! array to repopulate the input array.
+    DEALLOCATE(arrayIn)
+    ALLOCATE(arrayIn(SIZE(holder)))
+    arrayIn = holder
+
+    ! tidy up
+    DEALLOCATE(holder)
+    
+  END SUBROUTINE FISOC_shrinkInt
+
+
+
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE FISOC_shrinkReal(arrayIn,ignoreVal)
+    
+    REAL(ESMF_KIND_R8),INTENT(INOUT),ALLOCATABLE :: arrayIn(:)
+    REAL(ESMF_KIND_R8),INTENT(IN)                :: ignoreVal
+
+    REAL(ESMF_KIND_R8),ALLOCATABLE               :: holder(:) ! temporary holding array
+    INTEGER :: ii,numIgnores,nn
+
+    numIgnores = 0
+    DO ii = 1,SIZE(arrayIn)
+       IF ( arrayIn(ii) .EQ. ignoreVal ) numIgnores = numIgnores + 1
+    END DO
+
+    IF ( numIgnores .GE. SIZE(arrayIn) ) THEN
+       msg= "FATAL: too many ignored vals in FISOC_shrinkInt"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    ! populate the temporary holding array
+    ALLOCATE(holder(SIZE(arrayIn) - numIgnores))
+
+    holder = ignoreVal
+    nn = 0
+    DO ii = 1,SIZE(arrayIn)
+       IF ( arrayIn(ii) .NE. ignoreVal ) THEN
+          nn = nn+1
+          holder(nn) = arrayIn(ii)
+       END IF
+    END DO
+
+    ! now we can resize the input array and use the temporary holding 
+    ! array to repopulate the input array.
+    DEALLOCATE(arrayIn)
+    ALLOCATE(arrayIn(SIZE(holder)))
+    arrayIn = holder
+
+    ! tidy up
+    DEALLOCATE(holder)
+    
+  END SUBROUTINE FISOC_shrinkReal
+
+
+
+  ! Wrapper for ESMF_VMAllGather, but allows array sizes to vary over PETs.
+  ! We assume Array_local is already allocated and populated, but 
+  ! Array_all is not.  Array_all is allocated within this routine.
+  SUBROUTINE FISOC_VMAllGather_Int(vm,Array_local,Array_all,rc)
+
+    TYPE(ESMF_vm),INTENT(IN)        :: vm
+    INTEGER,INTENT(IN)              :: Array_local(:) ! on the local PET
+    INTEGER,ALLOCATABLE,INTENT(OUT) :: Array_all(:)   ! over all PETs
+    INTEGER,INTENT(OUT),OPTIONAL    :: rc
+
+    INTEGER,ALLOCATABLE  :: Array_local_holder(:)
+    INTEGER :: ArrLocSize, ArrLocSizeMax, ArrAllSize, PETcount
+
+    IF (ALLOCATED(Array_all)) DEALLOCATE(Array_all)
+
+    CALL ESMF_VMGet(vm, petCount=PETcount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ArrLocSize = SIZE(Array_local)
+
+    ! Get the max number of array elements per pet.
+    CALL ESMF_VMAllFullReduce(vm, (/ArrLocSize/),ArrLocSizeMax, 1, ESMF_REDUCE_MAX, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Get the total number of array elements over all PETs.
+    CALL ESMF_VMAllFullReduce(vm,(/ArrLocSize/),ArrAllSize,1,ESMF_REDUCE_SUM, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! The holding array is a copy of the local array but padded with missing values
+    ALLOCATE(Array_local_holder(ArrLocSizeMax))
+    Array_local_holder = FISOC_missing
+    Array_local_holder(1:ArrLocSize) = Array_local
+
+    ALLOCATE(Array_all(ArrLocSizeMax*PETcount))
+    CALL ESMF_VMAllGather(vm,Array_local_holder,Array_all,ArrLocSizeMax,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL FISOC_shrink(Array_all,FISOC_missing)
+
+    IF (ArrAllSize.NE.SIZE(Array_all)) THEN
+       msg = "Array size mismatch after AllGather and shrink. "
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+  END SUBROUTINE FISOC_VMAllGather_Int
+
+
+
+  ! Wrapper for ESMF_VMAllGather, but allows array sizes to vary over PETs.
+  ! We assume Array_local is already allocated and populated, but 
+  ! Array_all is not.  Array_all is allocated within this routine.
+  SUBROUTINE FISOC_VMAllGather_Real(vm,Array_local,Array_all,rc)
+
+    TYPE(ESMF_vm),INTENT(IN)                   :: vm
+    REAL(ESMF_KIND_R8),INTENT(IN)              :: Array_local(:) ! on the local PET
+    REAL(ESMF_KIND_R8),ALLOCATABLE,INTENT(OUT) :: Array_all(:)   ! over all PETs
+    INTEGER,INTENT(OUT),OPTIONAL               :: rc
+
+    REAL(ESMF_KIND_R8),ALLOCATABLE  :: Array_local_holder(:)
+    INTEGER :: ArrLocSize, ArrLocSizeMax, ArrAllSize, PETcount
+
+    IF (ALLOCATED(Array_all)) DEALLOCATE(Array_all)
+
+    CALL ESMF_VMGet(vm, petCount=PETcount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ArrLocSize = SIZE(Array_local)
+
+    ! Get the max number of array elements per pet.
+    CALL ESMF_VMAllFullReduce(vm, (/ArrLocSize/),ArrLocSizeMax, 1, ESMF_REDUCE_MAX, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Get the total number of array elements over all PETs.
+    CALL ESMF_VMAllFullReduce(vm,(/ArrLocSize/),ArrAllSize,1,ESMF_REDUCE_SUM, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! The holding array is a copy of the local array but padded with missing values
+    ALLOCATE(Array_local_holder(ArrLocSizeMax))
+    Array_local_holder = FISOC_missing_R8
+    Array_local_holder(1:ArrLocSize) = Array_local
+
+    ALLOCATE(Array_all(ArrLocSizeMax*PETcount))
+    CALL ESMF_VMAllGather(vm,Array_local_holder,Array_all,ArrLocSizeMax,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL FISOC_shrink(Array_all,FISOC_missing_R8)
+
+    IF (ArrAllSize.NE.SIZE(Array_all)) THEN
+       msg = "Array size mismatch after AllGather and shrink. "
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+  END SUBROUTINE FISOC_VMAllGather_Real
 
 END MODULE FISOC_utils_MOD

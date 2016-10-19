@@ -320,23 +320,30 @@ In FISOC, there is always a 1:1 relationship between PETs and MPI processes.
 \label{sec:config}
 
 The FISOC config file is named FISOC\_config.rc, and is expected to be present 
-in the current directory.  
+in the current directory when running FISOC.  
 This is a resource file, as described by the 
 ESMF documentation.  It supports different types and also lists. 
-In principle, llists of mixed types are supported, though FISOC does not utilise this capability.
+In principle, lists of mixed types are supported, though FISOC does not utilise this capability.
+Basic syntax highlighting for .rc files can be activated within emacs 
+(see notes in utils/emacsMode.asc in the FISOC repository).
 
-FISOC\_config.rc contains code specific to the coupling.  Components may also use their 
-independent means for configuration.
+FISOC\_config.rc mainly contains parameters specific to the coupling rather than to the running of 
+individual components.  
+Components should use their standard means for configuration, and component-specific configuration files 
+should be specified in the FISOC configuration file.
 
-Some of the FISOC config entries are required.
-This section describes all the valid standard (but note that model-specific non-standard entries 
-can be added as required) entries in a FISOC config file as follows:
+Some of the FISOC config entries are strictly required and some are optional.
+This section describes all the valid standard config entries. 
+Note that model-specific non-standard entries can be added if needed, and use of these 
+should be through the model-specific wrapper code.
+
+***timestepping stuff may not all be required now... two methods of timestepping, need to check this.
 
 \begin{flushleft}
-\textbf{label:}               [TYPE]   [Required?]                         \\
-Description                                                                \\
-\vspace{6pt}
-\vspace{6pt}
+%\textbf{label:}               [TYPE]   [Required?]                         \\
+%Description                                                                \\
+%\vspace{6pt}
+%\vspace{6pt}
 \textbf{ISM\_meshFile:}       [STRING] [optional]                          \\
 The name of a netcdf file containing the ISM mesh in ESMF format.          \\
 \vspace{6pt}

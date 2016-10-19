@@ -80,13 +80,13 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     label = 'FISOC_ISM_ReqVars:'
-    CALL FISOC_getStringListFromConfig(FISOC_config, label, ISM_ReqVarList,rc=rc)
+    CALL FISOC_getListFromConfig(FISOC_config, label, ISM_ReqVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     label = 'FISOC_ISM_DerVars:' ! also derived ISM variables
-    CALL FISOC_getStringListFromConfig(FISOC_config, label, ISM_DerVarList,rc=rc)
+    CALL FISOC_getListFromConfig(FISOC_config, label, ISM_DerVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -417,13 +417,13 @@ CONTAINS
 
     ! extract a list of derived ISM variables from the configuration object
     label = 'FISOC_ISM_DerVars:' 
-    CALL FISOC_getStringListFromConfig(FISOC_config, label, FISOC_ISM_DerVarList,rc=rc)
+    CALL FISOC_getListFromConfig(FISOC_config, label, FISOC_ISM_DerVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     label = 'FISOC_ISM_ReqVars:' 
-    CALL FISOC_getStringListFromConfig(FISOC_config, label, FISOC_ISM_ReqVarList,rc=rc)
+    CALL FISOC_getListFromConfig(FISOC_config, label, FISOC_ISM_ReqVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -470,13 +470,13 @@ CONTAINS
 
     ! extract a list of derived ISM variables from the configuration object
     label = 'FISOC_ISM_DerVars:' 
-    CALL FISOC_getStringListFromConfig(FISOC_config, label, FISOC_ISM_DerVarList,rc=rc)
+    CALL FISOC_getListFromConfig(FISOC_config, label, FISOC_ISM_DerVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     label = 'FISOC_ISM_ReqVars:' 
-    CALL FISOC_getStringListFromConfig(FISOC_config, label, FISOC_ISM_ReqVarList,rc=rc)
+    CALL FISOC_getListFromConfig(FISOC_config, label, FISOC_ISM_ReqVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
