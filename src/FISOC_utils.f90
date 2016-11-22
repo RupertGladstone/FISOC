@@ -8,11 +8,19 @@ MODULE FISOC_utils_MOD
 
   PRIVATE
 
-  PUBLIC   FISOC_getListFromConfig, FISOC_populateFieldBundle, FISOC_ConfigDerivedAttribute, &
-       FISOC_initCumulatorFB, FISOC_zeroBundle, FISOC_cumulateFB, FISOC_processCumulator, msg,    &
-       FISOC_VM_MPI_Comm_dup, FISOC_FieldRegridStore, FISOC_FB2NC, FISOC_setClocks, & 
-       FISOC_destroyClocks, FISOC_ISM2OM, FISOC_OM2ISM, FISOC_shrink, FISOC_VMAllGather
+  PUBLIC   FISOC_getListFromConfig, FISOC_populateFieldBundle, &
+       FISOC_ConfigDerivedAttribute, FISOC_initCumulatorFB,    &
+       FISOC_zeroBundle, FISOC_cumulateFB,                     & 
+       FISOC_processCumulator, msg, FISOC_VM_MPI_Comm_dup,     &
+       FISOC_FieldRegridStore, FISOC_FB2NC, FISOC_setClocks,   & 
+       FISOC_destroyClocks, FISOC_ISM2OM, FISOC_OM2ISM,        &
+       FISOC_shrink, FISOC_VMAllGather, Unique1DArray
   
+  INTERFACE Unique1DArray
+     MODULE PROCEDURE Unique1DArray_I4
+     MODULE PROCEDURE Unique1DArray_D
+  END INTERFACE Unique1DArray
+
   INTERFACE FISOC_VMAllGather 
      MODULE PROCEDURE FISOC_VMAllGather_Int   
      MODULE PROCEDURE FISOC_VMAllGather_Real
@@ -1462,5 +1470,58 @@ CONTAINS
     END IF
 
   END SUBROUTINE FISOC_VMAllGather_Real
+
+
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE Unique1DArray_I4(Arr_a)
+    ! Author: Kong, kinaxj@gmail.com
+    IMPLICIT NONE
+    INTEGER(ESMF_KIND_I4),DIMENSION(:),ALLOCATABLE ::Arr_a,Arr_b
+    LOGICAL,DIMENSION(:),ALLOCATABLE            ::mask
+    INTEGER,DIMENSION(:),ALLOCATABLE            ::index_vector,indexSos
+    INTEGER                                     ::i,j,num
+    
+    num=SIZE(Arr_a);  ALLOCATE(mask(num)); mask = .TRUE.
+    DO i=num,2,-1
+       mask(i)=.NOT.(ANY(Arr_a(:i-1)==Arr_a(i)))
+    END DO
+    
+    ! Make an index vector
+    ALLOCATE(indexSos(SIZE(PACK([(i,i=1,num)],mask))))
+    ALLOCATE(index_vector(SIZE(indexSos))); index_vector=PACK([(i,i=1,num)],mask)
+    
+    ! Now copy the unique elements of a into b
+    ALLOCATE(Arr_b(SIZE(index_vector)))
+    Arr_b=Arr_a(index_vector)
+    CALL move_alloc(Arr_b,Arr_a)
+    
+  END SUBROUTINE  Unique1DArray_I4
+  
+  !------------------------------------------------------------------------------
+  SUBROUTINE Unique1DArray_D(Arr_a)
+    ! Author: Kong, kinaxj@gmail.com
+    IMPLICIT NONE
+    REAL(ESMF_KIND_R8),DIMENSION(:),ALLOCATABLE ::Arr_a,Arr_b
+    LOGICAL,DIMENSION(:),ALLOCATABLE            ::mask
+    INTEGER,DIMENSION(:),ALLOCATABLE            ::index_vector,indexSos
+    INTEGER                                     ::i,j,num
+    
+    num=SIZE(Arr_a);  ALLOCATE(mask(num)); mask = .TRUE.
+    DO i=num,2,-1
+       mask(i)=.NOT.(ANY(Arr_a(:i-1)==Arr_a(i)))
+    END DO
+    
+    ! Make an index vector
+    ALLOCATE(indexSos(SIZE(PACK([(i,i=1,num)],mask))))
+    ALLOCATE(index_vector(SIZE(indexSos))); index_vector=PACK([(i,i=1,num)],mask)
+    
+    ! Now copy the unique elements of a into b
+    ALLOCATE(Arr_b(SIZE(index_vector)))
+    Arr_b=Arr_a(index_vector)
+    CALL move_alloc(Arr_b,Arr_a)
+    
+  END SUBROUTINE  Unique1DArray_D
+
 
 END MODULE FISOC_utils_MOD

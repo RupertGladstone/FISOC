@@ -776,38 +776,29 @@ INTEGER,ALLOCATABLE :: dummyIDs(:)
 REAL(ESMF_KIND_R8),POINTER :: ptr_ESMF(:),ptr_Elmer(:)
 
     ! Create dummy array on the distgrid for ESMF Elmer mesh
-!    CALL ESMF_MeshGet(ESMF_ElmerMesh, nodalDistgrid=distgridESMF, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-distgridESMF  = ESMF_DistgridCreate(ElmerIDs, rc=rc)
-IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-     line=__LINE__, file=__FILE__)) &
-     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_MeshGet(ESMF_ElmerMesh, nodalDistgrid=distgridESMF, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!distgridESMF  = ESMF_DistgridCreate(ElmerIDs, rc=rc)
+!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!     line=__LINE__, file=__FILE__)) &
+!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     DummyArr_ESMF = ESMF_ArrayCreate(distgridESMF, ESMF_TYPEKIND_R8, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
-IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-     line=__LINE__, file=__FILE__)) &
-     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-IF (localPET.EQ.3) THEN
-   ALLOCATE(dummyIDs(SIZE(ElmerIDs)+1))
-   dummyIDs(SIZE(ElmerIDs)+1) = ElmerIDs(1)
-ELSE
-   ALLOCATE(dummyIDs(SIZE(ElmerIDs)))
-END IF
-dummyIDs(1:SIZE(ElmerIDs)) = ElmerIDs(:)
+    CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Create a distgrid containing sequence indices for the Elmer array, i.e. 
     ! containing the duplicate node IDs.  This can be used to create an array 
     ! including duplicates, like the Elmer fields.
-!    distgridElmer  = ESMF_DistgridCreate(ElmerIDs, rc=rc)
-    distgridElmer  = ESMF_DistgridCreate(dummyIDs, rc=rc)
+    distgridElmer  = ESMF_DistgridCreate(arbSeqIndexList=ElmerIDs, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -816,64 +807,48 @@ dummyIDs(1:SIZE(ElmerIDs)) = ElmerIDs(:)
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-IF (localPET.EQ.3) THEN
-!CALL ESMF_DistGridGet(distgridElmer, 0, seqIndexList=tst3, rc=rc)
-CALL ESMF_DistGridGet(distgridElmer, 0,elementCount=ct_Elmer, rc=rc)
-IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-     line=__LINE__, file=__FILE__)) &
-     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-ALLOCATE(dg_Elmer(ct_Elmer))
-CALL ESMF_DistGridGet(distgridElmer, 0, seqIndexList=dg_Elmer, rc=rc)
-IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-     line=__LINE__, file=__FILE__)) &
-     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-CALL ESMF_DistGridGet(distgridESMF, 0,elementCount=ct_ESMF, rc=rc)
-IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-     line=__LINE__, file=__FILE__)) &
-     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-ALLOCATE(dg_ESMF(ct_ESMF))
-CALL ESMF_DistGridGet(distgridESMF, 0, seqIndexList=dg_ESMF, rc=rc)
-IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-     line=__LINE__, file=__FILE__)) &
-     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_DistGridGet(distgridElmer, 0,elementCount=ct_Elmer, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(dg_Elmer(ct_Elmer))
+    CALL ESMF_DistGridGet(distgridElmer, 0, seqIndexList=dg_Elmer, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_DistGridGet(distgridESMF, 0,elementCount=ct_ESMF, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(dg_ESMF(ct_ESMF))
+    CALL ESMF_DistGridGet(distgridESMF, 0, seqIndexList=dg_ESMF, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!CALL ESMF_DistGridGet(distgridESMF,  0, seqIndexList=dg_ESMF, elementCount=ct_ESMF,  rc=rc)
+    !print*," *** ",maxval(dg_Elmer),minval(dg_Elmer),ct_Elmer
+    !print*," *** ",maxval(dg_ESMF),minval(dg_ESMF),ct_ESMF
+
+    ! initialilse arrays to zero, probably not needed
+    CALL ESMF_ArrayGet(DummyArr_Elmer, farrayPtr=ptr_Elmer, rc=rc)
+    CALL ESMF_ArrayGet(DummyArr_ESMF,  farrayPtr=ptr_ESMF, rc=rc)
+    ptr_Elmer=0.0
+    ptr_ESMF=0.0
+
+    ! Create the route handles for later use 
+    CALL ESMF_ArrayRedistStore(DummyArr_ESMF, DummyArr_Elmer, &
+         RH_ESMF2Elmer, ignoreUnmatchedIndices=.TRUE., rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+! Note: many to one default behaviour is not suitable, so don't 
+! use this method for Elmer to ESMF data exchange
+!    CALL ESMF_ArrayRedistStore(DummyArr_Elmer, DummyArr_ESMF, &
+!         RH_Elmer2ESMF, ignoreUnmatchedIndices=.TRUE., rc=rc)
 !    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
 !         line=__LINE__, file=__FILE__)) &
 !         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-!print*," *** ",ElmerIDs
-print*," *** ",ElmerIDs(1)
-!print*," *** "
-!print*," *** ",dg_Elmer(:)
-!print*,distgridElmer
-print*," *** ",maxval(ElmerIDs),minval(ElmerIDs),SIZE(ElmerIDs)
-print*," *** ",maxval(dummyIDs),minval(dummyIDs),SIZE(dummyIDs)
-print*," *** ",maxval(dg_Elmer),minval(dg_Elmer),ct_Elmer
-print*," *** ",maxval(dg_ESMF),minval(dg_ESMF),ct_ESMF
-print*," *** "
-!print*,distgridESMF
-
-END IF
-CALL ESMF_ArrayGet(DummyArr_Elmer, farrayPtr=ptr_Elmer, rc=rc)
-CALL ESMF_ArrayGet(DummyArr_ESMF,  farrayPtr=ptr_ESMF, rc=rc)
-ptr_Elmer=10.0
-ptr_ESMF=5.0
-!print*," *** ",maxval(ptr_Elmer),minval(ptr_Elmer),SIZE(ptr_Elmer)
-!print*," *** ",maxval(ptr_ESMF),minval(ptr_ESMF),SIZE(ptr_ESMF)
-!print*," *** "
-
-! get array pointers for both arrays and check the sizes
-
-    ! Create the route handles for later use 
-    CALL ESMF_ArrayRedistStore(DummyArr_ESMF, DummyArr_Elmer, RH_ESMF2Elmer, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_ArrayRedistStore(DummyArr_Elmer, DummyArr_ESMF, RH_Elmer2ESMF, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Tidy up 
     CALL ESMF_ArrayDestroy(DummyArr_Elmer, rc=rc)
@@ -892,9 +867,6 @@ ptr_ESMF=5.0
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-print*,"end it for now"
-CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
   END SUBROUTINE CreateArrayMappingRouteHandles
 
@@ -1094,7 +1066,7 @@ print*,"node ordering here..."
 
     ! Some nodes will occur on multiple elements.  We only want a 
     ! unique list of nodes here.
-    CALL  Unique1DArray_D(NodeIDs_real)
+    CALL  Unique1DArray(NodeIDs_real)
     DEALLOCATE(EI_NodeIDs)
     ALLOCATE(EI_NodeIDs(SIZE(NodeIDs_real)))
     EI_NodeIDs = NINT(NodeIDs_real)
@@ -1102,30 +1074,6 @@ print*,"node ordering here..."
   END SUBROUTINE findNodesAndElements
 
 
-  !------------------------------------------------------------------------------
-  SUBROUTINE Unique1DArray_D(Arr_a)
-    ! Author: Kong, kinaxj@gmail.com
-    IMPLICIT NONE
-    REAL(ESMF_KIND_R8),DIMENSION(:),ALLOCATABLE ::Arr_a,Arr_b
-    LOGICAL,DIMENSION(:),ALLOCATABLE            ::mask
-    INTEGER,DIMENSION(:),ALLOCATABLE            ::index_vector,indexSos
-    INTEGER                                     ::i,j,num
-    
-    num=SIZE(Arr_a);  ALLOCATE(mask(num)); mask = .TRUE.
-    DO i=num,2,-1
-       mask(i)=.NOT.(ANY(Arr_a(:i-1)==Arr_a(i)))
-    END DO
-    
-    ! Make an index vector
-    ALLOCATE(indexSos(SIZE(PACK([(i,i=1,num)],mask))))
-    ALLOCATE(index_vector(SIZE(indexSos))); index_vector=PACK([(i,i=1,num)],mask)
-    
-    ! Now copy the unique elements of a into b
-    ALLOCATE(Arr_b(SIZE(index_vector)))
-    Arr_b=Arr_a(index_vector)
-    CALL move_alloc(Arr_b,Arr_a)
-    
-  END SUBROUTINE  Unique1DArray_D
   
   !------------------------------------------------------------------------------
   INTEGER FUNCTION numElementsByType(Elmer_mesh,typeList,ESMF_elementTypeList,elementIDlist,elemConn)

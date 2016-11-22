@@ -758,7 +758,8 @@ The config object can be passed to the wrapper and accessed directly.
 
 \section{Pre-requisite installation notes}
 \label{app:A}
-The following commands worked to install NetCDF and ESMF on a Linux Mint system in 2015.
+The following commands worked to install NetCDF and ESMF on a Linux Mint system in 2015 
+in a suitable configuration for use with FISOC. 
 Some pre-requisites for netcdf were also installed.
 The system already had a working OpenMPI installation.
 
@@ -821,7 +822,7 @@ sudo apt-get install ncview
 
 # ESMF requires ESMF_DIR and probably other environment variables.  
 # These can be set at the command line or, for example, in your 
-# .bashrc file.  These might work:
+# .bashrc fileor a local script file.  These might work:
 export ESMF_DIR="/top/level/directory/for/esmf/"
 export ESMF_NETCDF="split"
 export ESMF_NETCDF_INCLUDE="/usr/local/include"
@@ -842,7 +843,17 @@ cd ..
 # will probably end up somewhere like this:
 export ESMFMKFILE="$ESMF_DIR/DEFAULTINSTALLDIR/lib/libO/Linux.gfortran.64.openmpi.default/esmf.mk"
 
-
+\end{lstlisting}
+\vspace{10mm}
+... or for ESMF version 7.0.0 ...
+\begin{lstlisting}[language=bash]
+wget https://sourceforge.net/projects/esmf/files/ESMF_7_0_0/esmf_7_0_0_src.tar.gz
+tar -xf esmf_7_0_0_src.tar.gz 
+\end{lstlisting}
+\vspace{10mm}
+... or for ESMF version 7.1.0 beta snapshot 14 ...
+\begin{lstlisting}[language=bash]
+git archive --remote=git://git.code.sf.net/p/esmf/esmf --format=tar --prefix=esmf/ ESMF_7_1_0_beta_snapshot_14 | tar xf -
 \end{lstlisting}
 
 \end{document}
