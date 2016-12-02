@@ -71,16 +71,22 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! This dummy wrapper aims to create the dummy mesh and required variables 
   ! in the ESMF formats.  
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,FISOC_config,localPet,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,ISM_ExpFB,FISOC_config,vm,rc)
 
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ImpFB, ISM_ExpFB
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ImpFB
+    TYPE(ESMF_VM),INTENT(IN)              :: vm
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
-    INTEGER,INTENT(IN)                    :: localPet
 
+    INTEGER                               :: localPet
     LOGICAL                               :: verbose_coupling
 
     rc = ESMF_FAILURE
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -104,18 +110,24 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Run(FISOC_config,localPet,ISM_ImpFB,ISM_ExpFB,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Run(FISOC_config,vm,ISM_ExpFB,ISM_ImpFB,rc)
 
-    TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
     TYPE(ESMF_config)      :: FISOC_config
-    INTEGER,INTENT(IN)     :: localPet
+    TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
+    TYPE(ESMF_VM)          :: vm
     INTEGER,INTENT(OUT),OPTIONAL :: rc
 
+    INTEGER                      :: localPet
     TYPE(ESMF_field)             :: OM_dBdt_l0, ISM_z_l0, ISM_z_l1
     REAL(ESMF_KIND_R8),POINTER   :: OM_dBdt_l0_ptr(:),ISM_z_l0_ptr(:),ISM_z_l1_ptr(:)
     LOGICAL                      :: verbose_coupling
 
     rc = ESMF_FAILURE
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! query the FISOC config
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)

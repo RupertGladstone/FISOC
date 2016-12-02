@@ -62,7 +62,6 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-print*,"reqvars ",ISM_ReqVarList
     CALL FISOC_populateFieldBundle(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -100,8 +99,8 @@ print*,"reqvars ",ISM_ReqVarList
   !-----------------------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,ISM_ExpFB,FISOC_config,vm,rc)
 
-    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ImpFB, ISM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_VM),INTENT(IN)              :: vm
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
