@@ -411,7 +411,7 @@ CONTAINS
     INTEGER, INTENT(OUT),OPTIONAL          :: rc
 
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: FISOC_ISM_DerVarList(:),FISOC_ISM_ReqVarList(:)
-    CHARACTER(len=ESMF_MAXSTR)             ::  label
+    CHARACTER(len=ESMF_MAXSTR)             :: label
     INTEGER                                :: ii, numDerVars
 
     rc = ESMF_FAILURE
