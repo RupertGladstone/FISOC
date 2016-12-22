@@ -56,20 +56,30 @@ MODULE FISOC_ISM_Wrapper
   ! during initialisation, and are needed during variable transfer while 
   ! timestepping.
 
-!***might all change...
-  ! How many nodes on the curret PET at the lower surface of the mesh.
+!***many of these might not need to be module scope, need revising
+
+  ! How many nodes on the curret PET for the required mesh boundary (typically lower surface)
   INTEGER  :: EI_numNodes 
   INTEGER, ALLOCATABLE :: EI_NodeIDs(:), EI_ElementIDs(:), nodeOwners(:)
+
+  ! This is an array of Elmer node IDs for the current partition that are owned by 
+  ! the local pet.  This is needed for mapping Elmer data on to the ESMF mesh.
+  INTEGER, ALLOCATABLE :: ownedNodeIDs(:)
   
   ! Global node numbering reference (Elmer uses local node numbering).  We 
   ! must add this number to the node id whenever converting from Elmer node 
   ! ids to ESMF node ids.  Same for element id.
+  ! Edit: probably no longer needed now that full ID lists are kept in memory.
   INTEGER  :: EI_firstNodeThisPET, EI_firstElemThisPET
 
   ! Route handles for switching between Elmer arrays (which include duplicated nodes 
   ! along partition boundaries) and corresponding ESMF arrays (which don't)
   TYPE(ESMF_RouteHandle) :: RH_ESMF2Elmer
-  TYPE(ESMF_RouteHandle) :: RH_Elmer2ESMF
+!  TYPE(ESMF_RouteHandle) :: RH_Elmer2ESMF ! not needed because the redist operation in this direction is not well defined
+
+  ! nodal distgrid, an ESMF object holding information about the distribution of 
+  ! Elmer nodes across partitions, needed for the redist related operations.
+  TYPE(ESMF_distgrid):: distgridElmer
 
 CONTAINS
 
@@ -418,8 +428,9 @@ CONTAINS
 
     INTEGER                               :: fieldCount, localPet, petCount
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
+    TYPE(ESMF_Array)                      :: ESMFarr, Elmerarr 
     CHARACTER(len=ESMF_MAXSTR)            :: fieldName
-    REAL(ESMF_KIND_R8),POINTER            :: ptr(:)
+    REAL(ESMF_KIND_R8),POINTER            :: ptr(:), ptr_Elmer(:)
     INTEGER                               :: ii, jj, nn
     INTEGER,POINTER                       :: EI_fieldPerm(:)
     REAL(KIND=dp),POINTER                 :: EI_fieldVals(:)
@@ -447,7 +458,8 @@ CONTAINS
 
     fieldLoop: DO nn = 1,fieldCount
 
-       ! access the FISOC version of the current field 
+       ! access the FISOC version of the current field, and extract the array 
+       ! from the field (because we can't do a redist on a field)
        CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
@@ -456,33 +468,64 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       CALL ESMF_FieldGet(fieldList(nn), array=ESMFarr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+       ! we need to create an elmer array on the fly and then convert from the 
+       ! array to the elmer variable after the redist...
+       Elmerarr = ESMF_ArrayCreate(distgridElmer, ESMF_TYPEKIND_R8, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
+       
+       ! now redist the ESMF array onto the Elmer array (this is still not yet 
+       ! in an Elmer variable)
+       CALL ESMF_ArrayRedist(ESMFarr, Elmerarr, RH_ESMF2Elmer, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-       ! access the Elmer/Ice version of the current field
+       ! ...and get a pointer to the data
+       CALL ESMF_ArrayGet(Elmerarr, farrayPtr=ptr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       ! check if the current variable is in the list of variables to be passed 
+       ! to Elmer
        IF (FISOC_OM2ISM(fieldName,FISOC_config,rc=rc)) THEN
 
           SELECT CASE (TRIM(ADJUSTL(fieldName)))
               
           CASE ('OM_dBdt_l0')
 
+             ! access the Elmer/Ice variable for the current field
              EI_field => VariableGet( CurrentModel % Mesh % Variables, &
                   EIname_dBdt_l0, UnFoundFatal=.TRUE.)
              EI_fieldVals => EI_field % Values
              EI_fieldPerm => EI_field % Perm
-             DO ii = 1,EI_numNodes
-!                EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(EI_firstNodeThisPET+ii-1) * FISOC_secPerYear
-                EI_fieldVals(EI_fieldPerm(EI_nodeIds(ii))) = ptr(ii) * FISOC_secPerYear
-             END DO
+
+             ! copy the data from the Elmer array (ESMF object) to the Elmer 
+             ! vairable (native Elmer object)
+             EI_fieldVals = ptr * FISOC_secPerYear
+
+!             DO ii = 1,EI_numNodes
+!!                EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(EI_firstNodeThisPET+ii-1) * FISOC_secPerYear
+!                EI_fieldVals(EI_fieldPerm(EI_nodeIds(ii))) = ptr(ii) * FISOC_secPerYear
+!             END DO
 
           CASE ('OM_temperature_l0')
-             EI_field => VariableGet( CurrentModel % Mesh % Variables, &
-                  EIname_temperature_l0, UnFoundFatal=.TRUE.)
-             EI_fieldVals => EI_field % Values
-             EI_fieldPerm => EI_field % Perm
-             DO ii = 1,EI_numNodes
+print*,"Hang on, need to get temperature exchange going too..."
+!             EI_field => VariableGet( CurrentModel % Mesh % Variables, &
+!                  EIname_temperature_l0, UnFoundFatal=.TRUE.)
+!             EI_fieldVals => EI_field % Values
+!             EI_fieldPerm => EI_field % Perm
+!             DO ii = 1,EI_numNodes
 !                EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(EI_firstNodeThisPET+ii-1)
-                EI_fieldVals(EI_fieldPerm(EI_nodeIds(ii))) = ptr(ii)
-             END DO
+!                EI_fieldVals(EI_fieldPerm(EI_nodeIds(ii))) = ptr(ii)
+!             END DO
 
           CASE ('OM_turnips')
              msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
@@ -530,6 +573,10 @@ CONTAINS
     REAL(KIND=dp),POINTER                 :: EI_fieldVals(:)
     TYPE(Variable_t),POINTER              :: EI_field
 
+!INTEGER :: numOwnedNodes
+!TYPE(ESMF_MESH) :: ElMesh
+!real(ESMF_KIND_R8),ALLOCATABLE :: ElMeshCoords(:)
+
     rc = ESMF_FAILURE
 
     CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
@@ -570,18 +617,34 @@ CONTAINS
           EI_field => VariableGet( CurrentModel % Mesh % Variables, &
                EIname_z_l0, UnFoundFatal=.TRUE.)
           EI_fieldVals => EI_field % Values
-          DO ii = 1,EI_numNodes
-!              ptr(EI_firstNodeThisPET+ii-1) = EI_fieldVals(nodeIds(ii))
-!if (ii.gt.EI_numNodes) then
-!print*,'oh'
-!print*,size(EI_nodeIds),EI_numNodes,maxval(EI_nodeIds)
-!end if
-             IF (localPET.EQ.nodeOwners(ii)) THEN
-if ((EI_nodeIDs(ii).gt.size(ptr)).and.(localPET.eq.3)) print *, 'flarp ',size(ptr),ii,EI_nodeIds(ii),localPET,nodeOwners(ii)
-                ptr(ii) = EI_fieldVals(EI_nodeIds(ii))
-             END IF
+          DO ii = 1,SIZE(ownedNodeIDs)
+             ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
           END DO
           
+
+!call ESMF_FieldGet(fieldList(nn), mesh=ElMesh, rc=rc)
+!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!     line=__LINE__, file=__FILE__)) &
+!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!CALL ESMF_MeshGet(ElMesh, numOwnedNodes=numOwnedNodes, rc=rc)
+!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!     line=__LINE__, file=__FILE__)) &
+!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!ALLOCATE(ElMeshCoords(2*numOwnedNodes))
+!CALL ESMF_MeshGet(ElMesh, ownedNodeCoords=ElMeshCoords, rc=rc)
+!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!     line=__LINE__, file=__FILE__)) &
+!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!print*,SIZE(ptr),numOwnedNodes,EI_numNodes,SIZE(ownedNodeIDs)
+!print*,CurrentModel % Mesh % Nodes % x(ownedNodeIDs(ii)), CurrentModel % Mesh % Nodes % y(ownedNodeIDs(ii))
+!print*,ElMeshCoords(ii*2-1),ElMeshCoords(ii*2)
+!print*,CurrentModel % Mesh % Nodes % x(1), CurrentModel % Mesh % Nodes % y(1)
+!print*,MAXVAL(CurrentModel % Mesh % Nodes % x), MAXVAL(CurrentModel % Mesh % Nodes % y)
+!print*,MINVAL(CurrentModel % Mesh % Nodes % x), MINVAL(CurrentModel % Mesh % Nodes % y)
+!print*,MAXVAL(ElMeshCoords),MAXVAL(ElMeshCoords)
+!print*,MINVAL(ElMeshCoords),MINVAL(ElMeshCoords)
+!END IF
+
        CASE ('ISM_temperature_l0','ISM_temperature_l1','ISM_velocity_l0','ISM_z_l1','ISM_z_l0_previous')
           msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
@@ -720,6 +783,8 @@ print*,"change comments about EI vars at top when resolved..."
 
     CALL uniquifyGlobalNodeIDs(nodeIDs_global,nodeCoords,vm)
 
+    ownedNodeIDs = locallyOwnedNodes(nodeOwners,localPet,EI_NodeIDs)
+
     ! TODO (probably not urgent)
     ! Note that ElmerMesh%ParallelInfo%GlobalDOFs may already contain global unique node ids 
     ! (not just for the boundary of interest but for the whole mesh). It might make sense to 
@@ -766,7 +831,7 @@ print*,"change comments about EI vars at top when resolved..."
 
     TYPE(ESMF_array)   :: DummyArr_ESMF  ! will not contain duplicate nodes
     TYPE(ESMF_array)   :: DummyArr_Elmer ! will contain duplicate nodes
-    TYPE(ESMF_distgrid):: distgridElmer, distgridESMF
+    TYPE(ESMF_distgrid):: distgridESMF
     INTEGER            :: rc
 
     INTEGER,TARGET :: tst
@@ -775,22 +840,22 @@ INTEGER :: ct_Elmer, ct_ESMF,localPET,PETcount,tmp
 INTEGER,ALLOCATABLE :: dummyIDs(:)
 REAL(ESMF_KIND_R8),POINTER :: ptr_ESMF(:),ptr_Elmer(:)
 
+    CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     ! Create dummy array on the distgrid for ESMF Elmer mesh
     CALL ESMF_MeshGet(ESMF_ElmerMesh, nodalDistgrid=distgridESMF, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!distgridESMF  = ESMF_DistgridCreate(ElmerIDs, rc=rc)
+!distgridESMF  = ESMF_DistgridCreate(arbSeqIndexList=ElmerIDs, rc=rc)
 !IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
 !     line=__LINE__, file=__FILE__)) &
 !     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     DummyArr_ESMF = ESMF_ArrayCreate(distgridESMF, ESMF_TYPEKIND_R8, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -807,24 +872,25 @@ REAL(ESMF_KIND_R8),POINTER :: ptr_ESMF(:),ptr_Elmer(:)
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_DistGridGet(distgridElmer, 0,elementCount=ct_Elmer, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ALLOCATE(dg_Elmer(ct_Elmer))
-    CALL ESMF_DistGridGet(distgridElmer, 0, seqIndexList=dg_Elmer, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_DistGridGet(distgridESMF, 0,elementCount=ct_ESMF, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ALLOCATE(dg_ESMF(ct_ESMF))
-    CALL ESMF_DistGridGet(distgridESMF, 0, seqIndexList=dg_ESMF, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!get stuff for printing
+!    CALL ESMF_DistGridGet(distgridElmer, 0,elementCount=ct_Elmer, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    ALLOCATE(dg_Elmer(ct_Elmer))
+!    CALL ESMF_DistGridGet(distgridElmer, 0, seqIndexList=dg_Elmer, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    CALL ESMF_DistGridGet(distgridESMF, 0,elementCount=ct_ESMF, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    ALLOCATE(dg_ESMF(ct_ESMF))
+!    CALL ESMF_DistGridGet(distgridESMF, 0, seqIndexList=dg_ESMF, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     !print*," *** ",maxval(dg_Elmer),minval(dg_Elmer),ct_Elmer
     !print*," *** ",maxval(dg_ESMF),minval(dg_ESMF),ct_ESMF
@@ -859,14 +925,14 @@ REAL(ESMF_KIND_R8),POINTER :: ptr_ESMF(:),ptr_Elmer(:)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_DistGridDestroy(distgridElmer, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_DistGridDestroy(distgridESMF, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    CALL ESMF_DistGridDestroy(distgridElmer, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    CALL ESMF_DistGridDestroy(distgridESMF, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
   END SUBROUTINE CreateArrayMappingRouteHandles
 
@@ -980,6 +1046,33 @@ print*,"node ordering here..."
   END SUBROUTINE buildElementConnectivity
 
 
+  !------------------------------------------------------------------------------
+  FUNCTION locallyOwnedNodes(nodeOwners,localPet,EI_NodeIDs)
+
+    INTEGER,DIMENSION(:),ALLOCATABLE ::  locallyOwnedNodes
+    INTEGER,INTENT(IN) :: localPet,nodeOwners(:),EI_NodeIDs(:)
+    INTEGER :: LON_count, ii
+    
+    ! How many of the nodes are locally owned?
+    LON_count = 0
+    DO ii = 1,SIZE(EI_NodeIDs)
+       IF (nodeOwners(ii).EQ.localPet) THEN
+          LON_count = LON_count + 1
+       END IF
+    END DO
+    ALLOCATE(locallyOwnedNodes(LON_count))
+
+    LON_count = 0
+    DO ii = 1,SIZE(EI_NodeIDs)
+       IF (nodeOwners(ii).EQ.localPet) THEN
+          LON_count = LON_count + 1
+          locallyOwnedNodes(LON_count) = EI_NodeIDs(ii)
+       END IF
+    END DO
+
+  END FUNCTION locallyOwnedNodes
+
+  
   !------------------------------------------------------------------------------
   INTEGER FUNCTION findIndex(val,IDs)
     INTEGER,INTENT(IN)              :: val
