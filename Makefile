@@ -7,7 +7,9 @@
 ################################################################################
 
 SRCDIR = src
-FFLAGS += -fbacktrace -g -O0
+#FFLAGS += -fbacktrace -g -debug -DD -inline-debug-info -O0
+#FFLAGS += -g -check all -fpe0 -warn -traceback -debug extended
+FFLAGS += -O3 -xHost #-ipo
 
 # check for presence of required env vars
 ifneq ($(origin ESMFMKFILE), environment)
