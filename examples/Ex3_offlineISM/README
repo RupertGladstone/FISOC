@@ -1,0 +1,7 @@
+
+example setup for running ISOMIP+ OCN3 simulation.
+FISOC should be compiled with ISM=FOOL
+
+unpack the netcdf files (in subdir ocn3Forcing):
+tar -xvf isomip_plus_ocean3.tar 
+

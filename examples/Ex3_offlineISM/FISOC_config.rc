@@ -20,15 +20,15 @@
  #    300     3000     295.8
  #  ::
 
-  ISM_configFile:     /short/ks3/FISOC/examples/Ex1_LongThinMIS/FISOC_Ex1.sif
-  FISOC_ISM_ReqVars:    ISM_z_l0 ISM_velocity_l0
-  FISOC_ISM_DerVars:	ISM_z_l0_previous ISM_dddt
-  ISM2OM_vars:        
+  ISM_configFile:     /short/ks3/rmg581/FISOC/examples/Ex3_offlineISM/FOOL_config.rc
+  FISOC_ISM_ReqVars:  ISM_z_l0
+  FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dddt
+  ISM2OM_vars:        ISM_z_l0
   ISM_stdoutFile:     EI_out
-  ISM_gridType:       ESMF_mesh
+  ISM_gridType:       ESMF_grid
 
   OM_configFile:      /short/ks3/ROMSIceShelf_MISOMIP/ROMS/External/ocean_isomip_plus_new.in
-  OM_stdoutFile:      /short/ks3/rmg581/FISOC/ROMS_stdout.asc
+  OM_stdoutFile:      /short/ks3/FISOC/ROMS_stdout.asc
   OM_writeNetcdf:     .TRUE.
   output_dir:         /short/ks3/rmg581/FISOC/output
 
