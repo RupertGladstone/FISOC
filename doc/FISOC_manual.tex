@@ -263,7 +263,7 @@ environment variables.  For example:
 export MY_ROMS_DIR="/home/elmeruser/Source/ROMSIceShelf_devel"
 export FISOC_OM="ROMS"
 export FISOC_OM_LIBS="-loceanM"
-export FISOC_OM_INCLUDE="${MY_ROMS_DIR}/Build"
+export FISOC_OM_INCLUDE="\${MY_ROMS_DIR}/Build"
 export FISOC_OM_LIBPATH="/usr/local/lib"
 \end{lstlisting}
 
@@ -350,6 +350,9 @@ List of variable names required to be provided by the ISM.                 \\
 List of variables derived by FISOC from the ISM vars.                      \\ 
 To be calculated from ISM vars by hard coded routines in FISOC\_ISM.       \\
 \vspace{6pt}
+\textbf{ISM\_grdType:}        [STRING] [required]                          \\
+Which ESMF object to use.  Valid values are ESMF\_mesh and ESMF\_grid.     \\
+\vspace{6pt}
 
 \textbf{OM\_configFile:}      [STRING] [optional]                          \\
 The name of the ISM-specific config file.                                  \\
@@ -376,6 +379,9 @@ Defaults to current directory.                                             \\
 Switch to allow the OM to overwrite its cavity geometry with ISM\_z\_l0 
 during the second phase of initialisation.
 Defaults to .FALSE.                                                        \\
+\vspace{6pt}
+\textbf{OM\_grdType:}        [STRING] [required]                           \\
+Which ESMF object to use.  Valid values are ESMF\_mesh and ESMF\_grid.     \\
 \vspace{6pt}
 
 \textbf{OM\_outputInterval:} [INTEGER][optional]                           \\
@@ -412,6 +418,12 @@ Valid values are given in Table~\ref{tab:vars}.
 Note that the units given in Table~\ref{tab:vars} are suggested units.  FISOC doesn't care about units, but 
 the user must ensure unit consistency.  There may be hard coded unit assumptions in the model specific 
 wrappers.
+
+OM\_grdType and ISM\_grdType refer to the type of ESMF object to be used for holding information about 
+the model grid.  Typically models utilising unstructured meshes (e.g. Elmer/Ice) would use an 
+ESMF\_mesh object for holding mesh information in FISOC and models utilising structured grids 
+(e.g. ROMS) would use an ESMF\_grid object for holding grid information in FISOC.
+
 
 ***variable names: sort out dddt and dBdt\_l0.  consistent naming convention needed.
 
@@ -492,9 +504,41 @@ For example (it is assumed \$ELMER\_HOME was set during Elmer installation):
 export LD_LIBRARY_PATH="$FISOC_ISM_LIBPATH/:$LD_LIBRARY_PATH"
 \end{lstlisting}
 
-***something about parallelism in mesh
+As with a normal Elmer/Ice simulation, the mesh should be partitioned into the 
+same number of partitions as the number of processors (which is the same as the number of 
+ESMF PETs and DEs, but don't worry if you don't know what those things are). 
 
-***add links to elmerice wiki and elmer forum.
+More information about Elmer, and especially Elmer/Ice, can be found on several sources 
+on the internet.
+
+https://www.csc.fi/web/elmer
+
+http://www.nic.funet.fi/pub/sci/physics/elmer/doc/
+
+http://elmerice.elmerfem.org/
+
+http://elmerice.elmerfem.org/wiki/doku.php
+
+http://www.elmerfem.org/forum/
+
+
+
+
+\subsubsection{Elmer/Ice specific configuration}
+
+The following options in the FISOC configuration file are used by Elmer/Ice.  These 
+are non-standard configuration options.
+
+\textbf{ISM\_BodyID:} [INTEGER] [required]                               \\
+The body ID of the surface on which interactions with the ocean occurs.  
+Typically this will be the lower surface, defined as a boundary in the    
+Elmer/Ice mesh file and as a body in the boundary condition section of   
+the .sif.                                                                \\
+\vspace{6pt}
+\textbf{ISM\_ProjVector:} [INTEGER LIST] [optional]                      \\
+3D vector describing the view direction for use in node ordering of 
+elements.  Default down.  NYI
+\vspace{6pt}
 
 
 
