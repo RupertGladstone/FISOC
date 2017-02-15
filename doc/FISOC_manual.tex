@@ -159,17 +159,16 @@ Specifies the linker directives needed to link the ISM library to FISOC. \\
 \label{sec:PreReq}
 
 A Message Passing Interface (MPI) implementation, such as 
-OpenMPI (\url{http://www.open-mpi.org/}), is required. 
+OpenMPI is required.\\
+ \url{http://www.open-mpi.org/}
 
-The Network Common Data Form (NetCDF,  
-\url{http://www.unidata.ucar.edu/software/netcdf/}) 
-Fortran interface must be available 
+The Network Common Data Form (NetCDF) Fortran interface must be available. 
+More specifically, NetCDF4 in parallel should be used (this is not the same as PnetCDF). \\
+\url{http://www.unidata.ucar.edu/software/netcdf/}
 
-ESMF must be available (\url{https://www.earthsystemcog.org/projects/esmf/}).  
-ESMF should have been built with NetCDF and MPI 
-(see also notes in Appendix~\ref{app:A}).
-
-More specifically, NetCDF4 in parallel should be used (this is not the same as PnetCDF).
+ESMF must be available. ESMF should have been built with NetCDF and MPI 
+(see also notes in Appendix~\ref{app:A}). \\
+\url{https://www.earthsystemcog.org/projects/esmf/}.
 
 %For example, environment variables like these may be used for the ESMF build
 %\begin{lstlisting}
@@ -511,16 +510,13 @@ ESMF PETs and DEs, but don't worry if you don't know what those things are).
 More information about Elmer, and especially Elmer/Ice, can be found on several sources 
 on the internet.
 
-https://www.csc.fi/web/elmer
-
-http://www.nic.funet.fi/pub/sci/physics/elmer/doc/
-
-http://elmerice.elmerfem.org/
-
-http://elmerice.elmerfem.org/wiki/doku.php
-
-http://www.elmerfem.org/forum/
-
+\begin{flushleft}
+\url{https://www.csc.fi/web/elmer}\\
+\url{http://www.nic.funet.fi/pub/sci/physics/elmer/doc/}\\
+\url{http://elmerice.elmerfem.org/}\\
+\url{http://elmerice.elmerfem.org/wiki/doku.php}\\
+\url{http://www.elmerfem.org/forum/}\\
+\end{flushleft}
 
 
 
@@ -529,16 +525,18 @@ http://www.elmerfem.org/forum/
 The following options in the FISOC configuration file are used by Elmer/Ice.  These 
 are non-standard configuration options.
 
+\begin{flushleft}
 \textbf{ISM\_BodyID:} [INTEGER] [required]                               \\
 The body ID of the surface on which interactions with the ocean occurs.  
-Typically this will be the lower surface, defined as a boundary in the    
+Typically this will be the lower surface, defined as a boundary in the   
 Elmer/Ice mesh file and as a body in the boundary condition section of   
 the .sif.                                                                \\
 \vspace{6pt}
 \textbf{ISM\_ProjVector:} [INTEGER LIST] [optional]                      \\
-3D vector describing the view direction for use in node ordering of 
-elements.  Default down.  NYI
+3D vector describing the view direction for use in node ordering of      
+elements.  Default down.  NYI                                            \\
 \vspace{6pt}
+\end{flushleft}
 
 
 
