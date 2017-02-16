@@ -4,8 +4,9 @@
 !
 ! Ex1 aims to match the geometry for the ROMS iceshelf2d case.
 !
+! Ex4 aims to match the geometry for the ROMS iceshelf2d_toy case.
 
-MODULE  MOD_Ex1
+MODULE MOD_Ex1
   
   USE DefUtils
   IMPLICIT NONE
@@ -66,6 +67,17 @@ CONTAINS
   END FUNCTION Ex1_bedrock
   
 END MODULE MOD_Ex1
+
+
+!-------------------------------------------------------------------------------
+REAL(KIND=dp) FUNCTION Ex4_LowerSurface(Model, node, x_dist) RESULT(LowerSurface)
+  USE DefUtils
+  TYPE(Model_t),INTENT(IN)  :: Model
+  INTEGER,INTENT(IN)        :: node
+  REAL(KIND=dp),INTENT(IN)  :: x_dist
+  LowerSurface = -450_dp + (400.0_dp * x_dist/100000.)
+!  print*,x_dist,LowerSurface
+END FUNCTION Ex4_LowerSurface
 
 
 !-------------------------------------------------------------------------------

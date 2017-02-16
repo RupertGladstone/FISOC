@@ -1,0 +1,13 @@
+
+
+Uses one of the userfunctions from Ex1:
+cp ../Ex1_LongThinMIS/FISOC_Elmer_geometries.f90 .
+elmerf90 FISOC_Elmer_geometries.f90 -o FISOC_Elmer_geometries.so
+
+Grid creation is similar to Ex1 too, see Ex1 README.
+
+To make the mesh:
+ElmerGrid 1 2 FISOC_Ex4.grd
+
+To partition the mesh for parallel runs (4 partitions):
+ElmerGrid 2 2 FISOC_Ex4 -partition 1 4 0 2
