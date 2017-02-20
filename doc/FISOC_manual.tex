@@ -349,8 +349,13 @@ List of variable names required to be provided by the ISM.                 \\
 List of variables derived by FISOC from the ISM vars.                      \\ 
 To be calculated from ISM vars by hard coded routines in FISOC\_ISM.       \\
 \vspace{6pt}
+\textbf{ISM2OM\_vars:}        [STRING] [required***(default all?)]                          \\
+List of variables to be passed from the ISM to the OM.                     \\ 
+\vspace{6pt}
 \textbf{ISM\_grdType:}        [STRING] [required]                          \\
 Which ESMF object to use.  Valid values are ESMF\_mesh and ESMF\_grid.     \\
+\vspace{6pt}
+\vspace{6pt}
 \vspace{6pt}
 
 \textbf{OM\_configFile:}      [STRING] [optional]                          \\
@@ -379,8 +384,16 @@ Switch to allow the OM to overwrite its cavity geometry with ISM\_z\_l0
 during the second phase of initialisation.
 Defaults to .FALSE.                                                        \\
 \vspace{6pt}
+\textbf{OM2ISM\_vars:}        [STRING] [required***(default all?)]                          \\
+List of variables to be passed from the OM to the ISM.                     \\ 
+\vspace{6pt}
 \textbf{OM\_grdType:}        [STRING] [required]                           \\
 Which ESMF object to use.  Valid values are ESMF\_mesh and ESMF\_grid.     \\
+\vspace{6pt}
+\textbf{OM\_cavityUpdate:}   [STRING] [optional]                           \\
+How to process ISM ice draft for use in OM.  Valid values are RecentIce    \\
+(default), Rate, CorrectedRate, and Linterp.                               \\
+\vspace{6pt}
 \vspace{6pt}
 
 \textbf{OM\_outputInterval:} [INTEGER][optional]                           \\
@@ -403,13 +416,18 @@ End year and month define the finish time of the coupled simulation.       \\
 \vspace{6pt}
 \textbf{end\_month:}         [INTEGER][required]                           \\
 \vspace{6pt}
+\vspace{6pt}
+
 \textbf{verbose\_coupling:}  [LOGICAL][required]                           \\
 If true, some run time information is printed to the screen.  A log file is always 
 written, but writing to the log during timestepping is suppressed when 
 verbose\_coupling is false.\\
 \end{flushleft}
 
+
+
 \subsubsection{FISOC variables}
+\label{sec:FISOCvars}
 
 The union of \textbf{FISOC\_ISM\_ReqVars}, \textbf{FISOC\_ISM\_DerVars}, \textbf{FISOC\_OM\_ReqVars} 
 and \textbf{FISOC\_OM\_DerVars} describes the full set of variables required by FISOC for a given simulation. 
@@ -418,43 +436,37 @@ Note that the units given in Table~\ref{tab:vars} are suggested units.  FISOC do
 the user must ensure unit consistency.  There may be hard coded unit assumptions in the model specific 
 wrappers.
 
-OM\_grdType and ISM\_grdType refer to the type of ESMF object to be used for holding information about 
-the model grid.  Typically models utilising unstructured meshes (e.g. Elmer/Ice) would use an 
-ESMF\_mesh object for holding mesh information in FISOC and models utilising structured grids 
-(e.g. ROMS) would use an ESMF\_grid object for holding grid information in FISOC.
-
-
 ***variable names: sort out dddt and dBdt\_l0.  consistent naming convention needed.
 
 \begin{table}
-\begin{center}
-\begin{tabular}{ l|l|l }
-Variable              & Description                                  & Units \\
-\hline
-ISM\_temperature\_l0  & Ice temperature at the ice ocean interface.  & K \\
-ISM\_temperature\_l1  & Ice temperature in the ISM one level above   & K \\
-                      & the ice ocean interface.                     &   \\ 
-ISM\_z\_l0            & Height relative to sea level of the ice      & m \\
-                      & base.                                        &   \\
-ISM\_z\_l1            & Height relative to sea level of the first    &   \\
-                      & ISM model level above the ice base.          & m \\
-ISM\_z\_l0\_previous  & Height relative to sea level of the ice      &   \\
-                      & base one timestep previously.                & m \\
-ISM\_dTdz\_l0         & Vertical temperature gradient in the ice     &   \\
-                      & at the ice base.                             & K/m \\
-ISM\_dddt             & Rate of change of the height of the ice      &   \\
-                      & base relative to sea level with respect to   &   \\
-                      & time.                                        & m/a \\
-ISM\_velocity\_l0     & Ice flow velocity at the ice base            & m/a \\
-OM\_dBdt\_l0          & Ice shelf basal melt rate                    & m/a \\
-OM\_temperature\_l0   & Ocean temperature at the ice ocean           &   \\
-                      & interface  ***or is this the ocean model...  &   \\
-                      & guessing the ice temperature at the interface&   \\
-\end{tabular}
-\end{center}
-\caption{FISOC standard variables and typical units.  
-  Note that heights relative to sea level are always positive upward.}
-\label{tab:vars}
+  \begin{center}
+    \begin{tabular}{ l|l|l }
+      Variable              & Description                                  & Units \\
+      \hline
+      ISM\_temperature\_l0  & Ice temperature at the ice ocean interface.  & K \\
+      ISM\_temperature\_l1  & Ice temperature in the ISM one level above   & K \\
+                            & the ice ocean interface.                     &   \\ 
+      ISM\_z\_l0            & Height relative to sea level of the ice      & m \\
+                            & base.                                        &   \\
+      ISM\_z\_l1            & Height relative to sea level of the first    &   \\
+                            & ISM model level above the ice base.          & m \\
+      ISM\_z\_l0\_previous  & Height relative to sea level of the ice      &   \\
+                            & base one timestep previously.                & m \\
+      ISM\_dTdz\_l0         & Vertical temperature gradient in the ice     &   \\
+                            & at the ice base.                             & K/m \\
+      ISM\_dddt             & Rate of change of the height of the ice      &   \\
+                            & base relative to sea level with respect to   &   \\
+                            & time.                                        & m/a \\
+      ISM\_velocity\_l0     & Ice flow velocity at the ice base            & m/a \\
+      OM\_dBdt\_l0          & Ice shelf basal melt rate                    & m/a \\
+      OM\_temperature\_l0   & Ocean temperature at the ice ocean           &   \\
+                            & interface  ***or is this the ocean model...  &   \\
+                            & guessing the ice temperature at the interface&   \\
+    \end{tabular}
+  \end{center}
+  \caption{FISOC standard variables and typical units.  
+    Note that heights relative to sea level are always positive upward.}
+  \label{tab:vars}
 \end{table}
 
 As a naming convention, ``z'' refers to the vertical coordinate, and ``l0'' and ``l1'' refer to the 
@@ -484,6 +496,78 @@ ISM\_dddt.  Rate of change of depth of ice base.  This is calculated as
 \begin{equation}
 ISM\_dddt = \frac{ISM\_z\_l0 - ISM\_z\_l0\_previous}{ISM\_dt}
 \end{equation}
+
+Not all ISM variables need to be passed to the OM, and vice versa.  
+This choice is made by the 
+user through use of configuration options ISM2OM\_vars and OM2ISM\_vars.  
+These options alow the user to specify a subset of the full set of 
+required and derived variables that will be passed to the other component 
+in a given simulation.  An empty list can be used to avoid any variables 
+being passed between components.  This can be useful during testing and 
+troubleshooting.
+
+A note on efficiency: All the ISM and OM variables are regridded and passed 
+to the wrapper for the opposite component.  It is at the model-specific 
+wrapper level that ISM2OM\_vars and OM2ISM\_vars are checked.  If regridding 
+becomes a significant proportion of FISOC's computational cost this 
+should be re-implemented to reducenon-essential regridding operations.
+
+
+
+
+
+\subsubsection{Updating the ice shelf cavity for the OM}
+
+See the FISOC GMD paper (***ref) for more details about updating the ocean 
+representation of the ice shelf cavity. 
+Several options are available through FISOC, from the simplest option of using 
+the most recent cavity geometry from the ISM to update the OM representation of 
+cavity geometry to smoother options via either interpolation in time or specifying 
+a rate of change of cavity geometry.
+
+The options (summarised in Table~\ref{tab:cavity}) are all implemented within FISOC, 
+based on the cavity geometry 
+calculated by the ISM.  Some options are through FISOC derived variables, as described 
+in Section~\ref{sec:FISOCvars}.  The key ISM output from which all cavity options 
+are calculated is ISM\_z\_l0.  
+
+\begin{table}
+  \begin{center}
+    \begin{tabular}{ llll }
+      Cavity option  & Summary                                    & Required ISM2OM \\
+                     &                                            &  variable       \\
+      \hline
+      RecentIce      & Most recent ice draft from ISM             & ISM\_z\_l0      \\
+      Rate           & Rate of change of ice draft from two most  & ISM\_dddt       \\
+                     & recent ISM steps                           &                 \\
+      CorrectedRate  & As above with additional drift correction  & ISM\_dddt       \\
+      Linterp        & Time-interpolated ice draft from two most  & ISM\_z\_l0\_linterp \\
+                     &  recent ISM steps                          &                  \\
+    \end{tabular}
+  \end{center}
+  \caption{
+    Cavity update options.  Note that of the possible ISM cavity variables 
+    (ISM\_z\_l0, ISM\_z\_l0\_linterp, ISM\_dddt) only the required variable 
+    (third column) should be passed to the OM (constrained using ISM2OM\_vars).
+  }
+  \label{tab:cavity}
+\end{table}
+
+
+
+
+
+\subsubsection{Grids and meshes}
+OM\_grdType and ISM\_grdType refer to the type of ESMF object to be used for holding information about 
+the model grid.  Typically models utilising unstructured meshes (e.g. Elmer/Ice) would use an 
+ESMF\_mesh object for holding mesh information in FISOC and models utilising structured grids 
+(e.g. ROMS) would use an ESMF\_grid object for holding grid information in FISOC.
+
+
+
+
+
+
 
 
 \subsection{Timestepping}
