@@ -10,7 +10,7 @@ MODULE FISOC_utils_MOD
   PUBLIC  FISOC_getStringListFromConfig, FISOC_populateFieldBundle, FISOC_ConfigDerivedAttribute, &
        FISOC_initCumulatorFB, FISOC_zeroBundle, FISOC_cumulateFB, FISOC_processCumulator, msg,    &
        FISOC_VM_MPI_Comm_dup, FISOC_FieldRegridStore, FISOC_FB2NC, FISOC_setClocks, & 
-       FISOC_destroyClocks, FISOC_ISM2OM, FISOC_OM2ISM
+       FISOC_destroyClocks, FISOC_ISM2OM, FISOC_OM2ISM, FISOC_OneGrid
 
   INTERFACE FISOC_populateFieldBundle
       MODULE PROCEDURE FISOC_populateFieldBundleOn2dGrid
@@ -1129,5 +1129,51 @@ CONTAINS
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_FieldRegridStore
+
+
+  !--------------------------------------------------------------------
+  ! Each gridded component should have either a mesh or a grid.
+  ! If a gridded component has neither or both it is generally fatal.
+  SUBROUTINE FISOC_OneGrid(fatal,grid,mesh)
+
+    LOGICAL,INTENT(IN)                  :: fatal
+    TYPE(ESMF_grid),OPTIONAL,INTENT(IN) :: grid
+    TYPE(ESMF_mesh),OPTIONAL,INTENT(IN) :: mesh
+    
+    IF   (                                                        &
+         ( (PRESENT(grid)) .AND. (PRESENT(mesh)) )                & 
+         .OR.                                                     &
+         ( (.NOT.(PRESENT(grid))) .AND. (.NOT.(PRESENT(mesh))) )  & 
+         ) THEN
+
+       msg = "Expecting one mesh OR one grid per gridded component"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__)
+
+       IF (fatal) CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    END IF
+
+  END SUBROUTINE FISOC_OneGrid
+
+! probably scrap this and use ESMF_FieldRead 
+  !--------------------------------------------------------------------
+  ! Read a netcdf variable into an ESMF field.  
+  !
+  ! Input arguments:
+  !  fileName - name of netcdf file to be read (includes full path) 
+  !  field    - ESMF field object
+  !  varName  - name of variable in the netcdf file
+  ! 
+  ! The data for "varName" will be read from the netcdf file and written 
+  ! to the vlaues for "field".  Dimensions must match.
+  ! 
+!  SUBROUTINE FISOC_NC2FB(fileName,varName,field,rc)
+!    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: fileName, varName
+!    TYPE(ESMF_Field),INTENT(INOUT)        :: field
+!    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+!    TYPE(ESMF_FileStatus_Flag)            :: NC_status
+!    filename = TRIM(output_dir)//'/'//TRIM(filename)
+!  END SUBROUTINE FISOC_NC2FB    
 
 END MODULE FISOC_utils_MOD
