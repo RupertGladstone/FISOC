@@ -837,13 +837,20 @@ here, but for now adapting an existing wrapper module is advised.
 
 ESMF provides defensive error handling, with error codes and error messages passed up the 
 call stack. 
-FISOC implements ``fail fast'' error handling, with errors generally being considered 
+FISOC implements ``fail-fast'' error handling, with errors generally being considered 
 fatal. 
 Exceptions to this may be made where it is safe to do so (e.g. where a default value can be 
 used in the event of  failure to find a config parameter).
 All calls to ESMF routines have return codes checked immediately, and errors logged.
-If components (OM or ISM) provide a return code or  error code, 
+If components (OM or ISM) provide a return code or error code, 
 this should be checked by the component wrapper.
+
+Note that many FISOC subroutines contain a return code, but these are mostly not used in 
+practice.  Since errors are generally considered instantly fatal in FISOC, execution will 
+generaly not get as far as returning a failure code. 
+If a more defensive rather than fail-fast approach is adopted in the future these return 
+codes can be used.
+
 
 
 \subsection{Configuration options}
