@@ -42,8 +42,8 @@ MODULE FISOC_OM_Wrapper
 
   ! These switches correspond to ROMS preprocessor directives.  See also 
   ! ROMS/Include/iceshelf2d.h in ROMS repository.
-  LOGICAL, PARAMETER :: ROMS_MASKING = .FALSE.
-  LOGICAL, PARAMETER :: ROMS_SPHERICAL = .FALSE.
+!  LOGICAL, PARAMETER :: ROMS_MASKING = .FALSE.
+!  LOGICAL, PARAMETER :: ROMS_SPHERICAL = .FALSE.
   
 CONTAINS
   
@@ -101,7 +101,17 @@ CONTAINS
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     ELSE
+       msg = "Calling ROMS initialisation"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_VMBarrier(vm, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        CALL ROMS_initialize(first,mpic,OM_configFile)
+       msg = "Completed ROMS initialisation"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
     
     ! extract a list of required ocean variables from the configuration object
@@ -398,6 +408,16 @@ CONTAINS
        END DO
     END DO
 
+    IF (ASSOCIATED(ptr)) THEN
+       NULLIFY(ptr)
+    END IF
+    
+!also change zice to draft? (both curr and prev, maybe zice too... maybe need to set all of them...)
+    msg = "NYI: masks will be needed for cavity reset (also needs testing)"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+         line=__LINE__, file=__FILE__, rc=rc)
+    CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     rc = ESMF_SUCCESS
 
   END SUBROUTINE CavityReset
@@ -550,7 +570,7 @@ CONTAINS
     JstrR=BOUNDS(Ngrids)%JstrR(localPet)
     JendR=BOUNDS(Ngrids)%JendR(localPet)
     
-    ! get a list of fields and their names form the OM export field bundle
+    ! get a list of fields and their names from the OM export field bundle
     fieldCount = 0
     CALL ESMF_FieldBundleGet(OM_ImpFB, fieldCount=fieldCount, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -584,11 +604,13 @@ CONTAINS
                 END DO
              END DO
              
-          CASE ('ISM_z_l0')
-             !ICESHELFVAR(1) % iceshelf_draft(ii,jj)
-             msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
-             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
-                  line=__LINE__, file=__FILE__, rc=rc)          
+          CASE ('ISM_z_l0','ISM_z_l0_linterp')
+             DO jj = JstrR, JendR
+                DO ii = IstrR, IendR
+                   ICESHELFVAR(1) % iceshelf_draft(ii,jj,2) = ptr(ii,jj)
+                   ICESHELFVAR(1) % iceshelf_dddt(ii,jj)    = 0.0 ! ensure dddt does not influence draft
+                END DO
+             END DO
              
           CASE('ISM_temperature_l0', 'ISM_temperature_l1', 'ISM_z_l1', 'ISM_velocity_l0', 'ISM_z_l0_previous', 'ISM_dTdz_l0')
              msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
@@ -838,122 +860,122 @@ CONTAINS
           !
           if (ii == Idot) then
              if (verbose_coupling) then
-                IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),  &
                         lbound(GRID(ng)%lonp, dim=1), ubound(GRID(ng)%lonp, dim=1),     &
                         lbound(GRID(ng)%lonp, dim=2), ubound(GRID(ng)%lonp, dim=2)
-                ELSE
+#else
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),  &
                         lbound(GRID(ng)%xp, dim=1), ubound(GRID(ng)%xp, dim=1),         &
                         lbound(GRID(ng)%xp, dim=2), ubound(GRID(ng)%xp, dim=2)
-                END IF
+#endif
              end if
              !
              do j2 = JstrV, JendR
                 do i2 = IstrU, IendR
-                   IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                       ptrX(i2,j2) = GRID(ng)%lonp(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%latp(i2,j2)
-                   ELSE
+#else
                       ptrX(i2,j2) = GRID(ng)%xp(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%yp(i2,j2)
-                   END IF
-                   IF (ROMS_MASKING) THEN
+#endif
+#ifdef ROMS_MASKING
                       ptrM(i2,j2) = int(GRID(ng)%pmask(i2,j2))
-                   ELSE
+#else
                       ptrM(i2,j2) = 0
-                   END IF
+#endif
                    ptrA(i2,j2) = GRID(ng)%om_p(i2,j2)*GRID(ng)%on_p(i2,j2)
                 end do
              end do
           else if (ii == Icross) then
              if (verbose_coupling) then
-                IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),  &
                         lbound(GRID(ng)%lonr, dim=1), ubound(GRID(ng)%lonr, dim=1),     &
                         lbound(GRID(ng)%lonr, dim=2), ubound(GRID(ng)%lonr, dim=2)
-                ELSE
+#else
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),  &
                         lbound(GRID(ng)%xr, dim=1), ubound(GRID(ng)%xr, dim=1),     &
                         lbound(GRID(ng)%xr, dim=2), ubound(GRID(ng)%xr, dim=2)
-                END IF
+#endif
              end if
              !
              do j2 = JstrR, JendR
                 do i2 = IstrR, IendR
-                   IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                       ptrX(i2,j2) = GRID(ng)%lonr(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%latr(i2,j2)
-                   ELSE
+#else
                       ptrX(i2,j2) = GRID(ng)%xr(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%yr(i2,j2)
-                   END IF
-                   IF (ROMS_MASKING) THEN
+#endif
+#ifdef ROMS_MASKING
                       ptrM(i2,j2) = int(GRID(ng)%rmask(i2,j2))
-                   ELSE
+#else
                       ptrM(i2,j2) = 0
-                   END IF
+#endif
                    ptrA(i2,j2) = GRID(ng)%om_r(i2,j2)*GRID(ng)%on_r(i2,j2)
                 end do
              end do
           else if (ii == Iupoint) then
              if (verbose_coupling) then
-                IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
                         lbound(GRID(ng)%lonu, dim=1), ubound(GRID(ng)%lonu, dim=1),     &
                         lbound(GRID(ng)%lonu, dim=2), ubound(GRID(ng)%lonu, dim=2)
-                ELSE
+#else
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
                         lbound(GRID(ng)%xu, dim=1), ubound(GRID(ng)%xu, dim=1),     &
                         lbound(GRID(ng)%xu, dim=2), ubound(GRID(ng)%xu, dim=2)
-                END IF
+#endif
              end if
              !
              do j2 = JstrU, JendU
                 do i2 = IstrU, IendU
-                   IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                       ptrX(i2,j2) = GRID(ng)%lonu(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%latu(i2,j2)
-                   ELSE
+#else
                       ptrX(i2,j2) = GRID(ng)%xu(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%yu(i2,j2)
-                   END IF
-                   IF (ROMS_MASKING) THEN
+#endif
+#ifdef ROMS_MASKING
                       ptrM(i2,j2) = int(GRID(ng)%umask(i2,j2))
-                   ELSE
+#else
                       ptrM(i2,j2) = 0
-                   END IF
+#endif
                    ptrA(i2,j2) = GRID(ng)%om_u(i2,j2)*GRID(ng)%on_u(i2,j2)
                 end do
              end do
           else if (ii == Ivpoint) then
              if (verbose_coupling) then
-                IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
                         lbound(GRID(ng)%lonv, dim=1), ubound(GRID(ng)%lonv, dim=1), &
                         lbound(GRID(ng)%lonv, dim=2), ubound(GRID(ng)%lonv, dim=2)
-                ELSE
+#else
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
                         lbound(GRID(ng)%xv, dim=1), ubound(GRID(ng)%xv, dim=1), &
                         lbound(GRID(ng)%xv, dim=2), ubound(GRID(ng)%xv, dim=2)
-                END IF
+#endif
                 
                 end if
                 !
              do j2 = JstrV, JendV
                 do i2 = IstrV, IendV
-                   IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                       ptrX(i2,j2) = GRID(ng)%lonv(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%latv(i2,j2)
-                   ELSE
+#else
                       ptrX(i2,j2) = GRID(ng)%xv(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%yv(i2,j2)
-                   END IF
-                   IF (ROMS_MASKING) THEN
+#endif
+#ifdef ROMS_MASKING
                       ptrM(i2,j2) = int(GRID(ng)%vmask(i2,j2))
-                   ELSE
+#else
                       ptrM(i2,j2) = 0
-                   END IF
+#endif
                    ptrA(i2,j2) = GRID(ng)%om_v(i2,j2)*GRID(ng)%on_v(i2,j2)
                 end do
              end do

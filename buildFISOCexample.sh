@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
                                                                                                             
-export FISOC_MPI="yes"
+export CPPFLAGS="$CPPFLAGS -D FISOC_MPI"
 
 #export FISOC_ISM="dummy"
 #export FISOC_ISM_LIBS=""
@@ -27,6 +27,7 @@ export FISOC_OM="ROMS"
 export FISOC_OM_LIBS="-loceanM"
 export FISOC_OM_INCLUDE="${MY_ROMS_DIR}/Build"
 export FISOC_OM_LIBPATH="/usr/local/lib"
+export CPPFLAGS="$CPPFLAGS -D ROMS_MASKING"
 
 export ESMFMKFILE="$ESMF_DIR/DEFAULTINSTALLDIR/lib/libO/Linux.gfortran.64.openmpi.default/esmf.mk"
 
