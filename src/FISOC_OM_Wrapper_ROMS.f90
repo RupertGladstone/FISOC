@@ -598,19 +598,32 @@ CONTAINS
           SELECT CASE (TRIM(ADJUSTL(fieldName)))
              
           CASE ('ISM_dddt')
+# ifdef ROMS_DDDT
              DO jj = JstrR, JendR
                 DO ii = IstrR, IendR
                    ICESHELFVAR(1) % iceshelf_dddt(ii,jj) = ptr(ii,jj)
                 END DO
              END DO
+# else
+             msg = "Trying to pass DDDT to ROMS but incompatible cpp"
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+                  line=__LINE__, file=__FILE__, rc=rc)          
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
              
           CASE ('ISM_z_l0','ISM_z_l0_linterp')
+# ifdef ROMS_DRAFT
              DO jj = JstrR, JendR
                 DO ii = IstrR, IendR
                    ICESHELFVAR(1) % iceshelf_draft(ii,jj,2) = ptr(ii,jj)
-                   ICESHELFVAR(1) % iceshelf_dddt(ii,jj)    = 0.0 ! ensure dddt does not influence draft
                 END DO
              END DO
+# else
+             msg = "Trying to pass draft to ROMS but incompatible cpp"
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+                  line=__LINE__, file=__FILE__, rc=rc)          
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
              
           CASE('ISM_temperature_l0', 'ISM_temperature_l1', 'ISM_z_l1', 'ISM_velocity_l0', 'ISM_z_l0_previous', 'ISM_dTdz_l0')
              msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))

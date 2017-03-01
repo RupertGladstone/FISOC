@@ -262,10 +262,22 @@ environment variables.  For example:
 export MY_ROMS_DIR="/home/elmeruser/Source/ROMSIceShelf_devel"
 export FISOC_OM="ROMS"
 export FISOC_OM_LIBS="-loceanM"
-export FISOC_OM_INCLUDE="\${MY_ROMS_DIR}/Build"
+export FISOC_OM_INCLUDE="${MY_ROMS_DIR}/Build"
 export FISOC_OM_LIBPATH="/usr/local/lib"
 \end{lstlisting}
 
+ROMS uses C preprocessor (cpp) directives to determine which parts of the code are compiled, 
+and these may vary across experiments, requiring ROMS to be compiled multiple times. 
+Some of these require matching cpp directives in the FISOC compilation process. 
+These can be set for a FISOC build using the CPPFLAGS environment variable.
+For example (see also the example FISOC build script):
+\begin{lstlisting}
+export CPPFLAGS="$CPPFLAGS -D ROMS_DRAFT"
+\end{lstlisting}
+At the time of writing, the relevant values are ROMS\_MASKING, ROMS\_SPHERICAL, 
+ROMS\_DDDT and ROMS\_DRAFT.  The general rule is that any of these directives that 
+are defined for the ROMS compilation need to be defined also for the FISOC 
+compilation. 
 
 
 
