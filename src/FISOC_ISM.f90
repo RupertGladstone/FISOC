@@ -467,7 +467,7 @@ CONTAINS
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-       CASE ("ISM_dddt","ISM_dTdz_l0")
+       CASE ("ISM_dddt","ISM_dTdz_l0","ISM_z_l0_linterp")
 
        CASE DEFAULT
           msg="ERROR: derived variable name not recognised"
@@ -515,7 +515,7 @@ CONTAINS
 
        SELECT CASE(FISOC_ISM_DerVarList(ii))
 
-       CASE ("ISM_z_l0_previous")
+       CASE ("ISM_z_l0_previous","ISM_z_l0_linterp")
 
        CASE ("ISM_dddt")
           CALL ISM_derive_dddt(ISM_ExpFB,FISOC_config,rc)

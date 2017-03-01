@@ -9,8 +9,8 @@ MODULE FISOC_utils_MOD
 
   PUBLIC  FISOC_getStringListFromConfig, FISOC_populateFieldBundle, FISOC_ConfigDerivedAttribute, &
        FISOC_initCumulatorFB, FISOC_zeroBundle, FISOC_cumulateFB, FISOC_processCumulator, msg,    &
-       FISOC_VM_MPI_Comm_dup, FISOC_FieldRegridStore, FISOC_FB2NC, FISOC_setClocks, & 
-       FISOC_destroyClocks, FISOC_ISM2OM, FISOC_OM2ISM, FISOC_OneGrid
+       FISOC_VM_MPI_Comm_dup, FISOC_FieldRegridStore, FISOC_FB2NC, FISOC_setClocks,               & 
+       FISOC_destroyClocks, FISOC_ISM2OM, FISOC_OM2ISM, FISOC_OneGrid, FISOC_cavityCheckOptions 
 
   INTERFACE FISOC_populateFieldBundle
       MODULE PROCEDURE FISOC_populateFieldBundleOn2dGrid
@@ -19,12 +19,60 @@ MODULE FISOC_utils_MOD
 
   INTERFACE FISOC_ConfigDerivedAttribute
       MODULE PROCEDURE FISOC_ConfigDerivedAttributeInteger
+      MODULE PROCEDURE FISOC_ConfigDerivedAttributeString
       MODULE PROCEDURE FISOC_ConfigDerivedAttributeStaggerLocArray
   END INTERFACE 
 
   CHARACTER(len=ESMF_MAXSTR) :: msg
 
 CONTAINS
+
+
+
+  !------------------------------------------------------------------------------
+  ! 
+  ! check whether too many cavity geometry options are being passed to the OM
+  SUBROUTINE FISOC_cavityCheckOptions(FISOC_config,rc)
+
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    INTEGER,INTENT(OUT)                   :: rc
+
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM2OM_Vars(:)
+    CHARACTER(len=ESMF_MAXSTR)            :: label
+    INTEGER                               :: ii, count
+
+    rc = ESMF_FAILURE
+
+    label = 'ISM2OM_vars:'
+    CALL FISOC_getStringListFromConfig(FISOC_config, label, ISM2OM_Vars,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) THEN
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    count = 0
+    DO ii=1,SIZE(ISM2OM_Vars)
+          IF (TRIM('ISM_z_l0').EQ.TRIM(ISM2OM_Vars(ii))) count = count + 1
+          IF (TRIM('ISM_z_l0_linterp').EQ.TRIM(ISM2OM_Vars(ii))) count = count + 1
+          IF (TRIM('ISM_dddt').EQ.TRIM(ISM2OM_Vars(ii))) count = count + 1
+    END DO
+
+    IF (count.eq.0) THEN
+       msg = 'no ISM cavity variable will be passed to the OM'
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+            line=__LINE__, file=__FILE__, rc=rc)          
+    END IF
+
+    IF (count.gt.1) THEN
+       msg = 'only 1 ISM cavity variable should be passed to the OM'
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_cavityCheckOptions
 
 
 
@@ -724,6 +772,47 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
+  SUBROUTINE FISOC_ConfigDerivedAttributeString(FISOC_config, derivedAttribute, label,rc)
+    
+    CHARACTER(len=*),INTENT(IN)           :: label
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    CHARACTER(len=ESMF_MAXSTR),INTENT(OUT):: derivedAttribute
+    INTEGER,OPTIONAL,INTENT(OUT)          :: rc
+    
+    CHARACTER(len=ESMF_MAXSTR)            :: OM_cavityUpdate
+
+    rc = ESMF_FAILURE
+
+    SELECT CASE(label)
+
+    CASE("IceDraft")
+       CALL ESMF_ConfigGetAttribute(FISOC_config, OM_cavityUpdate, label='OM_cavityUpdate:', rc=rc)
+print*,'catch error and set default if missing att'
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!          derivedAttribute = 'draft'
+       SELECT CASE(OM_cavityUpdate)
+       CASE('RecentIce','Linterp')
+          derivedAttribute = 'actual'
+       CASE('Rate', 'CorrectedRate')
+          derivedAttribute = 'rate'
+       CASE DEFAULT
+       END SELECT
+ 
+    CASE DEFAULT
+       msg = 'ERROR: unrecognised derived config attribute label '
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END SELECT
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_ConfigDerivedAttributeString
+
+
+  !--------------------------------------------------------------------------------------
   SUBROUTINE FISOC_ConfigDerivedAttributeStaggerLocArray(FISOC_config, derivedAttribute, label, rc)
     
     CHARACTER(len=*),INTENT(IN)           :: label
@@ -922,10 +1011,12 @@ CONTAINS
     TYPE(ESMF_config),INTENT(INOUT)      :: config
 
     CHARACTER(len=ESMF_MAXSTR),INTENT(IN):: label
-    INTEGER,INTENT(OUT),OPTIONAL         :: rc
+    INTEGER,INTENT(OUT)                  :: rc
 
     CHARACTER(len=ESMF_MAXSTR)           :: dummyString
     INTEGER                              :: listCount,ii
+
+    CHARACTER(len=ESMF_MAXSTR)           :: local_label
 
     rc = ESMF_FAILURE
 

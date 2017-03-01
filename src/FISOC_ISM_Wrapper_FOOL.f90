@@ -21,9 +21,10 @@ MODULE FISOC_ISM_Wrapper
 CONTAINS
 
   !--------------------------------------------------------------------------------------
-  ! FOOL stands for FOrcing OffLine.  This wrapper pretends to be an ISM but actually 
+  ! FOOL stands for Forcing OffLine.  This wrapper pretends to be an ISM but actually 
   ! just reads in data from file and uses it to force the ocean. 
   ! 
+
   SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_mesh(ISM_ReqVarList,ISM_ExpFB,ISM_Mesh,&
        FISOC_config,vm,rc)
 
