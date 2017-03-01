@@ -80,6 +80,8 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
+    CALL FISOC_cavityCheckOptions(FISOC_config, rc)
+
     ! create empty field bundle to be populated by model-specific code.
     OM_ExpFB = ESMF_FieldBundleCreate(name='OM export fields', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -244,6 +246,11 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
+    ! The ocean cavity might need temporal linear interpolation at this point.
+    CALL OM_HandleCavity(FISOC_config, FISOC_clock, OM_ImpFB, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
     CALL ESMF_VMBarrier(vm, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -490,5 +497,121 @@ CONTAINS
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_OM_finalise  
+
+
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE OM_HandleCavity(FISOC_config, FISOC_clock, OM_ImpFB, rc)
+
+    TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: OM_ImpFB 
+    INTEGER,INTENT(OUT),OPTIONAL             :: rc
+    TYPE(ESMF_Clock),INTENT(IN)              :: FISOC_clock
+
+    CHARACTER(len=ESMF_MAXSTR)               :: OM_cavityUpdate
+    TYPE(ESMF_Alarm)                         :: alarm_ISM_exportAvailable
+    INTEGER, SAVE                            :: linterpCounter=0
+    INTEGER                                  :: dt_ratio
+
+    REAL(ESMF_KIND_R8)          :: linterpFactor
+    TYPE(ESMF_field)            :: ISM_z_l0, ISM_z_l0_previous, ISM_z_l0_linterp 
+    REAL(ESMF_KIND_R8),POINTER  :: ptr_curr(:,:),ptr_prev(:,:),ptr_linterp(:,:)
+
+    rc = ESMF_FAILURE
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_cavityUpdate,    & 
+         label='OM_cavityUpdate:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, dt_ratio,           & 
+         label='dt_ratio:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+
+    SELECT CASE (OM_cavityUpdate)
+
+    CASE('Rate','RecentIce')
+       ! handled elsewhere, do nothing
+
+    CASE('CorrectedRate')
+       msg = "OM_cavityUpdate NYI (corrRate)"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CASE('Linterp')
+       msg = "OM_cavityUpdate NYI (linterp)"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       ! If an ISM eport is available this means the ISM cavity has been 
+       ! updated.  Each time this happens we can reset a counter.  The 
+       ! counter is used to count steps since the last ISM cavity update. 
+       ! We rely on dt_ratio governing the total number of steps until 
+       ! the next ISM cavity update. 
+       CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_ISM_exportAvailable", alarm_ISM_exportAvailable, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldname='ISM_z_l0', field=ISM_z_l0, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldGet(field=ISM_z_l0, farrayPtr=ptr_curr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldname='ISM_z_l0_previous', field=ISM_z_l0_previous, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldGet(field=ISM_z_l0_previous, farrayPtr=ptr_prev, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldname='ISM_z_l0_linterp', field=ISM_z_l0_linterp, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       CALL ESMF_FieldGet(field=ISM_z_l0_linterp, farrayPtr=ptr_linterp, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN 
+          linterpCounter = 0
+          linterpFactor  = 1.0
+       ELSE
+          linterpCounter = linterpCounter + 1
+          linterpFactor  = linterpCounter/dt_ratio
+       END IF
+
+       ptr_linterp = ptr_prev*(1-linterpFactor) + ptr_curr*(linterpFactor)
+
+       NULLIFY(ptr_prev)
+       NULLIFY(ptr_curr)
+       NULLIFY(ptr_linterp)
+
+    CASE DEFAULT
+       msg = "OM_cavityUpdate not recognised"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END SELECT
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE OM_HandleCavity
 
 END MODULE FISOC_OM_MOD
