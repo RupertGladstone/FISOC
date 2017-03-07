@@ -22,8 +22,8 @@
 
   ISM_configFile:     /short/ks3/rmg581/FISOC/examples/Ex3_offlineISM/FOOL_config.rc
   FISOC_ISM_ReqVars:  ISM_z_l0
-  FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dddt
-  ISM2OM_vars:        ISM_z_l0
+  FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_z_l0_linterp 
+  ISM2OM_vars:        ISM_z_l0_linterp
   ISM_stdoutFile:     EI_out
   ISM_gridType:       ESMF_grid
 
@@ -38,7 +38,7 @@
   OM2ISM_vars:        
   OM_initCavityFromISM: .FALSE.
   OM_gridType:        ESMF_grid
-
+  OM_cavityUpdate:    Linterp
 
   OM_outputInterval: 1296 
 #  OM_outputInterval:  10512
@@ -52,7 +52,7 @@
   #runLength_ISM_steps: 10 
 
 
-!  verbose_coupling:   .FALSE.
+#  verbose_coupling:   .FALSE.
   verbose_coupling:   .TRUE.
 
 
