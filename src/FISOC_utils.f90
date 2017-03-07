@@ -92,7 +92,7 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-    label = 'ISM2OM_Vars:'
+    label = 'ISM2OM_vars:'
     CALL FISOC_getStringListFromConfig(FISOC_config, label, ISM2OM_Vars,rc=rc)
     IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
        msg = "ISM2OM_vars not found in FISOC config file, trying to pass all available vars"
@@ -134,7 +134,7 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-    label = 'OM2ISM_Vars:'
+    label = 'OM2ISM_vars:'
     CALL FISOC_getStringListFromConfig(FISOC_config, label, OM2ISM_Vars,rc=rc)
     IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
        msg = "OM2ISM_vars not found in FISOC config file, trying to pass all available vars"
