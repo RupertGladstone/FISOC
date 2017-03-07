@@ -793,6 +793,7 @@ CONTAINS
     INTEGER                          :: numNodes, numQuadElems, numTriElems, numTotElems
     INTEGER                          :: localPet, petCount, numElems
 
+
     rc = ESMF_FAILURE
 
     msg = "Elmer to ESMF mesh format conversion"
@@ -892,11 +893,13 @@ CONTAINS
        nodeCoords(nodeIndex) = Elmer_mesh % Nodes % y(ii)
     END DO
 
+
     ! Create Mesh structure in 1 step
     ESMF_ElmerMesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
          nodeIds=nodeIds_global, nodeCoords=nodeCoords, &
          nodeOwners=nodeOwners, elementIds=elementIDlist,&
          elementTypes=ESMF_elementTypeList, elementConn=elemConn, &
+         coordSys=ESMF_COORDSYS_CART,                         &
          rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &

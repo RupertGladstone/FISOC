@@ -695,7 +695,7 @@ CONTAINS
     !-----------------------------------------------------------------------
     !     Get limits of the grid arrays (based on PET and nest level)
     !-----------------------------------------------------------------------
-    
+
     IstrR = BOUNDS(ng)%IstrR(localPet)
     IendR = BOUNDS(ng)%IendR(localPet)
     JstrR = BOUNDS(ng)%JstrR(localPet)
@@ -725,6 +725,7 @@ CONTAINS
        deBlockList(2,1,tile+1)=BOUNDS(ng)%Jstr(tile)
        deBlockList(2,2,tile+1)=BOUNDS(ng)%Jend(tile)
     end do
+
     !-----------------------------------------------------------------------
     !     Create ESMF DistGrid based on ROMS model domain decomposition
     !-----------------------------------------------------------------------
@@ -768,6 +769,7 @@ CONTAINS
                gridEdgeLWidth=(/1,1/),                              &
                gridEdgeUWidth=(/1,1/),                              &
                indexflag=ESMF_INDEX_GLOBAL,                         &
+               coordSys=ESMF_COORDSYS_CART,                         &
                name="OM_grid",                                      &
                rc=rc)
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,  &
