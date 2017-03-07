@@ -10,7 +10,7 @@ $gravity = -9.81*yearinsec^2
 $GLTolerance = 1.0e-5
 $name = "BensBoxISM_4b"
 $m = 1.0/3.0
-$dt = 0.25*365.0/365.0
+$dt = 1.0/365.25
 
 
 !--------------------------------------------------------
@@ -25,7 +25,7 @@ _UppSurfPress =  draft*(rhow/rhoi-1.0) * rhoi * gravity  ;\
 
 !! in SI units, input in Kelvin
 $ function capacity(T) { _capacity=146.3+(7.253*T)}
-$ function conductivity(T)  { _conductivity=9.828*exp(-5.7E-03*T)}
+$ function conductivity(T) { _conductivity=9.828*exp(-5.7E-03*T)}
 
 !! pressuremeltingpoint (Pressure in MPa)
 $ function pressuremeltingpoint(PIN) {\
@@ -44,11 +44,12 @@ End
 
 !--------------------------------------------------------
 Simulation
+  Bandwidth optimization = Logical False
   Coordinate System  = Cartesian 3D
   Simulation Type ="Transient"
   Timestepping Method = "BDF"
   BDF Order = 1
-  Timestep Intervals = 4000
+  Timestep Intervals = 1
   Timestep Sizes = Real $dt
   Steady State Min Iterations = 1
   Steady State Max Iterations = 20	
@@ -111,7 +112,8 @@ End
 Body Force 2
   FS lower Accumulation Flux 1 = Real 0.0e0
   FS lower Accumulation Flux 2 = Real 0.0e0
-  FS lower Accumulation Flux 3 = Equals meltRate
+  FS lower Accumulation Flux 3 = Variable meltRate
+    Real MATC "100.0*tx"
 End
 
 

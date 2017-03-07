@@ -44,6 +44,7 @@ End
 
 !--------------------------------------------------------
 Simulation
+  Bandwidth optimization = Logical False
   Coordinate System  = Cartesian 3D
   Simulation Type ="Steady"
   Timestepping Method = "BDF"
