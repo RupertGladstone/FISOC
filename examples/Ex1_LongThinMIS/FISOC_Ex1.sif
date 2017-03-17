@@ -54,7 +54,7 @@ Simulation
   Steady State Max Iterations = 1
   Output Intervals = 50
   Initialize Dirichlet Conditions = Logical False
-  Output File = "$name".result"
+  Output File = "$name".result"  !"
 !  Post File = $name".vtu"
   max output level = 9
   Extruded Mesh Levels = Integer 10
@@ -247,7 +247,7 @@ Solver 5
   Bedrock Variable = String "bedrock"
   Toler = Real $GLTolerance
   SaveGL = Logical True
-  Save File Name = String "GL".dat"
+  Save File Name = String "GL".dat" !"
 End
 
 Solver 6

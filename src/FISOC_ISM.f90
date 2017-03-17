@@ -130,7 +130,7 @@ CONTAINS
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CASE DEFAULT
-       msg = "ERROR: FISOC does not recognise ISM_gridType"
+       msg = "ERROR: FISOC does not recognise ISM_gridType: "//ISM_gridType
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -470,7 +470,9 @@ CONTAINS
        CASE ("ISM_dddt","ISM_dTdz_l0","ISM_z_l0_linterp")
 
        CASE DEFAULT
-          msg="ERROR: derived variable name not recognised"
+          msg="ERROR: derived variable name not recognised: "//FISOC_ISM_DerVarList(ii)
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        END SELECT
@@ -530,7 +532,9 @@ CONTAINS
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        CASE DEFAULT
-          msg="ERROR: derived variable name not recognised"
+          msg="ERROR: derived variable name not recognised: "//FISOC_ISM_DerVarList(ii)
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        END SELECT
