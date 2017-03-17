@@ -100,7 +100,7 @@ CONTAINS
 
     CHARACTER(len=ESMF_MAXSTR)            :: ISM_configFile_FISOC, ISM_stdoutFile
     CHARACTER(len=MAX_STRING_LEN)         :: ISM_configFile_Elmer
-
+    LOGICAL                               :: verbose_coupling
     TYPE(Mesh_t)                          :: Elmer_Mesh
     REAL(ESMF_KIND_R8)                    :: Elmer_dt, FISOC_ISM_dt
     INTEGER                               :: localpet
@@ -130,6 +130,19 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     ISM_configFile_Elmer = ""
     ISM_configFile_Elmer = ISM_configFile_FISOC 
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       PRINT*,""
+       PRINT*,"******************************************************************************"
+       PRINT*,"**********      ISM wrapper.  Init phase 1 method.        *********************"
+       PRINT*,"******************************************************************************"
+       PRINT*,""
+    END IF
 
     ! FISOC sets the unit for Elmer's standard messaging routines to use instead of stdout
     CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_stdoutFile, label='ISM_stdoutFile:', rc=rc)
@@ -253,10 +266,10 @@ CONTAINS
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
        PRINT*,"******************************************************************************"
-       PRINT*,"**********      OM wrapper.  Init phase 2 method.        *********************"
+       PRINT*,"**********      ISM wrapper.  Init phase 2 method.        *********************"
        PRINT*,"******************************************************************************"
        PRINT*,""
-       PRINT*,"Here we have access to the initialised ISM fields, just in case the OM needs "
+       PRINT*,"Here we have access to the re-initialised OM fields, just in case the ISM needs "
        PRINT*,"to know about these in order to complete its initialisation."
        PRINT*,""
     END IF
@@ -344,7 +357,7 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-    CALL ElmerSolver_finalize()
+!    CALL ElmerSolver_finalize()
 
     CLOSE(unit=ISM_outputUnit, ERR=102)
 
@@ -744,12 +757,12 @@ CONTAINS
           msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
                line=__LINE__, file=__FILE__, rc=rc)          
-          
-       CASE ('ISM_dTdz_l0','ISM_dddt')
-          msg = "INFO: not exporting derived variable: "//TRIM(ADJUSTL(fieldName))
+       
+       CASE ('ISM_dTdz_l0','ISM_dddt','ISM_z_l0_linterp')
+          msg = "INFO: not extracting derived variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
                line=__LINE__, file=__FILE__, rc=rc)          
-          
+       
        CASE DEFAULT
           msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
