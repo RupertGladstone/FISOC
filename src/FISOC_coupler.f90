@@ -67,7 +67,6 @@ CONTAINS
     TYPE(ESMF_fieldBundle)        :: ISM_ExpFB, OM_ExpFB, OM_ImpFB
     TYPE(ESMF_grid)               :: OM_grid
     TYPE(ESMF_mesh)               :: OM_mesh
-    TYPE(ESMF_config)             :: config
     CHARACTER(len=ESMF_MAXSTR)    :: fieldName, ISM_gridType, OM_gridType
     INTEGER                       :: ISM_ExpFieldCount, OM_ExpFieldCount, ii
     TYPE(ESMF_Field),ALLOCATABLE  :: ISM_ExpFieldList(:), OM_ImpFieldList(:), OM_ExpFieldList(:)
@@ -76,8 +75,14 @@ CONTAINS
     TYPE(ESMF_VM)                 :: vm
     LOGICAL                       :: verbose_coupling
     TYPE(ESMF_config)             :: FISOC_config
+    TYPE(ESMF_RegridMethod_Flag)  :: Regrid_method
 
     rc = ESMF_FAILURE
+
+    CALL ESMF_cplCompGet(FISOC_coupler, vm=vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_cplCompGet(FISOC_coupler, config=FISOC_config, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -85,6 +90,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL  FISOC_ConfigDerivedAttribute(FISOC_config, Regrid_method, 'Regrid_method', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -179,9 +189,11 @@ CONTAINS
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
+!         regridmethod=ESMF_REGRIDMETHOD_NEAREST_STOD, &
+!         regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
     ! Create a route handle to add to the state object.  This will be used for regridding.
     CALL FISOC_FieldRegridStore(vm, ISM_ExpFieldList(1), OM_ExpFieldList(1), &
-         regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+         regridmethod=Regrid_method, &
          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
          routehandle=ISM2OM_regridRouteHandle, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -389,23 +401,35 @@ CONTAINS
     TYPE(ESMF_fieldBundle)        :: ISM_ExpFB, OM_ExpFB, ISM_ImpFB
     TYPE(ESMF_grid)               :: OM_grid
     TYPE(ESMF_mesh)               :: ISM_mesh
-!    TYPE(ESMF_config)             :: config
     CHARACTER(len=ESMF_MAXSTR)    :: fieldName
     INTEGER                       :: ISM_ExpFieldCount, OM_ExpFieldCount, ii
     TYPE(ESMF_Field),ALLOCATABLE  :: ISM_ExpFieldList(:), ISM_ImpFieldList(:), OM_ExpFieldList(:)
     TYPE(ESMF_RouteHandle)        :: OM2ISM_regridRouteHandle
     TYPE(ESMF_TypeKind_Flag)      :: fieldTypeKind
     TYPE(ESMF_VM)                 :: vm
+    LOGICAL                       :: verbose_coupling
+    TYPE(ESMF_config)             :: FISOC_config
+    TYPE(ESMF_RegridMethod_Flag)  :: Regrid_method
 
 
     rc = ESMF_FAILURE
 
-!    CALL ESMF_cplCompGet(FISOC_coupler, config=config, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
     CALL ESMF_cplCompGet(FISOC_coupler, vm=vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_cplCompGet(FISOC_coupler, config=FISOC_config, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL  FISOC_ConfigDerivedAttribute(FISOC_config, Regrid_method, 'Regrid_method', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -483,7 +507,7 @@ CONTAINS
 
     ! Create a route handle to add to the state object.  This will be used for regridding.
     CALL FISOC_FieldRegridStore(vm,OM_ExpFieldList(1), ISM_ExpFieldList(1), &
-         regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+         regridmethod=Regrid_method, &
          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
          routehandle=OM2ISM_regridRouteHandle, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
