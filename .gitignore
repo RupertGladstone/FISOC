@@ -17,6 +17,7 @@
 *.ep
 *.avi
 *tidy.bash
+*VTUoutput*
 *stdout.asc
 *EI_out
 *ELMERSOLVER_STARTINFO

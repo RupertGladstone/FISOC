@@ -334,9 +334,9 @@ The FISOC config file is named FISOC\_config.rc, and is expected to be present
 in the current directory.  
 This is a resource file, as described by the 
 ESMF documentation.  It supports different types and also lists. 
-In principle, llists of mixed types are supported, though FISOC does not utilise this capability.
+In principle, lists of mixed types are supported, though FISOC does not utilise this capability.
 
-FISOC\_config.rc contains code specific to the coupling.  Components may also use their 
+FISOC\_config.rc contains parameters specific to the coupling.  Components may also use their 
 independent means for configuration.
 
 Some of the FISOC config entries are required.
@@ -363,6 +363,10 @@ To be calculated from ISM vars by hard coded routines in FISOC\_ISM.       \\
 \vspace{6pt}
 \textbf{ISM2OM\_vars:}        [STRING] [required***(default all?)]                          \\
 List of variables to be passed from the ISM to the OM.                     \\ 
+\vspace{6pt}
+\textbf{ISM2OM\_init\_vars:}  [LOGICAL] [optional]                         \\
+Determines whether the ISM2OM\_vars should be passed to the OM during the 
+second phase of OM initialisation.   Default is .TRUE.                     \\ 
 \vspace{6pt}
 \textbf{ISM\_grdType:}        [STRING] [required]                          \\
 Which ESMF object to use.  Valid values are ESMF\_mesh and ESMF\_grid.     \\
@@ -398,6 +402,10 @@ Defaults to .FALSE.                                                        \\
 \vspace{6pt}
 \textbf{OM2ISM\_vars:}        [STRING] [required***(default all?)]                          \\
 List of variables to be passed from the OM to the ISM.                     \\ 
+\vspace{6pt}
+\textbf{OM2ISM\_init\_vars:}  [LOGICAL] [optional]                         \\
+Determines whether the OM2ISM\_vars should be passed to the ISM during the 
+second phase of ISM initialisation.   Default is .TRUE.                    \\ 
 \vspace{6pt}
 \textbf{OM\_grdType:}        [STRING] [required]                           \\
 Which ESMF object to use.  Valid values are ESMF\_mesh and ESMF\_grid.     \\
@@ -740,6 +748,23 @@ required variables in the FISOC config file (Section~\ref{sec:config})
 
 
 
+
+
+\subsection{FISOC examples}
+
+Example FISOC configurations can be found in the repository under FISOC\_examples. 
+
+\subsubsection{Example 1: Long thin marine ice sheet}
+\subsubsection{Example 2: Ice cliff}
+\subsubsection{Example 3: Using FISOC to handle time evolving forcing}
+\subsubsection{Example 4: Floating only test}
+
+This corresponds to experiments *** in the FISOC model description paper 
+(***authors to insert reference here once discussion paper is published***).
+
+
+
+
 \section{Post processing}
 
 It is expected that the OM and ISM components will output data in their usual formats, 
@@ -749,7 +774,7 @@ in netcdf format.
 
 Scripts for visualising these outputs may be developed at some point, but no firm 
 plans exist.  If/when developed, they will be located in the FISOC\_pp directory.
-There is currently an inflexible script and unfriendly script used as a sanity 
+There is currently (end 2016) an inflexible script and unfriendly script used as a sanity 
 check during development.
 
 The script requires a recent python installation and the netcdf4-python module.
@@ -867,20 +892,38 @@ codes can be used.
 
 \subsection{Configuration options}
 
-The configuration file must be called ``FISOC\_config.rc'' and is compatible with ESMF 
-config methods.  
-An ESMF\_config object is automatically created from this file.
+The configuration file must be named ``FISOC\_config.rc''.  
+It is compatible with ESMF config methods.  
+An ESMF\_config object is automatically created from this file at run time.
+This object is always named ``FISOC\_config'' in the FISOC code.
+New parameters may be introduced to the config file and can be accessed 
+within the model-specific wrapper at run time, via  ``FISOC\_config''. 
+No further coding is needed for this functionality.
+See existing model-specific wrappers (e.g. FISOC\_ISM\_Wrapper\_Elmer.f90) 
+for examples of this.
 
-There may be some parameters that are derived from config parameters.  
-The FISOC\_utils module provides subroutines under the 
-FISOC\_ConfigDerivedAttribute interface 
-for obtaining derived config parameters.
-These subroutines can be viewed informally as additional methods to complement the ESMF config access methods. 
+The master list of standard FISOC configuration options is contained in 
+FISOC/doc/FISOC\_emacsMode.asc (the contents of this file may also be 
+pasted into your .emacs file to give minimal syntax highlighting for .rc 
+files). 
+When new standard configuration options are added during development, they 
+should also be added to this file, and additionally described in 
+Section~\ref{sec:config} of the manual.
 
-An advantage of the way the config object is used is that new config arguments can be added and 
-used in the coupling without requiring developments to any code other than the new wrapper. 
-The config object can be passed to the wrapper and accessed directly. 
+The config file is intended to avoid duplication of information.  
+In the case of configuration options that can be derived from other 
+configuration options, their derivation is hard coded into 
+FISOC\_utils.f90 (see FISOC\_ConfigDerivedAttribute interface) 
+rather than adding redundant parameters to the config file.
+It is recommended (though not strictly required) that further developments 
+also follow this approach. 
 
+Note that the approach of derived attributes can be used to hard code a 
+default value for an attribute that is in essence not a derived attribute. 
+Using the derived attribute subroutines as a wrapper in which to hard 
+code a default value has the benefit of entering the hard coded value 
+only at one location rather than each time the attribute is accessed 
+from the config object.
 
 %\subsection{ISM wrapper}
 
