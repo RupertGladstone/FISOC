@@ -15,6 +15,11 @@
 *.grd
 *.log
 *.ep
+*.avi
+*tidy.bash
+*stdout.asc
+*EI_out
+*ELMERSOLVER_STARTINFO
 FISOC_caller
 a.out
 FISOC_mesh1a_2D/

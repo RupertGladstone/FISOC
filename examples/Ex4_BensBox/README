@@ -1,4 +1,5 @@
 
+Note that example 5 is a variant on example 4 and does not have its own README, instead being summarised here.
 
 Uses one of the userfunctions from Ex1:
 cp ../Ex1_LongThinMIS/FISOC_Elmer_geometries.f90 .
@@ -11,3 +12,31 @@ ElmerGrid 1 2 FISOC_Ex4.grd
 
 To partition the mesh for parallel runs (4 partitions):
 ElmerGrid 2 2 FISOC_Ex4 -partition 1 4 0 2
+
+Ex5 (like Ex4 but with grounded section):
+cp ../Ex1_LongThinMIS/FISOC_Elmer_geometries.f90 .
+elmerf90 FISOC_Elmer_geometries.f90 -o FISOC_Elmer_geometries.so
+ElmerGrid 1 2 FISOC_Ex5.grd
+ElmerGrid 2 2 FISOC_Ex5 -partition 1 2 0 2
+ElmerGrid 2 2 FISOC_Ex5 -partition 1 4 0 2
+
+
+TODO:
+
+draft:
+change roms to not set any of draft, draft2 or zice during running.
+change fisoc to first set old draft to draft2, then set draft2 and zice to the new cavity from ism.
+
+implement corrected dddt
+
+try much finer ism mesh
+
+why does some ocean output text not get written to the specified text file?  (fort 31)
+
+prevent ROMS and Elmer from calling mpi finalise
+
+code tidy for finalise: make FISOC_Finalize, to finalize fisoc things before calling esmf_finalize.  Use this for all fatal calls (huge number of replacements required!)
+
+replace the three line fatal (log pass through etc) with a single fatal routine
+
+code tidy up:make coupler phases 1 and 2 more similar.  They should echo each other (ideally have some auto generated code here to avoid duplication, but that is probably overengineering...
