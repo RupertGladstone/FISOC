@@ -18,9 +18,11 @@ MODULE FISOC_utils_MOD
   END INTERFACE FISOC_populateFieldBundle
 
   INTERFACE FISOC_ConfigDerivedAttribute
+      MODULE PROCEDURE FISOC_ConfigDerivedAttributeLogical
       MODULE PROCEDURE FISOC_ConfigDerivedAttributeInteger
       MODULE PROCEDURE FISOC_ConfigDerivedAttributeString
       MODULE PROCEDURE FISOC_ConfigDerivedAttributeStaggerLocArray
+      MODULE PROCEDURE FISOC_ConfigDerivedAttributeRegridMethod
   END INTERFACE 
 
   CHARACTER(len=ESMF_MAXSTR) :: msg
@@ -38,10 +40,13 @@ CONTAINS
     INTEGER,INTENT(OUT)                   :: rc
 
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM2OM_Vars(:)
-    CHARACTER(len=ESMF_MAXSTR)            :: label
+    CHARACTER(len=ESMF_MAXSTR)            :: label, OM_cavityUpdate
     INTEGER                               :: ii, count
+    LOGICAL                               :: cavityUpdateMismatch
 
     rc = ESMF_FAILURE
+
+    cavityUpdateMismatch = .FALSE.
 
     label = 'ISM2OM_vars:'
     CALL FISOC_getStringListFromConfig(FISOC_config, label, ISM2OM_Vars,rc=rc)
@@ -50,11 +55,34 @@ CONTAINS
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
+    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_cavityUpdate, label='OM_cavityUpdate:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     count = 0
     DO ii=1,SIZE(ISM2OM_Vars)
-          IF (TRIM('ISM_z_l0').EQ.TRIM(ISM2OM_Vars(ii))) count = count + 1
-          IF (TRIM('ISM_z_l0_linterp').EQ.TRIM(ISM2OM_Vars(ii))) count = count + 1
-          IF (TRIM('ISM_dddt').EQ.TRIM(ISM2OM_Vars(ii))) count = count + 1
+
+          IF (TRIM('ISM_z_l0').EQ.TRIM(ISM2OM_Vars(ii))) THEN
+             IF (OM_cavityUpdate.NE.'RecentIce') cavityUpdateMismatch = .TRUE.
+             count = count + 1
+          END IF
+          
+          IF (TRIM('ISM_z_l0_linterp').EQ.TRIM(ISM2OM_Vars(ii))) THEN
+             IF (OM_cavityUpdate.NE.'Linterp') cavityUpdateMismatch = .TRUE.
+             count = count + 1
+          END IF
+
+          IF (TRIM('ISM_dddt').EQ.TRIM(ISM2OM_Vars(ii))) THEN
+             IF ( (OM_cavityUpdate.NE.'Rate')          &
+                  .AND.                                &
+                  (OM_cavityUpdate.NE.'CorrectedRate') &
+                  ) THEN
+                cavityUpdateMismatch = .TRUE.
+                count = count + 1
+             END IF
+          END IF
+          
     END DO
 
     IF (count.eq.0) THEN
@@ -65,6 +93,13 @@ CONTAINS
 
     IF (count.gt.1) THEN
        msg = 'only 1 ISM cavity variable should be passed to the OM'
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    IF (cavityUpdateMismatch) THEN
+       msg = 'Cavity update mismatch (check ISM2OM vars) for OM_cavityUpdate: '//OM_cavityUpdate
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -772,6 +807,100 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
+  SUBROUTINE FISOC_ConfigDerivedAttributeRegridMethod(FISOC_config, derivedAttribute, label,rc)
+    
+    CHARACTER(len=*),INTENT(IN)             :: label
+    TYPE(ESMF_config),INTENT(INOUT)         :: FISOC_config
+    TYPE(ESMF_RegridMethod_Flag),INTENT(OUT):: derivedAttribute
+    INTEGER,OPTIONAL,INTENT(OUT)            :: rc
+    
+    CHARACTER(len=ESMF_MAXSTR)              :: regridMethodChar
+    INTEGER                                 :: rc_local
+
+    rc = ESMF_FAILURE
+
+    SELECT CASE(label)
+
+    CASE('Regrid_method')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, regridMethodChar, label='Regrid_method:', rc=rc_local)
+       IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+          regridMethodChar = "ESMF_REGRIDMETHOD_BILINEAR"
+          msg = "WARNING: Regrid_method not found, setting to bilinear."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+
+       SELECT CASE (regridMethodChar)
+       CASE("ESMF_REGRIDMETHOD_BILINEAR")
+          derivedAttribute = ESMF_REGRIDMETHOD_BILINEAR
+       CASE("ESMF_REGRIDMETHOD_NEAREST_DTOS")
+          derivedAttribute = ESMF_REGRIDMETHOD_NEAREST_DTOS
+       CASE("ESMF_REGRIDMETHOD_NEAREST_STOD")
+          derivedAttribute = ESMF_REGRIDMETHOD_NEAREST_STOD
+       CASE DEFAULT
+          msg = 'ERROR: regrid method NYI in FISOC: '//regridMethodChar
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)          
+       END SELECT
+
+    CASE DEFAULT
+       msg = 'ERROR: unrecognised derived config attribute label: '//label
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    END SELECT
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_ConfigDerivedAttributeRegridMethod
+
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE FISOC_ConfigDerivedAttributeLogical(FISOC_config, derivedAttribute, label,rc)
+    
+    CHARACTER(len=*),INTENT(IN)           :: label
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    LOGICAL,INTENT(OUT)                   :: derivedAttribute
+    INTEGER,OPTIONAL,INTENT(OUT)          :: rc
+
+    INTEGER :: rc_local
+    
+    rc = ESMF_FAILURE
+
+    SELECT CASE(label)
+
+    CASE('ISM2OM_init_vars')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='ISM2OM_init_vars:', rc=rc_local)
+       IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+          derivedAttribute = .TRUE.
+          msg = "WARNING: ISM2OM_init_vars not found, setting to .TRUE."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+
+    CASE DEFAULT
+       msg = 'ERROR: unrecognised derived config attribute label: '//label
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    END SELECT
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_ConfigDerivedAttributeLogical
+
+
+  !--------------------------------------------------------------------------------------
   SUBROUTINE FISOC_ConfigDerivedAttributeString(FISOC_config, derivedAttribute, label,rc)
     
     CHARACTER(len=*),INTENT(IN)           :: label
@@ -863,7 +992,7 @@ print*,'catch error and set default if missing att'
     
     IF (size(staggerLoc) .ne. size(staggerChar)) THEN
        msg = 'ERROR: stagger lists must be same length'
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
@@ -892,12 +1021,15 @@ print*,'catch error and set default if missing att'
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_populateFieldBundleOn2dGrid(fieldNames,fieldBundle,grid,init_value,fieldStagger,rc)
+  SUBROUTINE FISOC_populateFieldBundleOn2dGrid(fieldNames,fieldBundle,grid,init_value,&
+       fieldStagger,TLW,TUW,RouteHandle,rc)
 
-    CHARACTER(len=ESMF_MAXSTR),INTENT(IN)    :: fieldNames(:)
-    TYPE(ESMF_grid),INTENT(IN)               :: grid
-    REAL(ESMF_KIND_R8),INTENT(IN),OPTIONAL   :: init_value
-    TYPE(ESMF_staggerLoc),INTENT(IN),OPTIONAL:: fieldStagger(:)
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN)     :: fieldNames(:)
+    TYPE(ESMF_grid),INTENT(IN)                :: grid
+    REAL(ESMF_KIND_R8),INTENT(IN),OPTIONAL    :: init_value
+    TYPE(ESMF_staggerLoc),INTENT(IN),OPTIONAL :: fieldStagger(:)
+    INTEGER,INTENT(IN),OPTIONAL               :: TLW(2), TUW(2)
+    TYPE(ESMF_RouteHandle),INTENT(IN),OPTIONAL:: RouteHandle
 
     TYPE(ESMF_fieldbundle),INTENT(INOUT)  :: fieldBundle
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
@@ -917,36 +1049,88 @@ print*,'catch error and set default if missing att'
        initial_value = 0.0
     END IF
 
+    IF ( ( (PRESENT(TUW)) .AND. (.NOT.PRESENT(TLW)) )   &
+         .OR.                                           &
+         ( (PRESENT(TLW)) .AND. (.NOT.PRESENT(TUW)) ) ) &
+         THEN
+       msg = "Expecting neither or both of TUW and TLW"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    
+    IF (PRESENT(RouteHandle).AND.(.NOT.PRESENT(TUW))) THEN 
+       msg = "Expecting TUW and TLW if computing halo route handle"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    
     CALL ESMF_GridGet(grid, localDECount=localDECount, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     DO ii=1,SIZE(fieldNames)
-       field = ESMF_FieldCreate(grid, typekind=ESMF_TYPEKIND_R8, name=TRIM(fieldNames(ii)), rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!       DO jj = 0, localDECount-1
-!          CALL ESMF_FieldGet(field=field, localDe=jj, farrayPtr=field_ptr, rc=rc)
-!          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!               line=__LINE__, file=__FILE__)) &
-!               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!          field_ptr      = initial_value
-!          NULLIFY(field_ptr)
-!       END DO
+       IF (PRESENT(fieldStagger).AND.PRESENT(TUW)) THEN
+          field = ESMF_FieldCreate(grid, typekind=ESMF_TYPEKIND_R8,      &
+               name=TRIM(fieldNames(ii)),                                &
+               totalLWidth=TLW,totalUWidth=TUW,                          &
+               staggerloc=fieldStagger(ii),                              &
+               rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       ELSEIF (PRESENT(fieldStagger)) THEN
+          field = ESMF_FieldCreate(grid, typekind=ESMF_TYPEKIND_R8,      &
+               name=TRIM(fieldNames(ii)),                                &
+               staggerloc=fieldStagger(ii),                              &
+               rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       ELSEIF (PRESENT(TUW)) THEN
+          field = ESMF_FieldCreate(grid, typekind=ESMF_TYPEKIND_R8,      &
+               name=TRIM(fieldNames(ii)),                                &
+               totalLWidth=TLW,totalUWidth=TUW,                          &
+               indexflag=ESMF_INDEX_GLOBAL,             &
+               rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       ELSE 
+          field = ESMF_FieldCreate(grid, typekind=ESMF_TYPEKIND_R8,      &
+               name=TRIM(fieldNames(ii)),                                &
+               rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       END IF
+
+       IF ( (ii.EQ.1) .AND. (PRESENT(RouteHandle)) ) THEN
+print*,"need RH"
+print*,"need RH"
+print*,"need RH"
+print*,"need RH"
+       END IF
+
        CALL ESMF_FieldGet(field=field, localDe=0, farrayPtr=field_ptr, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        field_ptr      = initial_value
+       NULLIFY(field_ptr)
+
        CALL ESMF_FieldBundleAdd(fieldBundle, (/field/), rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END DO
 
-    NULLIFY(field_ptr)
+    END DO
 
     rc = ESMF_SUCCESS
     
@@ -1186,6 +1370,9 @@ print*,'catch error and set default if missing att'
     END SELECT
     
     CALL ESMF_VMBarrier(vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! create the routehandle for regridding
     CALL ESMF_FieldRegridStore(InField, OutField, regridmethod=regridmethod, &
