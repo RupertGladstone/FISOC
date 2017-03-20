@@ -397,9 +397,9 @@ CONTAINS
        END IF
        
        IF (ESMF_AlarmIsRinging(alarm_OM, rc=rc)) THEN
-          msg = "FISOC parent run: calling OM"
-          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-               line=__LINE__, file=__FILE__, rc=rc)
+!          msg = "FISOC parent run: calling OM"
+!          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+!               line=__LINE__, file=__FILE__, rc=rc)
           CALL ESMF_GridCompRun(FISOC_OM, &
                importState=OM_ImpSt, exportState=OM_ExpSt, &
                clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
