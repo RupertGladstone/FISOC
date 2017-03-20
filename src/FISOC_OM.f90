@@ -635,7 +635,7 @@ CONTAINS
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
           ISM_dt = REAL(ISM_dt_int,ESMF_KIND_R8)
 
-          dddt = dddt + 0.5*(ISM_z_l0 - OM_z_l0)/ISM_dt
+          dddt = dddt + 0.5*(ISM_z_l0 + 20.0 - OM_z_l0)/ISM_dt
 
           NULLIFY(ISM_z_l0)
           NULLIFY(OM_z_l0)
