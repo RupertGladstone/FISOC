@@ -10,7 +10,7 @@ $gravity = -9.81*yearinsec^2
 $GLTolerance = 1.0e-4
 $name = "BensBoxISM_5b"
 $m = 1.0/3.0
-$dt = 1.0/365.25 !/86400
+$dt = 30.0/365.25 !/86400
 
 
 !--------------------------------------------------------
@@ -471,7 +471,8 @@ Solver 15
   Save Geometry Ids = Logical True
   Output File Name = File $name"."
   Output Format = String "vtu"
-  Output Directory = File "VTUoutputs"
+!  Output Directory = File "VTUoutputs"
+  Output Directory = File "/mnt/hgfs/VMshare/FISEX5/VTUoutputs"
   Vtu Format = Logical True
 End
 

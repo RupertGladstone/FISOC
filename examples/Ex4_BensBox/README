@@ -23,6 +23,8 @@ ElmerGrid 2 2 FISOC_Ex5 -partition 1 4 0 2
 
 TODO:
 
+fix om hack to set 20m water column depth
+
 draft:
 change roms to not set any of draft, draft2 or zice during running.
 change fisoc to first set old draft to draft2, then set draft2 and zice to the new cavity from ism.
