@@ -2,6 +2,7 @@
 MODULE FISOC_utils_MOD
 
   USE ESMF
+  USE FISOC_types_MOD
 
   IMPLICIT NONE
 
