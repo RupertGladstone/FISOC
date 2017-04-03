@@ -94,7 +94,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL  FISOC_ConfigDerivedAttribute(FISOC_config, Regrid_method, 'Regrid_method', rc=rc)
+    CALL  FISOC_ConfigDerivedAttribute(FISOC_config, Regrid_method, 'ISM2OM_regrid:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -429,7 +429,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL  FISOC_ConfigDerivedAttribute(FISOC_config, Regrid_method, 'Regrid_method', rc=rc)
+    CALL  FISOC_ConfigDerivedAttribute(FISOC_config, Regrid_method, 'OM2ISM_regrid:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)

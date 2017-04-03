@@ -20,6 +20,7 @@ MODULE FISOC_utils_MOD
   INTERFACE FISOC_ConfigDerivedAttribute
       MODULE PROCEDURE FISOC_ConfigDerivedAttributeLogical
       MODULE PROCEDURE FISOC_ConfigDerivedAttributeInteger
+      MODULE PROCEDURE FISOC_ConfigDerivedAttributeReal
       MODULE PROCEDURE FISOC_ConfigDerivedAttributeString
       MODULE PROCEDURE FISOC_ConfigDerivedAttributeStaggerLocArray
       MODULE PROCEDURE FISOC_ConfigDerivedAttributeRegridMethod
@@ -807,6 +808,44 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
+  SUBROUTINE FISOC_ConfigDerivedAttributeReal(FISOC_config, derivedAttribute, label,rc)
+    
+    CHARACTER(len=*),INTENT(IN)           :: label
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    REAL(ESMF_KIND_R8),INTENT(OUT)        :: derivedAttribute
+    INTEGER,OPTIONAL,INTENT(OUT)          :: rc
+    
+    rc = ESMF_FAILURE
+
+    SELECT CASE(label)
+
+    CASE('OM_WCmin') ! OM water column minimum thickness
+       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_WCmin:', rc=rc)
+       IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+          derivedAttribute = 0.0
+          msg = "WARNING: OM_WCmin not found, setting to zero."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+       
+    CASE DEFAULT
+       msg = 'ERROR: unrecognised derived config attribute label '
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    END SELECT
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_ConfigDerivedAttributeReal
+
+
+  !--------------------------------------------------------------------------------------
   SUBROUTINE FISOC_ConfigDerivedAttributeRegridMethod(FISOC_config, derivedAttribute, label,rc)
     
     CHARACTER(len=*),INTENT(IN)             :: label
@@ -821,6 +860,32 @@ CONTAINS
 
     SELECT CASE(label)
 
+    CASE('ISM2OM_regrid:')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, regridMethodChar, label='ISM2OM_regrid:', rc=rc_local)
+       IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+          regridMethodChar = "ESMF_REGRIDMETHOD_BILINEAR"
+          msg = "WARNING: ISM2OM_regrid not found, setting to bilinear."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+
+    CASE('OM2ISM_regrid:')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, regridMethodChar, label='OM2ISM_regrid:', rc=rc_local)
+       IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+          regridMethodChar = "ESMF_REGRIDMETHOD_BILINEAR"
+          msg = "WARNING: OM2ISM_regrid not found, setting to bilinear."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+
     CASE('Regrid_method')
        CALL ESMF_ConfigGetAttribute(FISOC_config, regridMethodChar, label='Regrid_method:', rc=rc_local)
        IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
@@ -834,26 +899,26 @@ CONTAINS
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        END IF
 
-       SELECT CASE (regridMethodChar)
-       CASE("ESMF_REGRIDMETHOD_BILINEAR")
-          derivedAttribute = ESMF_REGRIDMETHOD_BILINEAR
-       CASE("ESMF_REGRIDMETHOD_NEAREST_DTOS")
-          derivedAttribute = ESMF_REGRIDMETHOD_NEAREST_DTOS
-       CASE("ESMF_REGRIDMETHOD_NEAREST_STOD")
-          derivedAttribute = ESMF_REGRIDMETHOD_NEAREST_STOD
-       CASE DEFAULT
-          msg = 'ERROR: regrid method NYI in FISOC: '//regridMethodChar
-          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-               line=__LINE__, file=__FILE__, rc=rc)
-          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)          
-       END SELECT
-
     CASE DEFAULT
        msg = 'ERROR: unrecognised derived config attribute label: '//label
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    END SELECT
+    
+    SELECT CASE (regridMethodChar)
+    CASE("ESMF_REGRIDMETHOD_BILINEAR")
+       derivedAttribute = ESMF_REGRIDMETHOD_BILINEAR
+    CASE("ESMF_REGRIDMETHOD_NEAREST_DTOS")
+       derivedAttribute = ESMF_REGRIDMETHOD_NEAREST_DTOS
+    CASE("ESMF_REGRIDMETHOD_NEAREST_STOD")
+       derivedAttribute = ESMF_REGRIDMETHOD_NEAREST_STOD
+    CASE DEFAULT
+       msg = 'ERROR: regrid method NYI in FISOC: '//regridMethodChar
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)          
     END SELECT
     
     rc = ESMF_SUCCESS
