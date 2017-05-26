@@ -8,6 +8,10 @@
 
 SRCDIR = src
 FFLAGS += -fbacktrace -g -O0 -fbounds-check #-Wall
+#FFLAGS += -O0 -g -fbacktrace -fcheck=all # -Wall
+#FFLAGS += -fbacktrace -g -debug -DD  -O0 # -inline-debug-info
+#FFLAGS += -g -check all -fpe0 -warn -traceback -debug extended
+#FFLAGS += -O3 -xHost #-ipo
 
 # check for presence of required env vars
 ifneq ($(origin ESMFMKFILE), environment)
@@ -22,13 +26,13 @@ ifneq ($(origin FISOC_ISM), environment)
  $(error Environment variable FISOC_ISM was not set.)
 endif
 
-# if env var FISOC_MPI exists and is set to "yes" then ...
-# TODO: perhaps find something in esmfmkfile that can avoid the need to use this
-ifeq ($(origin FISOC_MPI), environment)
- ifeq "$(FISOC_MPI)" "yes"
-  CPPFLAGS += -D FISOC_MPI
- endif
-endif
+## if env var FISOC_MPI exists and is set to "yes" then ...
+## TODO: perhaps find something in esmfmkfile that can avoid the need to use this
+#ifeq ($(origin FISOC_MPI), environment)
+# ifeq "$(FISOC_MPI)" "yes"
+#  CPPFLAGS += -D FISOC_MPI
+# endif
+#endif
 
 ifneq ($(origin FISOC_INSTALL_DIR), environment)
  ifneq ($(origin HOME), environment)

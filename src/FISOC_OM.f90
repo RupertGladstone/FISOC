@@ -80,6 +80,8 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
+    CALL FISOC_cavityCheckOptions(FISOC_config, rc)
+
     ! create empty field bundle to be populated by model-specific code.
     OM_ExpFB = ESMF_FieldBundleCreate(name='OM export fields', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -184,7 +186,7 @@ CONTAINS
     INTEGER, INTENT(OUT)       :: rc
 
     TYPE(ESMF_FileStatus_Flag) :: NC_status
-    CHARACTER(len=ESMF_MAXSTR) :: OutputFileName 
+    CHARACTER(len=ESMF_MAXSTR) :: OM_NCfreq
     TYPE(ESMF_VM)              :: vm
     INTEGER(ESMF_KIND_I8)      :: advanceCount
     INTEGER                    :: localPet,advanceCountInt4
@@ -219,6 +221,17 @@ CONTAINS
             line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
+    IF (OM_writeNetcdf) THEN      
+       CALL ESMF_ConfigGetAttribute(FISOC_config,  OM_NCfreq, label='OM_NCfreq:', rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) THEN
+          msg="WARNING: OM_NCfreq not found in FISOC_config.rc, setting to all"
+          OM_NCfreq = "all"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__, rc=rc)
+       END IF
+    END IF
+
     ! Clocks and alarms are used to control the asynchronous timestepping
     ! between the OM and ISM.  Most of the logic is on the OM side since 
     ! it is assumed (actually it is required) that the ISM timestep is 
@@ -244,95 +257,65 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
-
     CALL ESMF_VMBarrier(vm, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
+    CALL ESMF_StateGet(OM_ExpSt, "OM export fields", OM_ExpFB, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_StateGet(OM_ImpSt, "OM import fields", OM_ImpFB, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+    
+    ! The ocean cavity might need temporal linear interpolation at this point.
+    CALL OM_HandleCavity(FISOC_config, FISOC_clock, OM_ImpFB, OM_ExpFB, localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     ! Decide how to call OM run wrapper depending on relevant alarms
     OM_output: IF (ESMF_AlarmIsRinging(alarm_OM_output, rc=rc)) THEN
        
-       CALL ESMF_StateGet(OM_ExpSt, "OM export fields", OM_ExpFB, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-       ISM_input: IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN
-          CALL ESMF_StateGet(OM_ImpSt, "OM import fields", OM_ImpFB, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-          
+       ! we have new ISM output available and we need OM output
+       ISM_input1: IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN          
           CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB=OM_ExpFB,OM_ImpFB=OM_ImpFB,rc_local=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-          
-          writeNCimp: IF (OM_writeNetcdf) THEN
-             CALL ESMF_VMBarrier(vm, rc=rc)
-             IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-                  line=__LINE__, file=__FILE__)) &
-                  CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-             msg = "Writing NetCDF output from FISOC on ocean grid (OM import)"
-             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-                  line=__LINE__, file=__FILE__, rc=rc)
-             WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_imp_t", advanceCount, ".nc"
-             CALL FISOC_FB2NC(OutputFileName,OM_ImpFB,FISOC_config)
-          END IF writeNCimp
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
+          CALL OM_NetcdfWrapper(FISOC_config,OM_writeNetcdf,OM_NCfreq,advanceCount, &
+               OM_ExpFB=OM_ExpFB,OM_ImpFB=OM_ImpFB)
 
-          CALL ESMF_VMBarrier(vm, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-          
+       ! no new ISM output is available.  we need OM output
        ELSE
           CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB=OM_ExpFB,rc_local=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
-       END IF ISM_input
+          CALL OM_NetcdfWrapper(FISOC_config,OM_writeNetcdf,OM_NCfreq,advanceCount,OM_ExpFB=OM_ExpFB)
+       END IF ISM_input1
        
-       writeNC: IF (OM_writeNetcdf) THEN
-          CALL ESMF_VMBarrier(vm, rc=rc)
-          msg = "Writing NetCDF output from FISOC on ocean grid (OM export)"
-          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-               line=__LINE__, file=__FILE__, rc=rc)
-          WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_exp_t", advanceCount, ".nc"
-          CALL FISOC_FB2NC(OutputFileName,OM_ExpFB,FISOC_config)
-       END IF writeNC
-       
-    ELSE
-       
-       IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN
-          
-          CALL ESMF_StateGet(OM_ImpSt, "OM import fields", OM_ImpFB, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-          
+    ELSE       
+       ! we have new ISM output available but we do not need OM output
+       ISM_input2: IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN
           CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ImpFB=OM_ImpFB,rc_local=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-          
-          IF (OM_writeNetcdf) THEN
-             CALL ESMF_VMBarrier(vm, rc=rc)
-             msg = "Writing NetCDF output from FISOC on ocean grid (OM import)"
-             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-                  line=__LINE__, file=__FILE__, rc=rc)
-             WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_imp_t", advanceCount, ".nc"
-             CALL FISOC_FB2NC(OutputFileName,OM_ImpFB,FISOC_config)
-          END IF
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
+          CALL OM_NetcdfWrapper(FISOC_config,OM_writeNetcdf,OM_NCfreq,advanceCount,OM_ImpFB=OM_ImpFB)
 
+       ! no new ISM output is available and we do not need OM output
        ELSE
           CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,rc_local=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
           
-       END IF
-       
+       END IF ISM_input2
     END IF OM_output
     
 
@@ -490,5 +473,71 @@ CONTAINS
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_OM_finalise  
+
+
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE OM_NetcdfWrapper(FISOC_config,OM_writeNetcdf,OM_NCfreq,advanceCount,OM_ExpFB,OM_ImpFB)
+
+    TYPE(ESMF_config),INTENT(INOUT)               :: FISOC_config
+    LOGICAL,INTENT(IN)                            :: OM_writeNetcdf
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN)         :: OM_NCfreq
+    INTEGER(ESMF_KIND_I8),INTENT(IN)              :: advanceCount
+    TYPE(ESMF_fieldBundle),INTENT(INOUT),OPTIONAL :: OM_ExpFB, OM_ImpFB
+
+    CHARACTER(len=ESMF_MAXSTR) :: OutputFileName
+    INTEGER :: rc
+
+    IF(OM_writeNetcdf) THEN
+       
+       SELECT CASE (OM_NCfreq)
+
+       ! Writing out at all timesteps: write any field bundles we're given
+       CASE("all")          
+          IF (PRESENT(OM_ImpFB)) THEN
+             msg = "Writing NetCDF output from FISOC on ocean grid (OM import)"
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+                  line=__LINE__, file=__FILE__, rc=rc)
+             WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_imp_t", advanceCount, ".nc"
+             CALL FISOC_FB2NC(OutputFileName,OM_ImpFB,FISOC_config)
+          END IF
+          IF (PRESENT(OM_ExpFB)) THEN
+             msg = "Writing NetCDF output from FISOC on ocean grid (OM export)"
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+                  line=__LINE__, file=__FILE__, rc=rc)
+             WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_exp_t", advanceCount, ".nc"
+             CALL FISOC_FB2NC(OutputFileName,OM_ExpFB,FISOC_config)
+          END IF
+
+       ! Writing out at ISM export timesteps: hopefully we're given both field bundles
+       CASE("ISM")
+          IF (PRESENT(OM_ImpFB)) THEN
+             IF (PRESENT(OM_ExpFB)) THEN
+                msg = "Writing NetCDF output from FISOC on ocean grid (OM imp and exp)"
+                CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+                     line=__LINE__, file=__FILE__, rc=rc)
+                WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_exp_t", advanceCount, ".nc"
+                CALL FISOC_FB2NC(OutputFileName,OM_ExpFB,FISOC_config)
+                WRITE (OutputFileName, "(A14,I0,A3)") "FISOC_OM_imp_t", advanceCount, ".nc"
+                CALL FISOC_FB2NC(OutputFileName,OM_ImpFB,FISOC_config)
+          ELSE
+                msg = "OM_NCfreq=ISM but we have only OM_ImpFB and not OM_ExpFB... :("
+                CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+                     line=__LINE__, file=__FILE__, rc=rc)
+                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+             END IF
+          END IF
+
+       CASE DEFAULT
+          msg = "OM_NCfreq value not recognised: "//OM_NCfreq
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       END SELECT
+       
+    END IF
+    
+  END SUBROUTINE OM_NetcdfWrapper
 
 END MODULE FISOC_OM_MOD

@@ -51,7 +51,7 @@ PROGRAM FISOC_main
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-  call ESMF_ConfigLoadFile(FISOC_config, "FISOC_config.rc", rc=rc)
+  CALL ESMF_ConfigLoadFile(FISOC_config, "./FISOC_config.rc", rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)

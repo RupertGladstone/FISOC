@@ -1,0 +1,32 @@
+
+# This is a config file for reading in forcing data to use through FISOC to 
+# force ROMS.  To be used with ISM set to FOOL (FOrced OffLine) at FISOC 
+# compile time.
+# 
+# This example is for use with the ISOMIP+ ocean 3 and 4 forcing data, 
+# obtainable from:
+# http://dataservices.gfz-potsdam.de/pik/showshort.php?id=escidoc:1487953
+# 
+# Valid values for forcingDataFormat are at time of writing (Feb 2017): 
+# netcdf
+# 
+# FOOL_vars should be of the same length as the list of FISOC_ISM_ReqVars 
+# in the main FISOC config file, and entries should be in the same order (i.e. 
+# FOOL_vars maps variables in the netcdf file to FISOC_ISM_ReqVars).
+# 
+# Names for grid data and meta data should also be provided here.  At time of 
+# writing (Feb 2017) it is assumed that all distances are in metres.
+
+  ForcingDir:          /short/ks3/rmg581/FISOC/examples/Ex3_offlineISM/ocn3Forcing/
+  ForcingDataFormat:   netcdf
+  ForcingBaseName:     isomip_plus_ocean3_
+
+  NumForcingFiles:     100 
+  ForcingInterval_yr:  1  # interval in years
+  ForcingStartYr:      1
+
+  FOOL_vars:           zice
+
+  # currently hard coded, but other options for the grid could be added.
+  ISM_gridLayout:      isomip_plus
+
