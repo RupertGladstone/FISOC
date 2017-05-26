@@ -7,7 +7,7 @@
 ################################################################################
 
 SRCDIR = src
-FFLAGS += -O0 -g -fbacktrace -fcheck=all # -Wall
+#FFLAGS += -O0 -g -fbacktrace -fcheck=all # -Wall
 #FFLAGS += -fbacktrace -g -debug -DD  -O0 # -inline-debug-info
 #FFLAGS += -g -check all -fpe0 -warn -traceback -debug extended
 #FFLAGS += -O3 -xHost #-ipo

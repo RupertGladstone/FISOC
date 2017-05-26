@@ -471,8 +471,8 @@ Solver 15
   Save Geometry Ids = Logical True
   Output File Name = File $name"."
   Output Format = String "vtu"
-!  Output Directory = File "VTUoutputs"
-  Output Directory = File "/mnt/hgfs/VMshare/FISEX5/VTUoutputs"
+  Output Directory = File "VTUoutputs"
+!  Output Directory = File "/mnt/hgfs/VMshare/FISEX5/VTUoutputs"
   Vtu Format = Logical True
 End
 

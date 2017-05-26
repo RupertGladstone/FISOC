@@ -23,7 +23,8 @@
 #  Regrid_method:      ESMF_REGRIDMETHOD_BILINEAR
 #  Regrid_method:      ESMF_REGRIDMETHOD_NEAREST_STOD
 
-  ISM_configFile:     /home/elmeruser/Source/FISOC/examples/Ex5_BensBox_gl/FISOC_Ex5b.sif
+  ISM_configFile:     /short/ks3/rmg581/FISOC/examples/Ex5_BensBox_gl/FISOC_Ex5b.sif
+#  ISM_configFile:     /home/elmeruser/Source/FISOC/examples/Ex5_BensBox_gl/FISOC_Ex5b.sif
 #  FISOC_ISM_ReqVars:  ISM_temperature_l0 ISM_temperature_l1 ISM_velocity_l0 ISM_z_l0 ISM_z_l1
 #  FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dTdz_l0 ISM_dddt  
   FISOC_ISM_ReqVars:  ISM_z_l0 # ISM_temperature_l0 ISM_temperature_l1
@@ -35,9 +36,9 @@
   ISM2OM_regrid:      ESMF_REGRIDMETHOD_NEAREST_STOD
 
 #  OM_configFile:      /home/elmeruser/Source/ROMSIceShelf_devel/ROMS/External/ocean_iceshelf2d.in
-  OM_configFile:      /home/elmeruser/Source/ROMSIceShelf_devel/ROMS/External/ocean_iceshelf2d_toy_gl.in
+  OM_configFile:      /short/ks3/rmg581/ROMSIceShelf_devel/ROMS/External/ocean_iceshelf2d_toy_gl.in
   OM_stdoutFile:      ./ROMS_stdout.asc
-  OM_writeNetcdf:     .FALSE. # .TRUE.
+  OM_writeNetcdf:     .TRUE.
   OM_NCfreq:          all
   output_dir:         FISOCoutputs
   OM_cavityUpdate:    CorrectedRate # Linterp
