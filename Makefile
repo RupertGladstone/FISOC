@@ -8,6 +8,7 @@
 
 SRCDIR = src
 FFLAGS += -fbacktrace -g -O0 -fbounds-check #-Wall
+FISOC_EXE = FISOC_caller_no
 
 # check for presence of required env vars
 ifneq ($(origin ESMFMKFILE), environment)
@@ -90,11 +91,12 @@ $(SRCDIR)/FISOC_utils.o:                    $(SRCDIR)/FISOC_utils.f90
 ################################################################################
 
 install: FISOC_caller
-	cp FISOC_caller $(INSTALL_DIR)
+	cp FISOC_caller $(INSTALL_DIR)/$(FISOC_EXE)
+	mv FISOC_caller $(FISOC_EXE)
 
 .PHONY: clean
 
 clean:
-	rm -f FISOC_caller *.o *.mod $(SRCDIR)/*.o $(SRCDIR)/*.mod
+	rm -f FISOC_caller* *.o *.mod $(SRCDIR)/*.o $(SRCDIR)/*.mod
 
 
