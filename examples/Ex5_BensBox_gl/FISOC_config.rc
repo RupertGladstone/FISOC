@@ -1,0 +1,68 @@
+
+ # This is "Resource File" (.rc file), a type of configuration file, for use with ESMF.  
+ # This .rc file contains configuration information for FISOC.
+ #
+ # Syntax:
+ # It contains a list of <label,value> pairs.
+ # The colon after the label is required. 
+ # 
+ # Further notes:
+ # Although FISOC uses <label, value> pairs, the values after the label can also be a list.
+ # Multiple types are allowed.
+ # For example:
+ #  my_file_names:         jan87.dat jan88.dat jan89.dat  # all strings
+ #  constants:             3.1415   25                    # float and integer
+ #
+ # Or, the data can be located in a table using the following syntax:
+ #  my_table_name::
+ #   1000     3000     263.0
+ #    925     3000     263.0
+ #    300     3000     295.8
+ #  ::
+
+#  Regrid_method:      ESMF_REGRIDMETHOD_BILINEAR
+#  Regrid_method:      ESMF_REGRIDMETHOD_NEAREST_STOD
+
+  ISM_configFile:     /short/ks3/rmg581/FISOC/examples/Ex5_BensBox_gl/FISOC_Ex5b.sif
+#  ISM_configFile:     /home/elmeruser/Source/FISOC/examples/Ex5_BensBox_gl/FISOC_Ex5b.sif
+#  FISOC_ISM_ReqVars:  ISM_temperature_l0 ISM_temperature_l1 ISM_velocity_l0 ISM_z_l0 ISM_z_l1
+#  FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dTdz_l0 ISM_dddt  
+  FISOC_ISM_ReqVars:  ISM_z_l0 # ISM_temperature_l0 ISM_temperature_l1
+  FISOC_ISM_DerVars:  ISM_dddt ISM_z_l0_previous # ISM_z_l0_linterp # ISM_dTdz_l0
+  ISM2OM_vars:        ISM_dddt # ISM_dTdz_l0 # ISM_z_l0_linterp # 
+  ISM2OM_init_vars:   .FALSE.
+  ISM_stdoutFile:     ./EI_out
+  ISM_gridType:       ESMF_mesh
+  ISM2OM_regrid:      ESMF_REGRIDMETHOD_NEAREST_STOD
+
+#  OM_configFile:      /home/elmeruser/Source/ROMSIceShelf_devel/ROMS/External/ocean_iceshelf2d.in
+  OM_configFile:      /short/ks3/rmg581/ROMSIceShelf_devel/ROMS/External/ocean_iceshelf2d_toy_gl.in
+  OM_stdoutFile:      ./ROMS_stdout.asc
+  OM_writeNetcdf:     .TRUE.
+  OM_NCfreq:          all
+  output_dir:         FISOCoutputs
+  OM_cavityUpdate:    CorrectedRate # Linterp
+  FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0 OM_z_l0 OM_bed
+#  FISOC_OM_DerVars:   
+  OM_ReqVars_stagger: CENTER CENTER CENTER CENTER
+  OM2ISM_vars:        OM_dBdt_l0
+#  OM2ISM_init_vars:   .FALSE.  NYI
+  OM_initCavityFromISM: .FALSE.
+#  OM_initCavityFromISM: .TRUE.
+  OM_gridType:        ESMF_grid
+  OM_WCmin:           20.0
+  OM2ISM_regrid:      ESMF_REGRIDMETHOD_BILINEAR
+
+  OM_outputInterval:  1
+  OM_dt_sec:          3000 
+  dt_ratio:           864 # 288   # 86400 secperday / 1200 sec = 72  86400 secperday / 300 sec = 288    ! om_dt = 3000 and dt_ratio = 864 implies ism_dt 30 days
+  start_year:         1
+  start_month:        1
+#  end_year:           1000
+#  end_month:          1
+  runLength_ISM_steps: 100000
+
+  verbose_coupling:   .FALSE.
+#  verbose_coupling:   .TRUE.
+
+

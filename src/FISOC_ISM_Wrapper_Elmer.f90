@@ -15,7 +15,13 @@ MODULE FISOC_ISM_Wrapper
   PUBLIC :: FISOC_ISM_Wrapper_Init_Phase1,  FISOC_ISM_Wrapper_Init_Phase2,  &
        FISOC_ISM_Wrapper_Run, FISOC_ISM_Wrapper_Finalize
 
-  ! Note that CurrentModel is shared through the Types module (via MainUtils)
+
+  INTERFACE FISOC_ISM_Wrapper_Init_Phase1
+      MODULE PROCEDURE FISOC_ISM_Wrapper_Init_Phase1_mesh
+      MODULE PROCEDURE FISOC_ISM_Wrapper_Init_Phase1_grid
+   END INTERFACE
+
+  ! Note that Elmer's CurrentModel is shared through the Types module (via MainUtils)
 
   ! Elmer element types (not directly available from Elmer, though ideally they should be)
   INTEGER, PARAMETER :: ELMER_ELEMENT_NODAL            = 101
@@ -83,10 +89,28 @@ MODULE FISOC_ISM_Wrapper
 
 CONTAINS
 
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_grid(ISM_ReqVarList,ISM_ExpFB,ISM_grid,&
+       FISOC_config,vm,rc)
+
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: ISM_ReqVarList(:)
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    TYPE(ESMF_VM),INTENT(INOUT)           :: vm
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
+    TYPE(ESMF_grid),INTENT(OUT)           :: ISM_Grid
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+
+    msg = "ERROR: Dummy subroutine called probably due to ISM_gridType error"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+         line=__LINE__, file=__FILE__, rc=rc)
+    CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_grid
+
+
   !--------------------------------------------------------------------------------------
   ! This initialisation wrapper aims to convert the Elmer mesh and required variables 
   ! to the ESMF formats.  It also performs simple sanity/consistency checks.
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,&
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_mesh(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,&
        FISOC_config,vm,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
@@ -99,7 +123,7 @@ CONTAINS
 
     CHARACTER(len=ESMF_MAXSTR)            :: ISM_configFile_FISOC, ISM_stdoutFile
     CHARACTER(len=MAX_STRING_LEN)         :: ISM_configFile_Elmer
-
+    LOGICAL                               :: verbose_coupling
     TYPE(Mesh_t)                          :: Elmer_Mesh
     REAL(ESMF_KIND_R8)                    :: Elmer_dt, FISOC_ISM_dt
     INTEGER                               :: localpet, ISM_BodyID
@@ -128,6 +152,19 @@ CONTAINS
     ELSEIF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) THEN       
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       PRINT*,""
+       PRINT*,"******************************************************************************"
+       PRINT*,"**********      ISM wrapper.  Init phase 1 method.        *********************"
+       PRINT*,"******************************************************************************"
+       PRINT*,""
     END IF
 
     ! FISOC sets the unit for Elmer's standard messaging routines to use instead of stdout
@@ -183,7 +220,7 @@ CONTAINS
          line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1
+  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_mesh
   
 
   !--------------------------------------------------------------------------------------
@@ -217,10 +254,10 @@ CONTAINS
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
        PRINT*,"******************************************************************************"
-       PRINT*,"**********      OM wrapper.  Init phase 2 method.        *********************"
+       PRINT*,"**********      ISM wrapper.  Init phase 2 method.        *********************"
        PRINT*,"******************************************************************************"
        PRINT*,""
-       PRINT*,"Here we have access to the initialised ISM fields, just in case the OM needs "
+       PRINT*,"Here we have access to the re-initialised OM fields, just in case the ISM needs "
        PRINT*,"to know about these in order to complete its initialisation."
        PRINT*,""
     END IF
@@ -309,7 +346,7 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-    CALL ElmerSolver_finalize()
+!    CALL ElmerSolver_finalize()
 
     CLOSE(unit=ISM_outputUnit, ERR=102)
 
@@ -649,12 +686,12 @@ print*,"Hang on, need to get temperature exchange going too..."
           msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
                line=__LINE__, file=__FILE__, rc=rc)          
-          
-       CASE ('ISM_dTdz_l0','ISM_dddt')
-          msg = "INFO: not exporting derived variable: "//TRIM(ADJUSTL(fieldName))
+       
+       CASE ('ISM_dTdz_l0','ISM_dddt','ISM_z_l0_linterp')
+          msg = "INFO: not extracting derived variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
                line=__LINE__, file=__FILE__, rc=rc)          
-          
+       
        CASE DEFAULT
           msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
@@ -1538,6 +1575,7 @@ print*,"node ordering here..."
     INTEGER                          :: numQuadElems, numTriElems, numTotElems
     INTEGER                          :: localPet, petCount, numElems
 
+
     rc = ESMF_FAILURE
 
     msg = "Elmer to ESMF mesh format conversion"
@@ -1636,11 +1674,13 @@ print*,"node ordering here..."
        nodeCoords(nodeIndex) = Elmer_mesh % Nodes % y(ii)
     END DO
 
+
     ! Create Mesh structure in 1 step
     ESMF_ElmerMesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
          nodeIds=nodeIds_global, nodeCoords=nodeCoords, &
          nodeOwners=nodeOwners, elementIds=elementIDlist,&
          elementTypes=ESMF_elementTypeList, elementConn=elemConn, &
+         coordSys=ESMF_COORDSYS_CART,                         &
          rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &

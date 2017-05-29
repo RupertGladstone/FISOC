@@ -1,0 +1,8 @@
+
+Example setup for using the FOrcing OffLine ISM wrapper, in this case for running ISOMIP+ OCN3 simulation.
+FISOC should be compiled with ISM=FOOL
+
+unpack the netcdf files (in subdir ocn3Forcing):
+tar -xvf isomip_plus_ocean3.tar 
+
+(or if tar file not supplied use matlab scripts to process original ocn3 and 4 forcing files)

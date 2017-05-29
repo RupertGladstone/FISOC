@@ -61,10 +61,11 @@ CONTAINS
 
     TYPE(ESMF_config)          :: FISOC_config
     TYPE(ESMF_mesh)            :: ISM_mesh
+    TYPE(ESMF_grid)            :: ISM_grid
     TYPE(ESMF_fieldBundle)     :: ISM_ExpFB
     TYPE(ESMF_VM)              :: vm
 
-    CHARACTER(len=ESMF_MAXSTR) :: label
+    CHARACTER(len=ESMF_MAXSTR) :: label, ISM_gridType
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: ISM_ReqVarList(:),ISM_DerVarList(:)
  
     rc = ESMF_FAILURE
@@ -91,25 +92,50 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_gridType, label='ISM_gridType:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     ! create empty field bundle
     ISM_ExpFB = ESMF_FieldBundleCreate(name='ISM export fields', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    ! The model-specific initialisation adds the ISM vars to the field bundle.
+    ! This is followed by adding non-model-specific derived variables. 
+    SELECT CASE (ISM_gridType)
 
-    ! model-specific initialisation
-    CALL FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,&
-         FISOC_config,vm,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CASE("ESMF_grid","ESMF_Grid")
+       CALL FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_grid,&
+            FISOC_config,vm,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       CALL FISOC_populateFieldBundle(ISM_DerVarList,ISM_ExpFB,ISM_grid,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! The model-specific initialisation added the ISM vars to the field bundle, 
-    ! and here we add non-model-specific derived variables. 
-    CALL FISOC_populateFieldBundle(ISM_DerVarList,ISM_ExpFB,ISM_mesh,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CASE("ESMF_mesh","ESMF_Mesh")
+       CALL FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,&
+            FISOC_config,vm,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       CALL FISOC_populateFieldBundle(ISM_DerVarList,ISM_ExpFB,ISM_mesh,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CASE DEFAULT
+       msg = "ERROR: FISOC does not recognise ISM_gridType: "//ISM_gridType
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END SELECT
+
 
     ! Calculate values for derived variables from the model-specific ISM vars.
     CALL FISOC_ISM_calcDerivedFields(ISM_ExpFB,FISOC_config,rc)
@@ -359,10 +385,10 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    CALL ESMF_FieldGet(ImpFieldList(1), mesh=ISM_mesh, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    CALL ESMF_FieldGet(ImpFieldList(1), mesh=ISM_mesh, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     DO ii = 1,FieldCount
        CALL ESMF_FieldDestroy(ImpFieldList(ii), rc=rc)
@@ -410,7 +436,8 @@ CONTAINS
     TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
     INTEGER, INTENT(OUT),OPTIONAL          :: rc
 
-    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: FISOC_ISM_DerVarList(:),FISOC_ISM_ReqVarList(:), label
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: FISOC_ISM_DerVarList(:),FISOC_ISM_ReqVarList(:)
+    CHARACTER(len=ESMF_MAXSTR)             :: label
     INTEGER                                :: ii, numDerVars
 
     rc = ESMF_FAILURE
@@ -440,10 +467,12 @@ CONTAINS
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-       CASE ("ISM_dddt","ISM_dTdz_l0")
+       CASE ("ISM_dddt","ISM_dTdz_l0","ISM_z_l0_linterp")
 
        CASE DEFAULT
-          msg="ERROR: derived variable name not recognised"
+          msg="ERROR: derived variable name not recognised: "//FISOC_ISM_DerVarList(ii)
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        END SELECT
@@ -463,7 +492,8 @@ CONTAINS
     TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
     INTEGER, INTENT(OUT),OPTIONAL          :: rc
 
-    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: FISOC_ISM_DerVarList(:),FISOC_ISM_ReqVarList(:),label
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: FISOC_ISM_DerVarList(:),FISOC_ISM_ReqVarList(:)
+    CHARACTER(len=ESMF_MAXSTR)             :: label
     INTEGER                                :: ii, numDerVars
 
     rc = ESMF_FAILURE
@@ -487,7 +517,7 @@ CONTAINS
 
        SELECT CASE(FISOC_ISM_DerVarList(ii))
 
-       CASE ("ISM_z_l0_previous")
+       CASE ("ISM_z_l0_previous","ISM_z_l0_linterp")
 
        CASE ("ISM_dddt")
           CALL ISM_derive_dddt(ISM_ExpFB,FISOC_config,rc)
@@ -502,7 +532,9 @@ CONTAINS
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        CASE DEFAULT
-          msg="ERROR: derived variable name not recognised"
+          msg="ERROR: derived variable name not recognised: "//FISOC_ISM_DerVarList(ii)
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        END SELECT

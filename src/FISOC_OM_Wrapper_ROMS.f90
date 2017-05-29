@@ -19,7 +19,7 @@ MODULE FISOC_OM_Wrapper
   PRIVATE
 
   PUBLIC :: FISOC_OM_Wrapper_Init_Phase1,  FISOC_OM_Wrapper_Init_Phase2,  &
-       FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize
+       FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize, OM_HandleCavity
 
   !-----------------------------------------------------------------------
   !     Staggered grid point indices
@@ -40,10 +40,13 @@ MODULE FISOC_OM_Wrapper
   integer, parameter :: Iupoint = 3
   integer, parameter :: Ivpoint = 4
 
+  TYPE(ESMF_RouteHandle) :: OM_haloRouteHandle
+
+
   ! These switches correspond to ROMS preprocessor directives.  See also 
   ! ROMS/Include/iceshelf2d.h in ROMS repository.
-  LOGICAL, PARAMETER :: ROMS_MASKING = .FALSE.
-  LOGICAL, PARAMETER :: ROMS_SPHERICAL = .FALSE.
+!  LOGICAL, PARAMETER :: ROMS_MASKING = .FALSE.
+!  LOGICAL, PARAMETER :: ROMS_SPHERICAL = .FALSE.
   
 CONTAINS
   
@@ -58,13 +61,14 @@ CONTAINS
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ExpFB
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
-    INTEGER                           :: localPet ! local persistent execution thread (1:1 relationship to process)
-    INTEGER                               :: mpic ! mpi comm, duplicate from the OM VM
+    INTEGER                               :: localPet
+    INTEGER                               :: mpic
     CHARACTER(len=ESMF_MAXSTR)            :: label
     TYPE(ESMF_staggerLoc),ALLOCATABLE     :: OM_ReqVars_stagger(:)
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: OM_ReqVarList(:)
     CHARACTER(len=ESMF_MAXSTR)            :: OM_configFile, OM_stdoutFile
     LOGICAL                               :: verbose_coupling, first
+    INTEGER                               :: TLW(2), TUW(2)
 
     first = .TRUE.
 
@@ -94,6 +98,15 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       PRINT*,""
+       PRINT*,"******************************************************************************"
+       PRINT*,"**********      OM wrapper.  Init phase 1 method.        *********************"
+       PRINT*,"******************************************************************************"
+       PRINT*,""
+    END IF
+
+    WRITE (OM_outputUnit,*) 'FISOC is about to call ROMS init method.'
     IF (mpic.EQ.FISOC_mpic_missing) THEN
        msg = "ERROR: not currently configured for serial ROMS simulations"
        ! TODO: check whether ROMS needs a dummy mpic in serial configuration
@@ -101,8 +114,19 @@ CONTAINS
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     ELSE
+       msg = "Calling ROMS initialisation"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_VMBarrier(vm, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        CALL ROMS_initialize(first,mpic,OM_configFile)
+       msg = "Completed ROMS initialisation"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
+    WRITE (OM_outputUnit,*) 'FISOC has just called ROMS init method.'
     
     ! extract a list of required ocean variables from the configuration object
     label = 'FISOC_OM_ReqVars:' ! the FISOC names for the vars
@@ -128,11 +152,23 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL FISOC_populateFieldBundle(OM_ReqVarList,OM_ExpFB,OM_grid,init_value=FISOC_missingData,fieldStagger=OM_ReqVars_stagger,rc=rc)
+    ! Use ROMS information to define halo (aka region of ghost cells) size for this tile
+    TLW(1)=BOUNDS(NGrids)%Istr(localPet)-BOUNDS(NGrids)%LBi(localPet)
+    TLW(2)=BOUNDS(NGrids)%Jstr(localPet)-BOUNDS(NGrids)%LBj(localPet)
+    TUW(1)=BOUNDS(NGrids)%UBi(localPet)-BOUNDS(NGrids)%Iend(localPet)
+    TUW(2)=BOUNDS(NGrids)%UBj(localPet)-BOUNDS(NGrids)%Jend(localPet)
+
+!         fieldStagger=OM_ReqVars_stagger,                          &
+!         RouteHandle=OM_haloRouteHandle,                           &
+!        TLW=TLW,TUW=TUW,                                          &
+print*,"TODO: fix roms stagger and halo..."
+     CALL FISOC_populateFieldBundle(OM_ReqVarList,OM_ExpFB,OM_grid, &
+         init_value=FISOC_missingData,                             &
+         rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
+    
     CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -156,8 +192,8 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
     TYPE(ESMF_VM),INTENT(IN)              :: vm
 
-    LOGICAL                      :: verbose_coupling, OM_initCavityFromISM
-    INTEGER                      :: localpet
+    LOGICAL   :: verbose_coupling, OM_initCavityFromISM, ISM2OM_init_vars
+    INTEGER   :: localpet
 
     rc = ESMF_FAILURE
 
@@ -171,20 +207,6 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_initCavityFromISM, label='OM_initCavityFromISM:', rc=rc)
-    IF  (rc.EQ.ESMF_RC_NOT_FOUND) THEN
-       OM_initCavityFromISM = .FALSE.
-    ELSE
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
-
-    CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
        PRINT*,"******************************************************************************"
@@ -194,6 +216,27 @@ CONTAINS
        PRINT*,"Here we have access to the initialised ISM fields, just in case the OM needs "
        PRINT*,"to know about these in order to complete its initialisation."
        PRINT*,""
+    END IF
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_initCavityFromISM, label='OM_initCavityFromISM:', rc=rc)
+    IF  (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+       OM_initCavityFromISM = .FALSE.
+    ELSE
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM2OM_init_vars, 'ISM2OM_init_vars',rc=rc) 
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF (ISM2OM_init_vars) THEN
+       CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
     IF (OM_initCavityFromISM) THEN
@@ -328,7 +371,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ROMS_finalize
+!    CALL ROMS_finalize
 
     CLOSE(unit=OM_outputUnit, ERR=102)
 
@@ -359,8 +402,11 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   SUBROUTINE CavityReset(OM_ImpFB,localPet,rc)
 
+    USE mod_iceshelfvar, ONLY : ICESHELFVAR
     USE mod_param, ONLY : BOUNDS, Ngrids
     USE mod_grid , ONLY : GRID
+    USE mod_stepping, ONLY : nnew, nstp
+    USE set_depth_mod, ONLY : set_depth
 
     INTEGER,INTENT(IN)                    :: localPet
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB 
@@ -368,7 +414,9 @@ CONTAINS
 
     TYPE(ESMF_FIELD)                      :: ISM_z_l0
     REAL(ESMF_KIND_R8),POINTER            :: ptr(:,:)
-    INTEGER                               :: JstrT, IstrT, ii, jj
+    INTEGER                               :: ii, jj
+    INTEGER                               :: JstrR, JendR, IstrR, IendR
+    INTEGER                               :: Jstr, Jend, Istr, Iend
 
     rc = ESMF_FAILURE
 
@@ -389,18 +437,284 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    JstrT = BOUNDS(1) % JstrT (localPet)     
-    IstrT = BOUNDS(1) % IstrT (localPet)     
 
-    DO ii = 1,IstrT
-       DO jj = 1, JstrT
-          GRID(1) % zice (ii, jj) = ptr (ii, jj)
+    IstrR=BOUNDS(Ngrids)%IstrR(localPet)
+    IendR=BOUNDS(Ngrids)%IendR(localPet)
+    JstrR=BOUNDS(Ngrids)%JstrR(localPet)
+    JendR=BOUNDS(Ngrids)%JendR(localPet)
+
+    Istr =BOUNDS(Ngrids)%Istr (localPet)
+    Iend =BOUNDS(Ngrids)%Iend (localPet)
+    Jstr =BOUNDS(Ngrids)%Jstr (localPet) 
+    Jend =BOUNDS(Ngrids)%Jend (localPet)
+
+!    CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
+    DO jj = JstrR, JendR
+       DO ii = IstrR, IendR
+          IF ( ptr(ii,jj) .GT. 20_r8-GRID(Ngrids)%h(ii,jj) ) THEN
+             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nstp) = ptr (ii, jj)
+             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nnew) = ptr (ii, jj)
+             GRID(1) % zice (ii, jj) = ptr (ii, jj)
+          ELSE
+             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nstp) = 20_r8-GRID(Ngrids)%h(ii,jj)
+             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nnew) = 20_r8-GRID(Ngrids)%h(ii,jj)
+             GRID(1) % zice (ii, jj) = 20_r8-GRID(Ngrids)%h(ii,jj)
+          END IF
        END DO
     END DO
+!    CALL set_depth(Ngrids,localPet)
+print*,"TODO: fix cavity reset somehow..."
+!check draft is not below bedrock
+!ask ben what is needed to init roms from ism geometry
+!can we just set zice from draft in ROMS?
+
+    IF (ASSOCIATED(ptr)) THEN
+       NULLIFY(ptr)
+    END IF
+    
+    msg = "Ocean cavity reset.  Masks may be needed (NYI)"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+         line=__LINE__, file=__FILE__, rc=rc)
 
     rc = ESMF_SUCCESS
 
   END SUBROUTINE CavityReset
+
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE OM_HandleCavity(FISOC_config, FISOC_clock, OM_ImpFB, OM_ExpFB, localPet, rc)
+
+    USE mod_param, ONLY       : BOUNDS, Ngrids
+
+    TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: OM_ImpFB, OM_ExpFB
+    TYPE(ESMF_Clock),INTENT(IN)              :: FISOC_clock
+    INTEGER,INTENT(IN)                       :: localPet
+    INTEGER,INTENT(OUT),OPTIONAL             :: rc
+
+    CHARACTER(len=ESMF_MAXSTR)               :: OM_cavityUpdate
+    TYPE(ESMF_Alarm)                         :: alarm_ISM_exportAvailable
+    INTEGER, SAVE                            :: linterpCounter=0
+    INTEGER                                  :: dt_ratio, ISM_dt_int
+
+    REAL(ESMF_KIND_R8)          :: linterpFactor, ISM_dt, OM_WCmin
+    TYPE(ESMF_field)            :: ISM_z_l0_previous, ISM_z_l0_linterp 
+    TYPE(ESMF_field)            :: ISM_z_l0_field, OM_z_l0_field, dddt_field
+    TYPE(ESMF_field)            :: OM_bed_field
+    REAL(ESMF_KIND_R8),POINTER  :: ptr_curr(:,:),ptr_prev(:,:),ptr_linterp(:,:)
+    REAL(ESMF_KIND_R8),POINTER  :: ISM_z_l0(:,:), OM_z_l0(:,:), dddt(:,:)
+    REAL(ESMF_KIND_R8),POINTER  :: OM_bed(:,:)
+    INTEGER                     :: ii,jj,arrShape(2)
+    INTEGER                     :: IendR, IstrR, JendR, JstrR
+
+    rc = ESMF_FAILURE
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_cavityUpdate,    & 
+         label='OM_cavityUpdate:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, dt_ratio,           & 
+         label='dt_ratio:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    SELECT CASE (OM_cavityUpdate)
+
+    CASE('Rate','RecentIce')
+       ! handled elsewhere, do nothing
+
+    CASE('CorrectedRate')
+       
+       !       msg = "OM_cavityUpdate NYI: "//OM_cavityUpdate
+       !       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+       !            line=__LINE__, file=__FILE__, rc=rc)
+       !       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       ! ISM var dddt will be used.  If an ISM export is available, which means 
+       ! dddt has just been calculated, we modify dddt here to impose a 
+       ! correcting drift. The drift is designed to halve the ISM-OM 
+       ! discrepancy over one ISM timestep.
+       CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_ISM_exportAvailable", alarm_ISM_exportAvailable, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN 
+          
+          ! We need the OM cavity geom... 
+          CALL ESMF_FieldBundleGet(OM_ExpFB, fieldName="OM_z_l0", field=OM_z_l0_field, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldGet(field=OM_z_l0_field, farrayPtr=OM_z_l0, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+          ! ... the OM bedrock... 
+          CALL ESMF_FieldBundleGet(OM_ExpFB, fieldName="OM_bed", field=OM_bed_field, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldGet(field=OM_bed_field, farrayPtr=OM_bed, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          
+          ! ...and the ISM cavity geom.
+          CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_z_l0", field=ISM_z_l0_field, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldGet(field=ISM_z_l0_field, farrayPtr=ISM_z_l0, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          
+          ! And we need dddt, the cavity rate, in order to update it with the 
+          ! drift correction.
+          CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_dddt", field=dddt_field, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldGet(field=dddt_field, farrayPtr=dddt, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          
+          ! ISM time step in seconds is used (we are modifying dddt here in 
+          ! metres per second)
+          CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt_int, 'ISM_dt_sec',rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          ISM_dt = REAL(ISM_dt_int,ESMF_KIND_R8)
+
+          CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_WCmin, 'OM_WCmin',rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+          IF ( (SIZE(dddt).NE.SIZE(ISM_z_l0)) .OR.     & 
+               (SIZE(dddt).NE.SIZE(OM_z_l0))  .OR.     & 
+               (SIZE(dddt).NE.SIZE(OM_bed)) ) THEN
+             msg = "ERROR: array size inconsistency in corrected cavity rate calc."
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+                  line=__LINE__, file=__FILE__, rc=rc)
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+             
+          END IF
+
+!          arrShape = SHAPE(dddt)
+          IstrR=BOUNDS(Ngrids)%IstrR(localPet)
+          IendR=BOUNDS(Ngrids)%IendR(localPet)
+          JstrR=BOUNDS(Ngrids)%JstrR(localPet)
+          JendR=BOUNDS(Ngrids)%JendR(localPet)
+
+          DO jj=JstrR, JendR
+             DO ii=IstrR, IendR
+                dddt(ii,jj) = dddt(ii,jj) +                      &
+                     0.5*( MAX(ISM_z_l0(ii,jj),OM_bed(ii,jj)+    &
+                     OM_WCmin)-OM_z_l0(ii,jj) ) / ISM_dt
+             END DO
+          END DO
+print*,ISM_z_l0(4,10),OM_z_l0(4,10),OM_bed(4,10)
+
+          NULLIFY(ISM_z_l0)
+          NULLIFY(OM_z_l0)
+          NULLIFY(OM_bed)
+          NULLIFY(dddt)
+          
+       END IF
+
+
+    CASE('Linterp')
+ !      msg = "OM_cavityUpdate NYI: "//OM_cavityUpdate
+ !      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+ !           line=__LINE__, file=__FILE__, rc=rc)
+ !      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       ! If an ISM export is available this means the ISM cavity has been 
+       ! updated.  Each time this happens we can reset a counter.  The 
+       ! counter is used to count steps since the last ISM cavity update. 
+       ! We rely on dt_ratio governing the total number of steps until 
+       ! the next ISM cavity update. 
+       ! Note: we assume the ISM initialised both curr and previous cavity 
+       ! geom to the initial cavity geom, otherwise we would pass invalid 
+       ! cavity to OM
+       CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_ISM_exportAvailable", alarm_ISM_exportAvailable, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldname='ISM_z_l0', field=ISM_z_l0_field, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldGet(field=ISM_z_l0_field, farrayPtr=ptr_curr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldname='ISM_z_l0_previous', field=ISM_z_l0_previous, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldGet(field=ISM_z_l0_previous, farrayPtr=ptr_prev, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldname='ISM_z_l0_linterp', field=ISM_z_l0_linterp, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       CALL ESMF_FieldGet(field=ISM_z_l0_linterp, farrayPtr=ptr_linterp, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN 
+          linterpCounter = 0
+          linterpFactor  = 0.0
+       ELSE
+          linterpCounter = linterpCounter + 1
+          linterpFactor  = REAL(linterpCounter,ESMF_KIND_R8)/REAL(dt_ratio,ESMF_KIND_R8)
+       END IF
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       ptr_linterp = ptr_prev*(1.0-linterpFactor) + ptr_curr*(linterpFactor)
+
+       NULLIFY(ptr_prev)
+       NULLIFY(ptr_curr)
+       NULLIFY(ptr_linterp)
+
+       ! now turn on ISM export alarm, because the ISM may not have turned 
+       ! it on, but the time interpolated cavity is effectively a new ISM 
+       ! export, at least from the OM perspective
+       CALL ESMF_AlarmRingerOn(alarm_ISM_exportAvailable, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
+       
+    CASE DEFAULT
+       msg = "OM_cavityUpdate not recognised"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END SELECT
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE OM_HandleCavity
 
 
   !--------------------------------------------------------------------------------------
@@ -410,6 +724,8 @@ CONTAINS
 
     USE mod_iceshelfvar, ONLY : ICESHELFVAR
     USE mod_param, ONLY       : BOUNDS, Ngrids
+    USE mod_stepping, ONLY    : nnew
+    USE mod_grid , ONLY       : GRID
 
     IMPLICIT NONE
 
@@ -468,12 +784,6 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-              
-!       if (localPet == 1) then
-!          print*,"STUFF", nn, size(ptr),size(ptr(:,1)),size(ptr(1,:)),localPet
-!          print*,IstrR, IendR, JstrR, JendR
-!          print*,size(ICESHELFVAR(Ngrids) % m),size(ICESHELFVAR(Ngrids) % m(:,1)),size(ICESHELFVAR(Ngrids) % m(1,:))
-!       end if
        
        ptr = FISOC_missingData
        
@@ -485,6 +795,7 @@ CONTAINS
                 ptr(ii,jj) = ICESHELFVAR(1) % m(ii,jj)
              END DO
           END DO
+          CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
           
        CASE ('OM_temperature_l0')
           DO jj = JstrR, JendR
@@ -492,7 +803,21 @@ CONTAINS
                 ptr(ii,jj) = ICESHELFVAR(1) % Tb(ii,jj)
              END DO
           END DO
-          
+
+       CASE ('OM_z_l0')
+          DO jj = JstrR, JendR
+             DO ii = IstrR, IendR
+                ptr(ii,jj) = ICESHELFVAR(1) % iceshelf_draft(ii,jj,nnew(1))
+             END DO
+          END DO
+
+       CASE ('OM_bed')
+          DO jj = JstrR, JendR
+             DO ii = IstrR, IendR
+                ptr(ii,jj) = -GRID(1) % h(ii,jj)
+             END DO
+          END DO
+
        CASE DEFAULT
           msg = "ERROR: unknown variable"
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
@@ -513,10 +838,49 @@ CONTAINS
   
 
   !--------------------------------------------------------------------------------------
+  ! Copy values to boundary cells from neihgbouring interior cells.
+  SUBROUTINE cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
+
+    USE mod_param, ONLY : Lm, Mm, Ngrids
+
+    REAL(ESMF_KIND_R8),POINTER,INTENT(IN) :: ptr(:,:)
+    INTEGER,INTENT(IN)                    :: IstrR, IendR, JstrR, JendR
+
+    INTEGER                               :: ii, jj, rc
+
+    IF (Ngrids .ne. 1) THEN
+       msg = "ERROR: not expecting multiple ROMS grids"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    DO jj = JstrR, JendR
+       IF (jj .EQ. 0) THEN
+          ptr(:,jj) = ptr(:,jj+1)
+       ELSE IF (jj .EQ. Mm(1)+1) THEN
+          ptr(:,jj) = ptr(:,jj-1)
+       END IF
+    END DO
+    
+    DO ii = IstrR, IendR
+       IF (ii .EQ. 0) THEN
+          ptr(ii,:) = ptr(ii+1,:)
+       ELSE IF (ii .EQ. Lm(1)+1) THEN
+          ptr(ii,:) = ptr(ii-1,:)
+       END IF
+    END DO
+
+  END SUBROUTINE cp2bdry
+
+
+  !--------------------------------------------------------------------------------------
   SUBROUTINE sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc)
 
     USE mod_iceshelfvar, ONLY : ICESHELFVAR
     USE mod_param, ONLY       : BOUNDS, Ngrids
+    USE mod_stepping, ONLY    : nnew, nstp
+    USE mod_grid , ONLY       : GRID
 
     TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: OM_ImpFB 
     TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
@@ -550,7 +914,7 @@ CONTAINS
     JstrR=BOUNDS(Ngrids)%JstrR(localPet)
     JendR=BOUNDS(Ngrids)%JendR(localPet)
     
-    ! get a list of fields and their names form the OM export field bundle
+    ! get a list of fields and their names from the OM export field bundle
     fieldCount = 0
     CALL ESMF_FieldBundleGet(OM_ImpFB, fieldCount=fieldCount, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -578,17 +942,46 @@ CONTAINS
           SELECT CASE (TRIM(ADJUSTL(fieldName)))
              
           CASE ('ISM_dddt')
+# ifdef ROMS_DDDT
              DO jj = JstrR, JendR
                 DO ii = IstrR, IendR
                    ICESHELFVAR(1) % iceshelf_dddt(ii,jj) = ptr(ii,jj)
                 END DO
              END DO
-             
-          CASE ('ISM_z_l0')
-             !ICESHELFVAR(1) % iceshelf_draft(ii,jj)
-             msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
-             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+# else
+             msg = "Trying to pass DDDT to ROMS but incompatible cpp"
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
                   line=__LINE__, file=__FILE__, rc=rc)          
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
+             
+          CASE ('ISM_z_l0','ISM_z_l0_linterp')
+# ifdef ROMS_DRAFT
+             ! A note on the OM ICESHELFVAR(1) % iceshelf_draft:
+             ! iceshelf_draft(:,:,nstp) is the previous draft and iceshelf_draft(:,:,nnew) is 
+             ! the current draft.  We only update the new draft from the ISM.
+             ! The OM var zice will be set internally by the OM based on the iceshelf_draft.
+             CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
+!print*,"OM draft"
+!DO jj = JstrR, JendR
+!  print*,ICESHELFVAR(1) % iceshelf_draft(:,jj,nnew)
+!END DO
+!print*,"sending draft"
+!DO jj = JstrR, JendR
+!print*,ptr(:,jj)
+!END DO
+             DO jj = JstrR, JendR
+                DO ii = IstrR, IendR
+                   ICESHELFVAR(1) % iceshelf_draft(ii,jj,nnew) = ptr(ii,jj)
+!                   GRID(1) % zice (ii, jj) = ptr (ii, jj)
+                END DO
+             END DO
+# else
+             msg = "Trying to pass draft to ROMS but incompatible cpp"
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+                  line=__LINE__, file=__FILE__, rc=rc)          
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
              
           CASE('ISM_temperature_l0', 'ISM_temperature_l1', 'ISM_z_l1', 'ISM_velocity_l0', 'ISM_z_l0_previous', 'ISM_dTdz_l0')
              msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
@@ -660,7 +1053,7 @@ CONTAINS
     !-----------------------------------------------------------------------
     !     Get limits of the grid arrays (based on PET and nest level)
     !-----------------------------------------------------------------------
-    
+
     IstrR = BOUNDS(ng)%IstrR(localPet)
     IendR = BOUNDS(ng)%IendR(localPet)
     JstrR = BOUNDS(ng)%JstrR(localPet)
@@ -690,6 +1083,7 @@ CONTAINS
        deBlockList(2,1,tile+1)=BOUNDS(ng)%Jstr(tile)
        deBlockList(2,2,tile+1)=BOUNDS(ng)%Jend(tile)
     end do
+
     !-----------------------------------------------------------------------
     !     Create ESMF DistGrid based on ROMS model domain decomposition
     !-----------------------------------------------------------------------
@@ -733,6 +1127,7 @@ CONTAINS
                gridEdgeLWidth=(/1,1/),                              &
                gridEdgeUWidth=(/1,1/),                              &
                indexflag=ESMF_INDEX_GLOBAL,                         &
+               coordSys=ESMF_COORDSYS_CART,                         &
                name="OM_grid",                                      &
                rc=rc)
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,  &
@@ -754,12 +1149,14 @@ CONTAINS
        !-----------------------------------------------------------------------
        !     Allocate items for masking
        !-----------------------------------------------------------------------
+#ifdef ROMS_MASKING
        call ESMF_GridAddItem(OM_grid,       &
             staggerLoc=staggerLoc,          &
             itemflag=ESMF_GRIDITEM_MASK,    &
             rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
             line=__LINE__, file=__FILE__)) return
+#endif
        
        !-----------------------------------------------------------------------
        !     Allocate items for grid area 
@@ -802,6 +1199,7 @@ CONTAINS
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
                line=__LINE__, file=__FILE__)) return
           !
+#ifdef ROMS_MASKING
           call ESMF_GridGetItem (OM_grid,                 &
                localDE=jj,                                &
                staggerLoc=staggerLoc,                     &
@@ -810,6 +1208,7 @@ CONTAINS
                rc=rc)
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
                line=__LINE__, file=__FILE__)) return
+#endif
           !
           call ESMF_GridGetItem (OM_grid,                 &
                localDE=jj,                                &
@@ -838,122 +1237,122 @@ CONTAINS
           !
           if (ii == Idot) then
              if (verbose_coupling) then
-                IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),  &
                         lbound(GRID(ng)%lonp, dim=1), ubound(GRID(ng)%lonp, dim=1),     &
                         lbound(GRID(ng)%lonp, dim=2), ubound(GRID(ng)%lonp, dim=2)
-                ELSE
+#else
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),  &
                         lbound(GRID(ng)%xp, dim=1), ubound(GRID(ng)%xp, dim=1),         &
                         lbound(GRID(ng)%xp, dim=2), ubound(GRID(ng)%xp, dim=2)
-                END IF
+#endif
              end if
              !
              do j2 = JstrV, JendR
                 do i2 = IstrU, IendR
-                   IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                       ptrX(i2,j2) = GRID(ng)%lonp(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%latp(i2,j2)
-                   ELSE
+#else
                       ptrX(i2,j2) = GRID(ng)%xp(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%yp(i2,j2)
-                   END IF
-                   IF (ROMS_MASKING) THEN
+#endif
+#ifdef ROMS_MASKING
                       ptrM(i2,j2) = int(GRID(ng)%pmask(i2,j2))
-                   ELSE
-                      ptrM(i2,j2) = 0
-                   END IF
+!#else
+!                      ptrM(i2,j2) = 0
+#endif
                    ptrA(i2,j2) = GRID(ng)%om_p(i2,j2)*GRID(ng)%on_p(i2,j2)
                 end do
              end do
           else if (ii == Icross) then
              if (verbose_coupling) then
-                IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),  &
                         lbound(GRID(ng)%lonr, dim=1), ubound(GRID(ng)%lonr, dim=1),     &
                         lbound(GRID(ng)%lonr, dim=2), ubound(GRID(ng)%lonr, dim=2)
-                ELSE
+#else
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),  &
                         lbound(GRID(ng)%xr, dim=1), ubound(GRID(ng)%xr, dim=1),     &
                         lbound(GRID(ng)%xr, dim=2), ubound(GRID(ng)%xr, dim=2)
-                END IF
+#endif
              end if
              !
              do j2 = JstrR, JendR
                 do i2 = IstrR, IendR
-                   IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                       ptrX(i2,j2) = GRID(ng)%lonr(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%latr(i2,j2)
-                   ELSE
+#else
                       ptrX(i2,j2) = GRID(ng)%xr(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%yr(i2,j2)
-                   END IF
-                   IF (ROMS_MASKING) THEN
+#endif
+#ifdef ROMS_MASKING
                       ptrM(i2,j2) = int(GRID(ng)%rmask(i2,j2))
-                   ELSE
-                      ptrM(i2,j2) = 0
-                   END IF
+!#else
+!                      ptrM(i2,j2) = 0
+#endif
                    ptrA(i2,j2) = GRID(ng)%om_r(i2,j2)*GRID(ng)%on_r(i2,j2)
                 end do
              end do
           else if (ii == Iupoint) then
              if (verbose_coupling) then
-                IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
                         lbound(GRID(ng)%lonu, dim=1), ubound(GRID(ng)%lonu, dim=1),     &
                         lbound(GRID(ng)%lonu, dim=2), ubound(GRID(ng)%lonu, dim=2)
-                ELSE
+#else
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
                         lbound(GRID(ng)%xu, dim=1), ubound(GRID(ng)%xu, dim=1),     &
                         lbound(GRID(ng)%xu, dim=2), ubound(GRID(ng)%xu, dim=2)
-                END IF
+#endif
              end if
              !
              do j2 = JstrU, JendU
                 do i2 = IstrU, IendU
-                   IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                       ptrX(i2,j2) = GRID(ng)%lonu(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%latu(i2,j2)
-                   ELSE
+#else
                       ptrX(i2,j2) = GRID(ng)%xu(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%yu(i2,j2)
-                   END IF
-                   IF (ROMS_MASKING) THEN
+#endif
+#ifdef ROMS_MASKING
                       ptrM(i2,j2) = int(GRID(ng)%umask(i2,j2))
-                   ELSE
-                      ptrM(i2,j2) = 0
-                   END IF
+!#else
+!                      ptrM(i2,j2) = 0
+#endif
                    ptrA(i2,j2) = GRID(ng)%om_u(i2,j2)*GRID(ng)%on_u(i2,j2)
                 end do
              end do
           else if (ii == Ivpoint) then
              if (verbose_coupling) then
-                IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
                         lbound(GRID(ng)%lonv, dim=1), ubound(GRID(ng)%lonv, dim=1), &
                         lbound(GRID(ng)%lonv, dim=2), ubound(GRID(ng)%lonv, dim=2)
-                ELSE
+#else
                    write(*,30) localPet, jj, adjustl("DAT/OCN/GRD/"//name),         &
                         lbound(GRID(ng)%xv, dim=1), ubound(GRID(ng)%xv, dim=1), &
                         lbound(GRID(ng)%xv, dim=2), ubound(GRID(ng)%xv, dim=2)
-                END IF
+#endif
                 
                 end if
                 !
              do j2 = JstrV, JendV
                 do i2 = IstrV, IendV
-                   IF (ROMS_SPHERICAL) THEN
+#ifdef ROMS_SPHERICAL
                       ptrX(i2,j2) = GRID(ng)%lonv(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%latv(i2,j2)
-                   ELSE
+#else
                       ptrX(i2,j2) = GRID(ng)%xv(i2,j2)
                       ptrY(i2,j2) = GRID(ng)%yv(i2,j2)
-                   END IF
-                   IF (ROMS_MASKING) THEN
+#endif
+#ifdef ROMS_MASKING
                       ptrM(i2,j2) = int(GRID(ng)%vmask(i2,j2))
-                   ELSE
-                      ptrM(i2,j2) = 0
-                   END IF
+!#else
+!                      ptrM(i2,j2) = 0
+#endif
                    ptrA(i2,j2) = GRID(ng)%om_v(i2,j2)*GRID(ng)%on_v(i2,j2)
                 end do
              end do
@@ -974,10 +1373,12 @@ CONTAINS
              if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,  &
                   line=__LINE__, file=__FILE__)) return
              !
+#ifdef ROMS_MASKING
              arrM = ESMF_ArrayCreate(distGrid, ptrM,                         &
                   indexflag=ESMF_INDEX_DELOCAL, rc=rc) 
              if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,  &
                   line=__LINE__, file=__FILE__)) return
+#endif
              !
              arrA = ESMF_ArrayCreate(distGrid, ptrA,                         &
                   indexflag=ESMF_INDEX_DELOCAL, rc=rc) 
@@ -988,16 +1389,17 @@ CONTAINS
           !-----------------------------------------------------------------------
           !     Nullify pointers 
           !-----------------------------------------------------------------------
-
           if (associated(ptrX)) then
              nullify(ptrX)
           end if
           if (associated(ptrY)) then
              nullify(ptrY)
           end if
+#ifdef ROMS_MASKING
           if (associated(ptrM)) then
              nullify(ptrM)
           end if
+#endif
           if (associated(ptrA)) then
              nullify(ptrA)
           end if

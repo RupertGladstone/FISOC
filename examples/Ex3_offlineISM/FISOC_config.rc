@@ -20,45 +20,39 @@
  #    300     3000     295.8
  #  ::
 
-  ISM_configFile:     /home/elmeruser/Source/FISOC/examples/Ex1_LongThinMIS/FISOC_Ex1.sif
-#  FISOC_ISM_ReqVars:  ISM_temperature_l0 ISM_temperature_l1 ISM_velocity_l0 ISM_z_l0 ISM_z_l1
-#  FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dTdz_l0 ISM_dddt  
+  ISM_configFile:     /short/ks3/rmg581/FISOC/examples/Ex3_offlineISM/FOOL_config.rc
   FISOC_ISM_ReqVars:  ISM_z_l0
-  FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dddt  
-  ISM2OM_vars:        
+  FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_z_l0_linterp 
+  ISM2OM_vars:        ISM_z_l0_linterp
   ISM_stdoutFile:     EI_out
-  ISM_ProjVector:     0. 0. -1.
-  ISM_BodyID:         2
-  
+  ISM_gridType:       ESMF_grid
 
-  OM_configFile:      /home/elmeruser/Source/ROMSIceShelf_devel/ROMS/External/ocean_iceshelf2d.in
-  OM_stdoutFile:      /home/elmeruser/Source/FISOC/ROMS_stdout.asc
+  OM_configFile:      /short/ks3/ROMSIceShelf_MISOMIP/ROMS/External/ocean_isomip_plus_new.in
+  OM_stdoutFile:      /short/ks3/FISOC/ROMS_stdout.asc
   OM_writeNetcdf:     .TRUE.
-  output_dir:         /home/elmeruser/Source/FISOC/FISOC_pp
+  output_dir:         /short/ks3/rmg581/FISOC/output
 
   FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0
 #  FISOC_OM_DerVars:   
   OM_ReqVars_stagger: CENTER CENTER
   OM2ISM_vars:        
   OM_initCavityFromISM: .FALSE.
+  OM_gridType:        ESMF_grid
+  OM_cavityUpdate:    Linterp
 
-
-  OM_outputInterval:  1
+  OM_outputInterval: 1296 
 #  OM_outputInterval:  10512
 #  OM_dt_sec:          3153600  # 3153600 (sec per month) 86400 sec per day
-  OM_dt_sec:          300
-#  OM_dt_sec:          3000
-  dt_ratio:           288 # ISM dt ... 288 * 300 = 86400 sec = one day.  2880 means 10 days
-#  dt_ratio:           10512
-  start_year:         2010
+  OM_dt_sec:          200 # sec
+  dt_ratio:           1296  
+  start_year:	2010
   start_month:        1
-#  end_year:           2010
-#  end_month:          2
-  runLength_ISM_steps: 100
+  end_year:           2010
+  end_month:          2
+  #runLength_ISM_steps: 10 
 
-# 288 ocn steps of 300 sec per day
 
-  verbose_coupling:   .FALSE.
-!   verbose_coupling:   .TRUE.
+#  verbose_coupling:   .FALSE.
+  verbose_coupling:   .TRUE.
 
 
