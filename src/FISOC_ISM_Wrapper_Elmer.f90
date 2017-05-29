@@ -147,12 +147,12 @@ CONTAINS
     ! information to get the appropriate surface for the Elmer mesh.
     CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_BodyID, label='ISM_BodyID:', rc=rc)
     UseFootprint = .FALSE.
-    IF  (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
        UseFootprint = .TRUE.
     ELSEIF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) THEN       
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
+    END IF
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
