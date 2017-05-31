@@ -50,6 +50,7 @@ MODULE FISOC_ISM_Wrapper
   ! These variable names are hard coded to match the names given in the Elmer/Ice .sif
   ! The user must ensure the names correspond.
   ! TODO: is this information in the manual?
+  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_gmask          = 'groundedmask'
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_dBdt_l0        = 'meltRate'
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_temperature_l0 = 'oceanTemperature'
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_temperature_l1 = 'oceanTemperature'
@@ -180,9 +181,13 @@ CONTAINS
     ! initialise Elmer, and pull out the footprint before extrusion if we don't 
     ! have a bodyID defined.
     IF (UseFootprint) THEN
-       CALL ElmerSolver_init(meshFootprint=Elmer_Mesh, ParEnvInitialised=.TRUE., &
-            inputFileName=ISM_configFile_Elmer) 
-       CALL Elmer2ESMF_meshFootprint(Elmer_mesh,ISM_mesh,vm,rc=rc)
+          msg = "Elmer footprint mesh not currently supported; please define body id in FISOC config"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!       CALL ElmerSolver_init(meshFootprint=Elmer_Mesh, ParEnvInitialised=.TRUE., &
+!            inputFileName=ISM_configFile_Elmer) 
+!       CALL Elmer2ESMF_meshFootprint(Elmer_mesh,ISM_mesh,vm,rc=rc)
     ELSE
        CALL ElmerSolver_init(ParEnvInitialised=.TRUE., &
             inputFileName=ISM_configFile_Elmer) 
@@ -545,13 +550,11 @@ CONTAINS
              EI_fieldPerm => EI_field % Perm
 
              ! copy the data from the Elmer array (ESMF object) to the Elmer 
-             ! vairable (native Elmer object)
-             EI_fieldVals = ptr * FISOC_secPerYear
-
-!             DO ii = 1,EI_numNodes
-!!                EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(EI_firstNodeThisPET+ii-1) * FISOC_secPerYear
-!                EI_fieldVals(EI_fieldPerm(EI_nodeIds(ii))) = ptr(ii) * FISOC_secPerYear
-!             END DO
+             ! variable (native Elmer object)
+             DO ii = 1,SIZE(ptr)
+                EI_fieldVals(EI_fieldPerm(EI_NodeIDs(ii))) = ptr(ii) * FISOC_secPerYear
+             END DO
+          
 
           CASE ('OM_temperature_l0')
 print*,"Hang on, need to get temperature exchange going too..."
@@ -610,9 +613,6 @@ print*,"Hang on, need to get temperature exchange going too..."
     REAL(KIND=dp),POINTER                 :: EI_fieldVals(:)
     TYPE(Variable_t),POINTER              :: EI_field
 
-!INTEGER :: numOwnedNodes
-!TYPE(ESMF_MESH) :: ElMesh
-!real(ESMF_KIND_R8),ALLOCATABLE :: ElMeshCoords(:)
 
     rc = ESMF_FAILURE
 
@@ -654,34 +654,20 @@ print*,"Hang on, need to get temperature exchange going too..."
           EI_field => VariableGet( CurrentModel % Mesh % Variables, &
                EIname_z_l0, UnFoundFatal=.TRUE.)
           EI_fieldVals => EI_field % Values
+          EI_fieldPerm => EI_field % Perm ! don't need perm for coords
           DO ii = 1,SIZE(ownedNodeIDs)
              ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
           END DO
           
-
-!call ESMF_FieldGet(fieldList(nn), mesh=ElMesh, rc=rc)
-!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!     line=__LINE__, file=__FILE__)) &
-!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!CALL ESMF_MeshGet(ElMesh, numOwnedNodes=numOwnedNodes, rc=rc)
-!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!     line=__LINE__, file=__FILE__)) &
-!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!ALLOCATE(ElMeshCoords(2*numOwnedNodes))
-!CALL ESMF_MeshGet(ElMesh, ownedNodeCoords=ElMeshCoords, rc=rc)
-!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!     line=__LINE__, file=__FILE__)) &
-!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!print*,SIZE(ptr),numOwnedNodes,EI_numNodes,SIZE(ownedNodeIDs)
-!print*,CurrentModel % Mesh % Nodes % x(ownedNodeIDs(ii)), CurrentModel % Mesh % Nodes % y(ownedNodeIDs(ii))
-!print*,ElMeshCoords(ii*2-1),ElMeshCoords(ii*2)
-!print*,CurrentModel % Mesh % Nodes % x(1), CurrentModel % Mesh % Nodes % y(1)
-!print*,MAXVAL(CurrentModel % Mesh % Nodes % x), MAXVAL(CurrentModel % Mesh % Nodes % y)
-!print*,MINVAL(CurrentModel % Mesh % Nodes % x), MINVAL(CurrentModel % Mesh % Nodes % y)
-!print*,MAXVAL(ElMeshCoords),MAXVAL(ElMeshCoords)
-!print*,MINVAL(ElMeshCoords),MINVAL(ElMeshCoords)
-!END IF
-
+       CASE ('ISM_gmask')
+          EI_field => VariableGet( CurrentModel % Mesh % Variables, &
+               EIname_gmask, UnFoundFatal=.TRUE.)
+          EI_fieldVals => EI_field % Values
+          EI_fieldPerm => EI_field % Perm
+          DO ii = 1,SIZE(ownedNodeIDs)
+             ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
+          END DO
+          
        CASE ('ISM_temperature_l0','ISM_temperature_l1','ISM_velocity_l0','ISM_z_l1','ISM_z_l0_previous')
           msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
@@ -690,7 +676,7 @@ print*,"Hang on, need to get temperature exchange going too..."
        CASE ('ISM_dTdz_l0','ISM_dddt','ISM_z_l0_linterp')
           msg = "INFO: not extracting derived variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-               line=__LINE__, file=__FILE__, rc=rc)          
+               line=__LINE__, file=__FILE__, rc=rc) 
        
        CASE DEFAULT
           msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
@@ -822,20 +808,19 @@ print*,"change comments about EI vars at top when resolved..."
 
     ownedNodeIDs = locallyOwnedNodes(nodeOwners,localPet,EI_NodeIDs)
 
-    ! TODO (probably not urgent)
+    ! TODO (probably not urgent, maybe not needed at all)
     ! Note that ElmerMesh%ParallelInfo%GlobalDOFs may already contain global unique node ids 
     ! (not just for the boundary of interest but for the whole mesh). It might make sense to 
     ! use these rather than construct the uniqueIDs here. 
-    !print*,localPet,size(ElmerMesh%ParallelInfo%GlobalDOFs),maxval(ElmerMesh%ParallelInfo%GlobalDOFs),minval(ElmerMesh%ParallelInfo%GlobalDOFs)
-    !print*,localPet,size(nodeIDs_global),maxval(nodeIDs_global),minval(nodeIDs_global)
     
     CALL buildElementConnectivity(elemConn, nodeIDs_global, BodyID, ESMF_elemTypes, ISM_ProjVector,ELmerMesh)
 
     ! Create Mesh structure in 1 step
     ESMF_ElmerMesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
-         nodeIds=nodeIds_global, nodeCoords=nodeCoords, &
-         nodeOwners=nodeOwners, elementIds=ElementIDs_global,&
-         elementTypes=ESMF_elemTypes, elementConn=elemConn, &
+         nodeIds=nodeIds_global, nodeCoords=nodeCoords,            &
+         nodeOwners=nodeOwners, elementIds=ElementIDs_global,      &
+         elementTypes=ESMF_elemTypes, elementConn=elemConn,        &
+         coordSys=ESMF_COORDSYS_CART,                              &
          rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -871,11 +856,9 @@ print*,"change comments about EI vars at top when resolved..."
     TYPE(ESMF_distgrid):: distgridESMF
     INTEGER            :: rc
 
-    INTEGER,TARGET :: tst
     INTEGER,TARGET,ALLOCATABLE :: dg_Elmer(:), dg_ESMF(:)
-INTEGER :: ct_Elmer, ct_ESMF,localPET,PETcount,tmp
-INTEGER,ALLOCATABLE :: dummyIDs(:)
-REAL(ESMF_KIND_R8),POINTER :: ptr_ESMF(:),ptr_Elmer(:)
+    INTEGER :: localPET,PETcount,tmp
+    REAL(ESMF_KIND_R8),POINTER :: ptr_ESMF(:),ptr_Elmer(:)
 
     CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -928,9 +911,6 @@ REAL(ESMF_KIND_R8),POINTER :: ptr_ESMF(:),ptr_Elmer(:)
 !    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
 !         line=__LINE__, file=__FILE__)) &
 !         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    !print*," *** ",maxval(dg_Elmer),minval(dg_Elmer),ct_Elmer
-    !print*," *** ",maxval(dg_ESMF),minval(dg_ESMF),ct_ESMF
 
     ! initialilse arrays to zero, probably not needed
     CALL ESMF_ArrayGet(DummyArr_Elmer, farrayPtr=ptr_Elmer, rc=rc)
@@ -1078,7 +1058,7 @@ REAL(ESMF_KIND_R8),POINTER :: ptr_ESMF(:),ptr_Elmer(:)
           END DO NodesThisElement
 !       END IF
     END DO AllElements
-print*,"node ordering here..."
+print*,"node ordering to go here if needed..."
 
   END SUBROUTINE buildElementConnectivity
 
