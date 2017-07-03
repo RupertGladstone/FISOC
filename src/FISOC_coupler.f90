@@ -68,6 +68,7 @@ CONTAINS
     TYPE(ESMF_grid)               :: OM_grid
     TYPE(ESMF_mesh)               :: OM_mesh
     CHARACTER(len=ESMF_MAXSTR)    :: fieldName, ISM_gridType, OM_gridType
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: fieldNameList(:)
     INTEGER                       :: ISM_ExpFieldCount, OM_ExpFieldCount, ii
     TYPE(ESMF_Field),ALLOCATABLE  :: ISM_ExpFieldList(:), OM_ImpFieldList(:), OM_ExpFieldList(:)
     TYPE(ESMF_RouteHandle)        :: ISM2OM_regridRouteHandle
@@ -78,6 +79,8 @@ CONTAINS
     TYPE(ESMF_RegridMethod_Flag)  :: Regrid_method
 
     rc = ESMF_FAILURE
+
+    ! get some key info from the coupler component and from FISOC config
 
     CALL ESMF_cplCompGet(FISOC_coupler, vm=vm, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -104,102 +107,48 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! Extract ISM field bundle for regridding...
+    CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_gridType, label='ISM_gridType:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+
+    ! Create the import bundle for the OM.  This will be populated with 
+    ! the ISM fields, regridded onto the OM grid or mesh.  It will be added 
+    ! to the OM state.
+    OM_ImpFB = ESMF_FieldBundleCreate(name="OM import fields", rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+
+    ! get field bundle to be regridded
     CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! ...how many fields?...
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=ISM_ExpFieldCount, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    ! ... get list of fields from bundle.
-    ALLOCATE(ISM_ExpFieldList(ISM_ExpFieldCount))
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=ISM_ExpFieldCount, fieldList=ISM_ExpFieldList,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    IF (verbose_coupling) THEN
-       msg = "coupler extracted ISM fields from ISM export state"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__, rc=rc)
-    END IF
-    
-    ! Extract OM export field bundle just to make routehandle for regridding...
+    ! get field bundle containing target grid/mesh
     CALL ESMF_StateGet(OM_ImpSt, "OM export fields", OM_ExpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! ...how many fields?...
-    CALL ESMF_FieldBundleGet(OM_ExpFB, fieldCount=OM_ExpFieldCount, rc=rc)
+    ! use the first field from the field bundles to make a route handle
+    CALL FISOC_makeRHfromFB(ISM_ExpFB,OM_ExpFB,        &
+         Regrid_method,verbose_coupling,ISM2OM_regridRouteHandle,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! ... get list of fields from bundle.
-    ALLOCATE(OM_ExpFieldList(OM_ExpFieldCount))
-    CALL ESMF_FieldBundleGet(OM_ExpFB, fieldCount=OM_ExpFieldCount, fieldList=OM_ExpFieldList,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
-    SELECT CASE (OM_gridType)
-
-    CASE("ESMF_grid","ESMF_Grid")
-       CALL ESMF_FieldGet(OM_ExpFieldList(1), grid=OM_grid, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CASE("ESMF_mesh","ESMF_Mesh")
-       CALL ESMF_FieldGet(OM_ExpFieldList(1), mesh=OM_mesh, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CASE DEFAULT
-       msg = "ERROR: FISOC does not recognise OM_gridType"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END SELECT
-
-    IF (verbose_coupling) THEN
-       msg = "coupler extracted OM fields from OM import state"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__, rc=rc)
-    END IF
-       
-    IF (SIZE(OM_ExpFieldList).LT.1) THEN
-       msg = "OM field list less than length 1"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
-    
-    IF (SIZE(ISM_ExpFieldList).LT.1) THEN
-       msg = "ISM field list less than length 1"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
-
-!         regridmethod=ESMF_REGRIDMETHOD_NEAREST_STOD, &
-!         regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
-    ! Create a route handle to add to the state object.  This will be used for regridding.
-    CALL FISOC_FieldRegridStore(vm, ISM_ExpFieldList(1), OM_ExpFieldList(1), &
-         regridmethod=Regrid_method, &
-         unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
-         routehandle=ISM2OM_regridRouteHandle, rc=rc)
+    ! name the route handle to facilitate future extraction from state
+    CALL ESMF_RouteHandleSet(ISM2OM_regridRouteHandle,name="ISM2OM_regridRouteHandle", rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    ! then add the route handle to the ISM exp state for future regridding
+    ! operations
     CALL ESMF_StateAdd(ISM_ExpSt, (/ISM2OM_regridRouteHandle/), rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -209,6 +158,19 @@ CONTAINS
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
          line=__LINE__, file=__FILE__, rc=rc)
 
+
+
+    ! We will create OM import fields with names corresponding to the ISM 
+    ! export field names and use the new routehandle to regrid the ISM 
+    ! export fields onto the new fields.  Then bundle the OM import fields 
+    ! and add them to the OM import state.
+
+    ! get the grid or mesh from the OM exp bundle.  
+    CALL FISOC_getGridOrMeshFromFB(OM_expFB,OM_gridType,OM_grid,OM_mesh,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     ! remove the OM export field bundle from OM export state 
     ! (we only put it there to set up the routehandle).
     CALL ESMF_StateRemove (OM_ImpSt, (/"OM export fields"/), rc=rc)
@@ -217,52 +179,43 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
 
-    ! We will create OM import fields with names corresponding to the ISM 
-    ! export field names and use the new routehandle to regrid the ISM 
-    ! export fields onto the new fields.  Then bundle the OM import fields 
-    ! and add them to the OM import state.
-
-    ALLOCATE(OM_ImpFieldList(ISM_ExpFieldCount))
-
-    loop_over_fields: DO ii = 1,ISM_ExpFieldCount 
-
-       CALL ESMF_FieldGet(ISM_ExpFieldList(ii), name=fieldName, typekind=fieldTypeKind, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-       SELECT CASE (OM_gridType)
-       CASE("ESMF_grid","ESMF_Grid")
-          OM_ImpFieldList(ii) = ESMF_FieldCreate(OM_grid, typekind=fieldTypeKind, name=fieldName, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       CASE("ESMF_mesh","ESMF_Mesh")
-          OM_ImpFieldList(ii) = ESMF_FieldCreate(OM_mesh, typekind=fieldTypeKind, name=fieldName, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       END SELECT
-
-       CALL ESMF_FieldRegrid(ISM_ExpFieldList(ii),OM_ImpFieldList(ii), &
-            routehandle=ISM2OM_regridRouteHandle, zeroregion= ESMF_REGION_TOTAL, &
-            checkflag=.TRUE.,rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-       msg = "Regridded field "//fieldName
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__, rc=rc)
-
-    END DO loop_over_fields
-
-    OM_ImpFB = ESMF_FieldBundleCreate(name="OM import fields", rc=rc)
+    ! get a list of field names from the ISM export bundle
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=ISM_ExpFieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(fieldNameList(ISM_ExpFieldCount))
+    CALL ESMF_FieldBundleGet(ISM_expFB, fieldNameList=fieldNameList, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleAdd(OM_ImpFB, OM_ImpFieldList, rc=rc)
+    ! use the OM grid or mesh and the field names from the ISM export 
+    ! field list to populate the OM import field bundle (fields are 
+    ! initially empty or set to zero). 
+    SELECT CASE (OM_gridType)
+    CASE("ESMF_grid","ESMF_Grid")
+       CALL FISOC_populateFieldBundle(fieldNameList,OM_impFB,   &
+            OM_grid,init_value=REAL(0.0,ESMF_KIND_R8),rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CASE("ESMF_mesh","ESMF_Mesh")
+       CALL FISOC_populateFieldBundle(fieldNameList,OM_impFB,    &
+            OM_mesh,init_value=REAL(0.0,ESMF_KIND_R8),rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CASE DEFAULT
+       msg = "ERROR: FISOC does not recognise OM_gridType"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR,     &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END SELECT
+
+    ! regrid the ISM export fields onto the OM grid or mesh to give 
+    ! suitable values to the new fields
+    CALL FISOC_regridFB(ISM_expFB,OM_impFB,ISM2OM_regridRouteHandle,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -277,116 +230,12 @@ CONTAINS
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
          line=__LINE__, file=__FILE__, rc=rc)
 
+    DEALLOCATE(fieldNameList)
+
     rc = ESMF_SUCCESS
 
 
   END SUBROUTINE FISOC_coupler_init_phase1
-
-! old code probably to me removed after checking for potential future relevance...
-!    TYPE(ESMF_grid)               :: OM_grid, ISM_grid
-!    TYPE(ESMF_mesh)               :: ISM_mesh, OM_mesh
-!
-!    ! get virtual machine
-!    CALL ESMF_cplCompGet(FISOC_coupler, vm=vm, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-!    CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_gridType, label='ISM_gridType:', rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!
-!    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_gridType, label='OM_gridType:', rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!
-!    ! get the grid object for the OM and ISM.  Obtained via one of the fields.
-!
-!    SELECT CASE (ISM_gridType)
-!
-!    CASE("ESMF_grid","ESMF_Grid")
-!       CALL ESMF_FieldGet(ISM_ExpFieldList(1), grid=ISM_grid, rc=rc)
-!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!            line=__LINE__, file=__FILE__)) &
-!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!
-!    CASE("ESMF_mesh","ESMF_Mesh")
-!       CALL ESMF_FieldGet(ISM_ExpFieldList(1), mesh=ISM_mesh, rc=rc)
-!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!            line=__LINE__, file=__FILE__)) &
-!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!
-!    CASE DEFAULT
-!       msg = "ERROR: FISOC does not recognise ISM_gridType"
-!       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-!            line=__LINE__, file=__FILE__, rc=rc)
-!       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!    END SELECT
-!
-!
-!    SELECT CASE (OM_gridType)
-!
-!    CASE("ESMF_grid","ESMF_Grid")
-!       CALL ESMF_FieldGet(OM_ExpFieldList(1), grid=OM_grid, rc=rc)
-!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!            line=__LINE__, file=__FILE__)) &
-!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!
-!    CASE("ESMF_mesh","ESMF_Mesh")
-!       CALL ESMF_FieldGet(OM_ExpFieldList(1), mesh=OM_mesh, rc=rc)
-!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!            line=__LINE__, file=__FILE__)) &
-!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!
-!    CASE DEFAULT
-!       msg = "ERROR: FISOC does not recognise OM_gridType"
-!       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-!            line=__LINE__, file=__FILE__, rc=rc)
-!       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!    END SELECT
-!
-!
-! bundles must have same number of fields
-!    CALL ESMF_FieldBundleRegridStore(ISM_ExpFB, OM_ExpFB, &
-!         regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
-!         unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
-!         routehandle=ISM2OM_regridRouteHandle, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!
-! some code for getting info about the grids/meshes...
-!    CALL ESMF_MeshGet(ISM_mesh, parametricDim=parametricDim, spatialDim=spatialDim, coordSys=IMS_mesh_coordSys, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!    print*,parametricDim, spatialDim, IMS_mesh_coordSys
-!    print*,ESMF_COORDSYS_CART
-!    print*,ESMF_COORDSYS_SPH_DEG
-!    print*,ESMF_COORDSYS_SPH_RAD
-!    CALL ESMF_GridGet(OM_grid, dimCount=dimCount, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-
-
-!    CALL ESMF_FieldRegridStore(ISM_ExpFieldList(1), OM_ExpFieldList(1), &
-!         regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
-!         unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
-!         routehandle=ISM2OM_regridRouteHandle, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-
-!    CALL ESMF_StateGet(OM_ExpSt, "OM export fields", OM_ExpFB, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-
 
 
 
