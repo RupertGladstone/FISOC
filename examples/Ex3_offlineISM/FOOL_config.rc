@@ -6,16 +6,11 @@
 # This example is for use with the ISOMIP+ ocean 3 and 4 forcing data, 
 # obtainable from:
 # http://dataservices.gfz-potsdam.de/pik/showshort.php?id=escidoc:1487953
+# A fair bit of hard coded stuff here.  Could gain more flexibility in 
+# future if needed.
 # 
-# Valid values for forcingDataFormat are at time of writing (Feb 2017): 
-# netcdf
+# forcingDataFormat NYI, assume netcdf
 # 
-# FOOL_vars should be of the same length as the list of FISOC_ISM_ReqVars 
-# in the main FISOC config file, and entries should be in the same order (i.e. 
-# FOOL_vars maps variables in the netcdf file to FISOC_ISM_ReqVars).
-# 
-# Names for grid data and meta data should also be provided here.  At time of 
-# writing (Feb 2017) it is assumed that all distances are in metres.
 
 #  ForcingDir:          /short/ks3/rmg581/FISOC/examples/Ex3_offlineISM/ocn3Forcing/
   ForcingDir:          /home/elmeruser/Work/MISOMIP_prep/ISOMIP/
@@ -26,10 +21,8 @@
   ForcingInterval_yr:  1  # interval in years
   ForcingStartYr:      1
 
-#  FOOL_vars:           zice
-
   # currently hard coded, but other options for the grid could be added.
   ISM_gridLayout:      isomip_plus
-  # partitioning in i and j directions (best that it matches the ROM .in tiles)
-  NtileI:              1 #4
-  NtileJ:              4 #16
+  # partitioning in i and j directions (best that it matches the ROMS .in tiles)
+  NtileI:              4
+  NtileJ:              16
