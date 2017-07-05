@@ -15,7 +15,9 @@ MODULE FISOC_utils_MOD
        FISOC_FieldRegridStore, FISOC_FB2NC, FISOC_setClocks,   & 
        FISOC_destroyClocks, FISOC_ISM2OM, FISOC_OM2ISM,        &
        FISOC_shrink, FISOC_VMAllGather, Unique1DArray,         &
-       FISOC_OneGrid, FISOC_cavityCheckOptions 
+       FISOC_OneGrid, FISOC_cavityCheckOptions,                & 
+       FISOC_getFirstFieldRank, FISOC_makeRHfromFB,            &
+       FISOC_getGridOrMeshFromFB, FISOC_regridFB
 
   INTERFACE Unique1DArray
      MODULE PROCEDURE Unique1DArray_I4
@@ -427,7 +429,7 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
-    
+
     FISOC_clock = ESMF_ClockCreate(OM_dt, startTime, stopTime=endTime, &
          name="FISOC main clock", rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -858,6 +860,19 @@ CONTAINS
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        END IF
        
+    CASE('OM_CavCorr') ! cavity drift corrrection factor
+       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_CavCorr:', rc=rc)
+       IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+          derivedAttribute = 0.2
+          msg = "WARNING: OM_CavCorr not found, setting to 0.2."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+
     CASE DEFAULT
        msg = 'ERROR: unrecognised derived config attribute label '
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
@@ -1890,6 +1905,252 @@ print*,"need RH"
     END IF
 
   END SUBROUTINE FISOC_OneGrid
+
+
+  ! --------------------------------------------------------------------------
+  ! Get the rank (this is .le. dimension count) fo the first 
+  ! field in a field bundle (assume all fields have same rank)
+  SUBROUTINE FISOC_getFirstFieldRank(fieldBundle,rank,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT) :: fieldBundle
+    INTEGER,INTENT(OUT)                  :: rank
+    INTEGER,INTENT(OUT),OPTIONAL         :: rc
+
+    TYPE(ESMF_Field)             :: field
+    TYPE(ESMF_Field),ALLOCATABLE :: fieldList(:)
+    INTEGER                      :: fieldCount
+
+    CALL ESMF_FieldBundleGet(fieldBundle, fieldCount=fieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ALLOCATE(fieldList(fieldCount))
+
+    CALL ESMF_FieldBundleGet(fieldBundle, fieldList=fieldList, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldGet(fieldList(1), rank=rank, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+  END SUBROUTINE FISOC_getFirstFieldRank
+
+
+  !--------------------------------------------------------------------
+  ! Make a route handle for regridding operations.  Use the first 
+  ! fields from the source and target field bundles to set up the 
+  ! route handle.
+  !
+  ! source_gridType and target_gridType must be either ESMF_mesh or 
+  ! ESMF_grid
+  !
+  SUBROUTINE FISOC_makeRHfromFB(sourceFB,targetFB, &
+       Regrid_method,verbose_coupling,regridRouteHandle,vm,rc)
+    
+!    CHARACTER(len=ESMF_MAXSTR),INTENT(IN)   :: source_gridType, target_gridType
+    TYPE(ESMF_fieldBundle)                  :: sourceFB, targetFB
+    TYPE(ESMF_RouteHandle),INTENT(OUT)      :: regridRouteHandle
+    TYPE(ESMF_RegridMethod_Flag),INTENT(IN) :: Regrid_method
+    TYPE(ESMF_vm),INTENT(IN)                :: vm
+    LOGICAL,INTENT(IN)                      :: verbose_coupling
+    INTEGER,INTENT(OUT),OPTIONAL            :: rc
+
+    INTEGER                            :: sourceFieldCount, targetFieldCount
+    TYPE(ESMF_field),ALLOCATABLE       :: sourceFieldList(:), targetFieldList(:)
+
+    rc = ESMF_FAILURE
+
+    ! Extract source fields from bundle for regridding...
+    ! ...how many fields?...
+    CALL ESMF_FieldBundleGet(sourceFB, fieldCount=sourceFieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ! ... get list of fields from bundle.
+    ALLOCATE(sourceFieldList(sourceFieldCount))
+    CALL ESMF_FieldBundleGet(sourceFB, fieldList=sourceFieldList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    ! Extract target fields from bundle...
+    ! ...how many fields?...
+    CALL ESMF_FieldBundleGet(targetFB, fieldCount=targetFieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ! ... get list of fields from bundle.
+    ALLOCATE(targetFieldList(targetFieldCount))
+    CALL ESMF_FieldBundleGet(targetFB, fieldList=targetFieldList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    IF (verbose_coupling) THEN
+       msg = "coupler extracted fields for creating routehandle"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
+           
+    IF (SIZE(sourceFieldList).LT.1) THEN
+       msg = "source field list less than length 1"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    
+    IF (SIZE(targetFieldList).LT.1) THEN
+       msg = "target field list less than length 1"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    ! Create a route handle to add to the state object.  This will be used for regridding.
+    CALL FISOC_FieldRegridStore(vm, sourceFieldList(1), targetFieldList(1), &
+         regridmethod=Regrid_method, &
+         unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
+         routehandle=regridRouteHandle, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_makeRHfromFB
+
+
+
+  !--------------------------------------------------------------------
+  !
+  ! assuming all fields in the bundle are on the same grid or mesh, 
+  ! use the first field to get the grid or mesh object and return it.
+  SUBROUTINE FISOC_getGridOrMeshFromFB(FB,gridType,grid,mesh,rc)
+
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: gridType
+    TYPE(ESMF_FieldBundle),INTENT(INOUT)  :: FB
+    TYPE(ESMF_grid),INTENT(OUT)           :: grid
+    TYPE(ESMF_mesh),INTENT(OUT)           :: mesh
+    INTEGER,OPTIONAL,INTENT(OUT)          :: rc
+
+    TYPE(ESMF_Field),ALLOCATABLE  :: FieldList(:)
+    INTEGER                       :: FieldCount     
+
+    rc = ESMF_FAILURE
+
+    ! How many fields?...
+    CALL ESMF_FieldBundleGet(FB, fieldCount=FieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! ... get list of fields from bundle.
+    ALLOCATE(FieldList(FieldCount))
+    CALL ESMF_FieldBundleGet(FB, fieldList=FieldList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Get grid or mesh from first field in list
+    SELECT CASE (gridType)
+    CASE("ESMF_grid","ESMF_Grid")
+       CALL ESMF_FieldGet(FieldList(1), grid=grid, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CASE("ESMF_mesh","ESMF_Mesh")
+       CALL ESMF_FieldGet(FieldList(1), mesh=mesh, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CASE DEFAULT
+       msg = "ERROR: FISOC does not recognise OM_gridType"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END SELECT
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_getGridOrMeshFromFB
+
+
+
+  !--------------------------------------------------------------------
+  ! Loop over the field bundle using the same routehandle for each 
+  ! regridding operation
+  SUBROUTINE FISOC_regridFB(sourceFB,targetFB,regridRH,rc)
+    TYPE(ESMF_FieldBundle),INTENT(INOUT) :: sourceFB,targetFB
+    TYPE(ESMF_RouteHandle),INTENT(INOUT) :: regridRH
+    INTEGER,INTENT(OUT),OPTIONAL         :: rc
+
+    INTEGER                       :: fieldCount, targetFieldCount, ii
+    TYPE(ESMF_field),ALLOCATABLE  :: sourceFieldList(:),targetFieldList(:)
+    CHARACTER(len=ESMF_MAXSTR)    :: fieldName
+
+    rc = ESMF_FAILURE
+
+    ! How many fields?  And consistency check.
+    CALL ESMF_FieldBundleGet(sourceFB, fieldCount=fieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldBundleGet(targetFB, fieldCount=targetFieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (fieldCount.NE.targetFieldCount) THEN
+       msg = "ERROR: mismatch in fieldbundle lengths"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    ! Get list of fields to be regridded
+    ALLOCATE(sourceFieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(sourceFB, fieldList=sourceFieldList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Get list of target fields for regridding
+    ALLOCATE(targetFieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(targetFB, fieldList=targetFieldList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    DO ii = 1,fieldCount
+
+       CALL ESMF_FieldRegrid(sourceFieldList(ii),targetFieldList(ii), &
+            routehandle=regridRH, zeroregion= ESMF_REGION_TOTAL, &
+            checkflag=.TRUE.,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldGet(sourceFieldList(ii), name=fieldName, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       msg = "Regridded field "//fieldName
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       
+    END DO
+
+    DEALLOCATE(targetFieldList)
+    DEALLOCATE(sourceFieldList)
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_regridFB
+
 
 ! probably scrap this and use ESMF_FieldRead 
   !--------------------------------------------------------------------

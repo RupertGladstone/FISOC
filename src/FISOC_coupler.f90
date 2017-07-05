@@ -712,16 +712,14 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!CALL ESMF_FieldGet(ISM_ExpFieldList(ii), farrayPtr=iptr, rc=rc)
+!print*,"remove this"
+!CALL ESMF_FieldGet(ISM_ExpFieldList(ii), farrayPtr=optr, rc=rc)
 !IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
 !     line=__LINE__, file=__FILE__)) &
 !     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!print*,fieldName,SIZE(iptr(:))
-!do nn = 1,SIZE(iptr(:))
-!iptr(nn) = 10.0 * nn
-!end do
-!print*,iptr(:)
-!nullify(iptr)
+!print*,fieldName,shape(optr)
+!print*,MINVAL(optr),MAXVAL(optr)
+!nullify(optr)
 
        CALL ESMF_FieldRegrid(ISM_ExpFieldList(ii),OM_ImpFieldList(ii), &
             routehandle=ISM2OM_regridRouteHandle, zeroregion= ESMF_REGION_TOTAL, &
@@ -729,14 +727,6 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-!CALL ESMF_FieldGet(OM_ImpFieldList(ii), farrayPtr=optr, rc=rc)
-!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!     line=__LINE__, file=__FILE__)) &
-!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!print*,fieldName
-!print*,optr
-!nullify(optr)
 
        IF (verbose_coupling) THEN
           msg = "Regridded field "//fieldName

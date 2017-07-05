@@ -2,6 +2,7 @@
 MODULE FISOC_ISM_Wrapper
 
   USE ESMF
+  USE Netcdf
   USE FISOC_utils_MOD
 
   IMPLICIT NONE
@@ -17,6 +18,7 @@ MODULE FISOC_ISM_Wrapper
    END INTERFACE
 
   TYPE(ESMF_config)                     :: FOOL_config 
+!  REAL(ESMF_KIND_R8),PARAMETER          :: yearinsec = 365.25*24.*60.*60. 
 
 CONTAINS
 
@@ -177,18 +179,28 @@ CONTAINS
   END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2
 
 
-  !--------------------------------------------------------------------------------------
+  !-------------------------------------------------------------------------------
+  ! 
   SUBROUTINE FISOC_ISM_Wrapper_Run(FISOC_config,vm,ISM_ExpFB,ISM_ImpFB,rc)
 
-    TYPE(ESMF_config)      :: FISOC_config
-    TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
-    TYPE(ESMF_VM)          :: vm
-    INTEGER,INTENT(OUT),OPTIONAL :: rc
+    TYPE(ESMF_config),INTENT(INOUT)      :: FISOC_config
+    TYPE(ESMF_fieldbundle),INTENT(INOUT) :: ISM_ImpFB,ISM_ExpFB
+    TYPE(ESMF_VM),INTENT(IN)             :: vm
+    INTEGER,INTENT(OUT),OPTIONAL         :: rc
 
-    INTEGER                      :: localPet
-    TYPE(ESMF_field)             :: OM_dBdt_l0, ISM_z_l0, ISM_z_l1
-    REAL(ESMF_KIND_R8),POINTER   :: OM_dBdt_l0_ptr(:),ISM_z_l0_ptr(:),ISM_z_l1_ptr(:)
+    TYPE(ESMF_grid)              :: FOOLgrid
+    INTEGER,SAVE                 :: year=1
+    INTEGER                      :: localPet, NumForcingFiles, rank
+    INTEGER                      :: ForcingInterval_yr, ForcingStartYr
+    INTEGER                      :: lbnd(2), ubnd(2), NtileI, NtileJ
+    INTEGER                      :: lbx, ubx, lby, uby, nx, ny
+    INTEGER                      :: status, ncid, varid
+    TYPE(ESMF_field)             :: ISM_z_l0
+    REAL(ESMF_KIND_R8),POINTER   :: ISM_z_l0_ptr(:,:)
+    REAL(ESMF_KIND_R8),ALLOCATABLE :: values(:,:)
     LOGICAL                      :: verbose_coupling
+    CHARACTER(len=ESMF_MAXSTR)   :: fileName, ForcingBaseName 
+    CHARACTER(len=ESMF_MAXSTR)   :: ForcingDir, fileNumber
 
     rc = ESMF_FAILURE
 
@@ -196,6 +208,29 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! We expect grids not meshes here, thus rank = dim = 2
+    CALL FISOC_getFirstFieldRank(ISM_ExpFB,rank,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (rank.NE.2) THEN
+       msg = "FOOL wrapper expecting ISM_ExpFB rank 2"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    CALL FISOC_getFirstFieldRank(ISM_ImpFB,rank,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (rank.NE.2) THEN
+       msg = "FOOL wrapper expecting ISM_ImpFB rank 2"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
 
     ! query the FISOC config
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
@@ -209,54 +244,134 @@ CONTAINS
        PRINT*,"*************       ISM dummy wrapper.  Run method.       ********************"
        PRINT*,"******************************************************************************"
        PRINT*,""
-       PRINT*,"OM export fields are available.  Run the ISM and return ISM export fields "
+       PRINT*,"OM export fields are available but for offline forcing we dont need them. "
+       PRINT*,"Just read new forcing data to pass to OM."
        PRINT*,""
     END IF
 
-    ! get import and export fields and do something with them.
-    CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldName="OM_dBdt_l0", field=OM_dBdt_l0, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
-    CALL ESMF_FieldGet(field=OM_dBdt_l0, localDe=0, farrayPtr=OM_dBdt_l0_ptr, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,"Lets just adjust depth coords according to basal melt rate from ocean."
-       PRINT*,"Melt rates dont look quite right on the ISM grid, needs checking..."
-       PRINT*,OM_dBdt_l0_ptr
-       PRINT*,""
-    END IF
-
+    ! Get a pointer to the array for height of the lower surface of the ice 
+    ! shelf.  We need to update this from the netcdf file.
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l1", field=ISM_z_l1, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=ISM_z_l1, localDe=0, farrayPtr=ISM_z_l1_ptr, rc=rc)
+
+    ! We can also use this field to get hold of the grid
+    CALL ESMF_FieldGet(ISM_z_l0, grid=FOOLgrid, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ISM_z_l0_ptr = ISM_z_l0_ptr + OM_dBdt_l0_ptr
-    ISM_z_l1_ptr = ISM_z_l1_ptr + OM_dBdt_l0_ptr
+
+    ! set up file name for this time interval
+    CALL ESMF_ConfigGetAttribute(FOOL_config, ForcingDir, label='ForcingDir:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FOOL_config, ForcingBaseName, label='ForcingBaseName:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FOOL_config, NumForcingFiles, label='NumForcingFiles:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FOOL_config, ForcingInterval_yr, label='ForcingInterval_yr:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FOOL_config, ForcingStartYr, label='ForcingStartYr:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+!    CALL ESMF_ClockGet(clock, startTime, currTime
+!    advanceCount, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+!    CALL ESMF_TimeGet(time, yy, rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! file names determined from FOOL config
+    WRITE (fileNumber, "(I0)") year
+    fileName = TRIM(ADJUSTL(ForcingDir))//TRIM(ADJUSTL(ForcingBaseName))//TRIM(ADJUSTL(fileNumber))//".nc"
+
+    ! Increment year for next time (we assume here the ISM timestep is 1 year)
+    year = year + 1
+
+    ! Get the bounds for the local pet
+    CALL ESMF_GridGetCoordBounds(FOOLgrid, 1,    &
+         totalLBound=lbnd, totalUBound=ubnd,   rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    lbx = lbnd(1)
+    ubx = ubnd(1)
+
+    CALL ESMF_GridGetCoordBounds(FOOLgrid, 2,    &
+         totalLBound=lbnd, totalUBound=ubnd,   rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    lby = lbnd(1)
+    uby = ubnd(1)
+    nx = ubx - lbx + 1
+    ny = uby - lby + 1
+
+    ALLOCATE(values(ny,nx))
+
+    ! Extract netcdf variable zice into ISM_z_l0, the lower surface of 
+    ! the ice shelf.  Var names hard coded here.
+    status = nf90_open(fileName, NF90_NOWRITE, ncid)
+    IF(status /= nf90_NoErr) CALL handle_err(status)
+    
+    status = nf90_inq_varid(ncid, "zice", varid)
+    IF(status /= nf90_NoErr) CALL handle_err(status)
+
+    status = nf90_get_var(ncid, varid, values,  &
+         start = (/ lby, lbx /),                      &
+         count = (/ ny,  nx  /)                        )
+    IF(status /= nf90_NoErr) CALL handle_err(status)
+
+    status = nf90_close(ncid)
+    IF(status /= nf90_NoErr) CALL handle_err(status)
+
+    ISM_z_l0_ptr = TRANSPOSE(values)
+
+    DEALLOCATE(values)
 
     rc = ESMF_SUCCESS
 
+  CONTAINS
+    SUBROUTINE handle_err(status)
+      INTEGER, INTENT(IN) :: status
+      
+      IF(status /= nf90_noerr) THEN
+         msg = "FISOC encountered NETCDF error.  Error text follows."
+         CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+              line=__LINE__, file=__FILE__, rc=rc)
+         msg = trim(nf90_strerror(status))           
+         CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+              line=__LINE__, file=__FILE__, rc=rc)
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      END IF
+    END SUBROUTINE handle_err
+    
   END SUBROUTINE FISOC_ISM_Wrapper_Run
-
+  
 
   !--------------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_Wrapper_Finalize(FISOC_config,localPet,rc)
@@ -290,19 +405,15 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE Create_ISOMIP_plus_grid(ISM_grid,rc)
+  SUBROUTINE Create_ISOMIP_plus_grid(FOOLgrid,rc)
 
-    TYPE(ESMF_grid),INTENT(INOUT)  :: ISM_grid
+    TYPE(ESMF_grid),INTENT(INOUT)  :: FOOLgrid
     INTEGER,INTENT(OUT),OPTIONAL   :: rc
 
     CHARACTER(len=ESMF_MAXSTR)     :: fileName, fileNumber, ForcingDir, ForcingBaseName
-
-    TYPE(ESMF_grid)                :: FOOLgrid
-    TYPE(ESMF_field)               :: field, ISM_z_l0
-    REAL(ESMF_KIND_R8),POINTER     :: xCoords(:), yCoords(:), field_arr(:,:), zice_arr(:,:)
-
-    INTEGER                        :: lbnd(2), ubnd(2), year
-    INTEGER                        :: nx, ny, dx, dy, ii, x1, y1
+    REAL(ESMF_KIND_R8),POINTER     :: xCoords(:), yCoords(:)
+    INTEGER                        :: lbnd(2), ubnd(2), year, NtileI, NtileJ
+    INTEGER                        :: nx, ny, dx, dy, ii, x1, y1, localDEcount
 
     rc = ESMF_FAILURE
 
@@ -315,35 +426,35 @@ CONTAINS
     
     ! Note: we are using David G's processed netcdf files with 2km instead of 1km 
     ! resolution, so set the values accordingly here:
-    nx = 240; ny = 40; dx = 2000; dy = 2000
-    x1 = 321000; y1 = 1000 ! starting coords (like all) are at cell centres
+    ny = 240; nx = 40; dx = 2000; dy = 2000
+    y1 = 321000; x1 = 1000 ! starting coords (like all) are at cell centres
     
+    ! get the decomposition from the FOOL config
+    CALL ESMF_ConfigGetAttribute(FOOL_config, NtileI, label='NtileI:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_ConfigGetAttribute(FOOL_config, NtileJ, label='NtileJ:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     ! read from FOOL config file
     CALL ESMF_ConfigGetAttribute(FOOL_config, ForcingDir, label='ForcingDir:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    year = 1
-!    ForcingDir      = "/short/ks3/rmg581/FISOC/examples/Ex3_offlineISM/ocn3Forcing/"
-    ForcingBaseName = "isomip_plus_ocean3_"
     
-!  NumForcingFiles:
-!  ForcingInterval_yr:
-!  ForcingStartYr:
 
-    ! use FOOL_vars from config for varNames
-    
-    WRITE (fileNumber, "(I0)") year
-    fileName = TRIM(ADJUSTL(ForcingDir))//TRIM(ADJUSTL(ForcingBaseName))//TRIM(ADJUSTL(fileNumber))//".nc"
-    
     ! Make the grid and add coords
-    FOOLgrid=ESMF_GridCreateNoPeriDim(          &
-         maxIndex=(/ny,nx/), & 
-         coordSys=ESMF_COORDSYS_CART, &
+    FOOLgrid=ESMF_GridCreateNoPeriDim(  &
+         maxIndex=(/ny,nx/),            & 
+         regDecomp=(/NtileJ,NtileI/),   &
+         coordSys=ESMF_COORDSYS_CART,   &
          coordDep1=(/1/), & ! 1st coord is 1D and depends on 1st Grid dim
          coordDep2=(/2/), & ! 2nd coord is 1D and depends on 2nd Grid dim
-         indexflag=ESMF_INDEX_GLOBAL, &
+         indexflag=ESMF_INDEX_GLOBAL,   &
          rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -382,6 +493,9 @@ CONTAINS
     DO ii=lbnd(1),ubnd(1)
        yCoords(ii) = y1 - dy + (ii*dy)
     END DO
+
+    NULLIFY(yCoords)
+    NULLIFY(xCoords)
     
     rc = ESMF_SUCCESS
 
