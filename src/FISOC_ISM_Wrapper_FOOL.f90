@@ -309,6 +309,10 @@ CONTAINS
     WRITE (fileNumber, "(I0)") year
     fileName = TRIM(ADJUSTL(ForcingDir))//TRIM(ADJUSTL(ForcingBaseName))//TRIM(ADJUSTL(fileNumber))//".nc"
 
+    msg = "Attempting to access netcdf file: "//fileName
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       line=__LINE__, file=__FILE__, rc=rc)
+
     ! Increment year for next time (we assume here the ISM timestep is 1 year)
     year = year + 1
 
