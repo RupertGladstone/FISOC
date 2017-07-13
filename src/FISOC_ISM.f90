@@ -756,9 +756,6 @@ CONTAINS
     ISM_dt = REAL(ISM_dt_int,ESMF_KIND_R8)
     ISM_dddt_ptr = (ISM_z_l0_ptr - ISM_z_l0_previous_ptr) / ISM_dt
 
-    ! first time we set it to zero
-    WHERE (ISM_z_l0_previous_ptr .EQ. 0.0) ISM_dddt_ptr = 0.0
-
     NULLIFY(ISM_z_l0_previous_ptr)
     NULLIFY(ISM_z_l0_ptr)
     NULLIFY(ISM_dddt_ptr)
