@@ -394,7 +394,7 @@ CONTAINS
     INTEGER                      :: lbx, ubx, lby, uby, nx, ny
     INTEGER                      :: status, ncid, varid, rc
 
-    msg = "Attempting to access netcdf file: "//fileName
+    msg = "NC file: "//fileName
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
