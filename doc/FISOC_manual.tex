@@ -275,12 +275,36 @@ For example (see also the example FISOC build script):
 export CPPFLAGS="$CPPFLAGS -D ROMS_DRAFT"
 \end{lstlisting}
 At the time of writing, the relevant values are ROMS\_MASKING, ROMS\_SPHERICAL, 
-ROMS\_DDDT and ROMS\_DRAFT.  The general rule is that any of these directives that 
+ROMS\_DDDT, ROMS\_DSDT and ROMS\_DRAFT.  The general rule is that any of these directives that 
 are defined for the ROMS compilation need to be defined also for the FISOC 
 compilation. 
 
+*** need a proper description of the relevant directives for ROMS compilation: ***
+FISOC
+FISOC\_DDDT
+FISOC\_DSDT
+FISOC\_DRAFT
+FISOC\_DTDZ
 
+ICESHELF\_MORPH
+LIMIT\_BSTRESS
+ICESHELF
+LIMIT\_ICESTRESS
+MASKING
+WET\_DRY
 
+also need some discussion on relevant ROMS params in .in file.
+DCRIT = 20.0
+
+Setting FISOC\_DSDT activates the following in ROMS:
+
+In the same way that zice is added to the GRID type and used to indicate height of the lower surface of the iceshelf relative to sea level (i.e. iceshelf draft), sice is added to the GRID type to indicate height of the upper surface of the ice sheet/shelf. sice can be read from netcdf in the same was as zice.
+
+In the same way that iceshelf\_dddt is added to the ICESHELFVAR type and accessed from FISOC to set the rate of change of iceshelf draft wrt time, iceshelf\_dsdt is added to ICESHELFVAR to set the rate of change of sice with time.  If FISOC does not update iceshelf\_dsdt then the upper ice surface will remain static.
+
+The calculation of pressure at the ice-ocean interface no longer estimates the weight of the ice column based on the assumption of floatation, but rather uses the actual ice thickness to estimate pressure.  The value for ice density defined in iceshelf_mod.h is used.
+
+***put the pressure equation here***
 
 
 %\subsection{Troubleshooting}
