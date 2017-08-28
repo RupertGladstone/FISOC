@@ -961,6 +961,13 @@ print*,"TODO: fix cavity reset somehow..."
                   line=__LINE__, file=__FILE__, rc=rc)          
              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 # endif
+
+          CASE ('ISM_dsdt')
+             DO jj = JstrR, JendR
+                DO ii = IstrR, IendR
+                   ICESHELFVAR(1) % iceshelf_dsdt(ii,jj) = ptr(ii,jj)
+                END DO
+             END DO
              
           CASE ('ISM_z_l0','ISM_z_l0_linterp')
 # ifdef ROMS_DRAFT
