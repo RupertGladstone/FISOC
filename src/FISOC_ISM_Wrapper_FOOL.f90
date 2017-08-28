@@ -149,29 +149,8 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! Get a pointer to the array for height of the lower surface of the ice 
-    ! shelf.  We need to update this from the netcdf file.
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_dddt", field=field, rc=rc)
-!    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-    CALL ESMF_FieldGet(field=field, localDe=0, farrayPtr=ptr, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    ! We can also use this field to get hold of the grid
-    CALL ESMF_FieldGet(field, grid=FOOLgrid, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL makeFileName(FOOL_config,fileName)
-
-    CALL readFromNC(FileName,FOOLgrid,ptr,ISM_dt_sec)
-
-    NULLIFY(ptr)
+    ! Get the fields needed from our ISM, in this case just the netcdf file
+    CALL getFieldDataFromISM(ISM_ExpFB,FISOC_config)
     
     rc = ESMF_SUCCESS
 
@@ -232,7 +211,6 @@ CONTAINS
     TYPE(ESMF_grid)              :: FOOLgrid
     TYPE(ESMF_field)             :: field
     LOGICAL                      :: verbose_coupling
-    REAL(ESMF_KIND_R8),POINTER   :: ptr(:,:)
 
     rc = ESMF_FAILURE
 
@@ -241,11 +219,6 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt_sec, 'ISM_dt_sec',rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
     ! We expect grids not meshes here, thus rank = dim = 2
     CALL FISOC_getFirstFieldRank(ISM_ExpFB,rank,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -268,7 +241,6 @@ CONTAINS
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
-
     ! query the FISOC config
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -286,37 +258,94 @@ CONTAINS
        PRINT*,""
     END IF
 
-
-    ! Get a pointer to the array for height of the lower surface of the ice 
-    ! shelf.  We need to update this from the netcdf file.
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_dddt", field=field, rc=rc)
-!    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-    CALL ESMF_FieldGet(field=field, localDe=0, farrayPtr=ptr, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    ! We can also use this field to get hold of the grid
-    CALL ESMF_FieldGet(field, grid=FOOLgrid, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL makeFileName(FOOL_config,fileName)
-
-    CALL readFromNC(FileName,FOOLgrid,ptr,ISM_dt_sec)
-
-    NULLIFY(ptr)
-
-    rc = ESMF_SUCCESS
+    ! Get the fields needed from our ISM, in this case just the netcdf file
+    CALL getFieldDataFromISM(ISM_ExpFB,FISOC_config)
 
   END SUBROUTINE FISOC_ISM_Wrapper_Run
 
 
   
+  !--------------------------------------------------------------------------------------                                                                                                                                                     
+  SUBROUTINE getFieldDataFromISM(ISM_ExpFB,FISOC_config)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: ISM_ExpFB 
+    TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
+
+    TYPE(ESMF_grid)                :: FOOLgrid
+    INTEGER                        :: nn, ISM_dt_sec
+    REAL(ESMF_KIND_R8),POINTER     :: ptr(:,:)
+    INTEGER                        :: fieldCount, rc
+    TYPE(ESMF_Field),ALLOCATABLE   :: fieldList(:)
+    CHARACTER(len=ESMF_MAXSTR)     :: fieldName, fileName
+
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt_sec, 'ISM_dt_sec',rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL makeFileName(FOOL_config,fileName)
+
+    ! get a list of fields and their names from the ISM export field bundle
+    fieldCount = 0
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=fieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(fieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldList=fieldList, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! We can use the first field to get hold of the grid
+    CALL ESMF_FieldGet(fieldList(1), grid=FOOLgrid, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+
+    fieldLoop: DO nn = 1,fieldCount
+       
+       ! access the FISOC version of the current field
+       CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       ! access the netcdf file for the current field
+       SELECT CASE (TRIM(ADJUSTL(fieldName)))
+
+       CASE ('ISM_z_l0')
+          CALL readFromNC(FileName,'zice',FOOLgrid,ptr,ISM_dt_sec)
+          
+       CASE ('ISM_dddt')
+          CALL readFromNC(FileName,'dddt',FOOLgrid,ptr,ISM_dt_sec)
+          
+       CASE ('ISM_dsdt')
+          CALL readFromNC(FileName,'dsdt',FOOLgrid,ptr,ISM_dt_sec)
+
+       CASE DEFAULT
+          msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       END SELECT
+
+    END DO fieldLoop
+
+    NULLIFY(ptr)
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE getFieldDataFromISM
+
+
 !    CALL ESMF_ClockGet(clock, startTime, currTime
 !    advanceCount, rc=rc)
 !    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -382,17 +411,18 @@ CONTAINS
 
 
 
-  SUBROUTINE readFromNC(FileName,FOOLgrid,ptr,ISM_dt_sec)
+  SUBROUTINE readFromNC(FileName,VarName,FOOLgrid,ptr,ISM_dt_sec)
 
     REAL(ESMF_KIND_R8),POINTER,INTENT(INOUT) :: ptr(:,:)
     CHARACTER(len=ESMF_MAXSTR),INTENT(IN)    :: FileName
+    CHARACTER(len=*),INTENT(IN)              :: VarName
     TYPE(ESMF_grid),INTENT(INOUT)            :: FOOLgrid
     INTEGER,INTENT(IN)                       :: ISM_dt_sec
 
     REAL(ESMF_KIND_R8),ALLOCATABLE :: values(:,:)
-    INTEGER                      :: lbnd(2), ubnd(2), NtileI, NtileJ
-    INTEGER                      :: lbx, ubx, lby, uby, nx, ny
-    INTEGER                      :: status, ncid, varid, rc
+    INTEGER                        :: lbnd(2), ubnd(2), NtileI, NtileJ
+    INTEGER                        :: lbx, ubx, lby, uby, nx, ny
+    INTEGER                        :: status, ncid, varid, rc
 
     msg = "NC file: "//fileName
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
@@ -423,8 +453,7 @@ CONTAINS
     status = nf90_open(fileName, NF90_NOWRITE, ncid)
     IF(status /= nf90_NoErr) CALL handle_err(status)
     
-    status = nf90_inq_varid(ncid, "dddt", varid)
-!    status = nf90_inq_varid(ncid, "zice", varid)
+    status = nf90_inq_varid(ncid, VarName, varid)
     IF(status /= nf90_NoErr) CALL handle_err(status)
 
     status = nf90_get_var(ncid, varid, values,  &
