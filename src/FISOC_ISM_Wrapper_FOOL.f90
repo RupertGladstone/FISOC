@@ -321,7 +321,7 @@ CONTAINS
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
 
        CASE ('ISM_z_l0')
-          CALL readFromNC(FileName,'zice',FOOLgrid,ptr,ISM_dt_sec)
+          CALL readFromNC(FileName,'zice',FOOLgrid,ptr,1)
           
        CASE ('ISM_dddt')
           CALL readFromNC(FileName,'dddt',FOOLgrid,ptr,ISM_dt_sec)
@@ -466,8 +466,8 @@ CONTAINS
 
     ptr = TRANSPOSE(values)
 
-!    ptr = ptr / ISM_dt_sec ! convert from m/yr to m/s
-ptr = ptr/31557600.0
+    ptr = ptr / ISM_dt_sec ! convert from m/yr to m/s
+!ptr = ptr/31557600.0
 
     DEALLOCATE(values)
 
