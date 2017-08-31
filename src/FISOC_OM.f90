@@ -285,8 +285,10 @@ CONTAINS
        ISM_input1: IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN          
           CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB=OM_ExpFB,OM_ImpFB=OM_ImpFB,rc_local=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
+               line=__LINE__, file=__FILE__)) THEN
+             CALL FISOC_OM_finalise(FISOC_OM, OM_ImpSt, OM_ExpSt, FISOC_clock, rc)
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          END IF
           CALL OM_NetcdfWrapper(FISOC_config,OM_writeNetcdf,OM_NCfreq,advanceCount, &
                OM_ExpFB=OM_ExpFB,OM_ImpFB=OM_ImpFB)
 
@@ -294,8 +296,10 @@ CONTAINS
        ELSE
           CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB=OM_ExpFB,rc_local=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
+               line=__LINE__, file=__FILE__)) THEN
+             CALL FISOC_OM_finalise(FISOC_OM, OM_ImpSt, OM_ExpSt, FISOC_clock, rc)
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          END IF
           CALL OM_NetcdfWrapper(FISOC_config,OM_writeNetcdf,OM_NCfreq,advanceCount,OM_ExpFB=OM_ExpFB)
        END IF ISM_input1
        
@@ -304,16 +308,20 @@ CONTAINS
        ISM_input2: IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN
           CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ImpFB=OM_ImpFB,rc_local=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
+               line=__LINE__, file=__FILE__)) THEN
+             CALL FISOC_OM_finalise(FISOC_OM, OM_ImpSt, OM_ExpSt, FISOC_clock, rc)
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          END IF
           CALL OM_NetcdfWrapper(FISOC_config,OM_writeNetcdf,OM_NCfreq,advanceCount,OM_ImpFB=OM_ImpFB)
 
        ! no new ISM output is available and we do not need OM output
        ELSE
           CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,rc_local=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
+               line=__LINE__, file=__FILE__)) THEN
+             CALL FISOC_OM_finalise(FISOC_OM, OM_ImpSt, OM_ExpSt, FISOC_clock, rc)
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          END IF
           
        END IF ISM_input2
     END IF OM_output

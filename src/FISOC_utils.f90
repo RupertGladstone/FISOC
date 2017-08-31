@@ -2151,25 +2151,4 @@ print*,"need RH"
 
   END SUBROUTINE FISOC_regridFB
 
-
-! probably scrap this and use ESMF_FieldRead 
-  !--------------------------------------------------------------------
-  ! Read a netcdf variable into an ESMF field.  
-  !
-  ! Input arguments:
-  !  fileName - name of netcdf file to be read (includes full path) 
-  !  field    - ESMF field object
-  !  varName  - name of variable in the netcdf file
-  ! 
-  ! The data for "varName" will be read from the netcdf file and written 
-  ! to the vlaues for "field".  Dimensions must match.
-  ! 
-!  SUBROUTINE FISOC_NC2FB(fileName,varName,field,rc)
-!    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: fileName, varName
-!    TYPE(ESMF_Field),INTENT(INOUT)        :: field
-!    INTEGER,INTENT(OUT),OPTIONAL          :: rc
-!    TYPE(ESMF_FileStatus_Flag)            :: NC_status
-!    filename = TRIM(output_dir)//'/'//TRIM(filename)
-!  END SUBROUTINE FISOC_NC2FB    
-
 END MODULE FISOC_utils_MOD

@@ -374,10 +374,6 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!    CALL ROMS_finalize
-
-    CLOSE(unit=OM_outputUnit, ERR=102)
-
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
        PRINT*,"******************************************************************************"
@@ -387,6 +383,10 @@ CONTAINS
        PRINT*,"FISOC has taken care of clearing up ESMF types.  Here we just need to call the "
        PRINT*,"OM finalise method."
     END IF
+
+    CALL ROMS_finalize
+
+    CLOSE(unit=OM_outputUnit, ERR=102)
 
     rc = ESMF_SUCCESS
 
