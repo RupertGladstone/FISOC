@@ -21,13 +21,12 @@
  #  ::
 
   ISM_configFile:     ./examples/Ex3_offlineISM/FOOL_config.rc
-  FISOC_ISM_ReqVars:  ISM_z_l0
-  FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dddt ISM_z_l0_linterp 
-  ISM2OM_vars:        ISM_dddt
+  FISOC_ISM_ReqVars:  ISM_dddt ISM_dsdt
+  ISM2OM_vars:        ISM_dddt ISM_dsdt
   ISM_stdoutFile:     EI_out
   ISM_gridType:       ESMF_grid
   ISM2OM_init_vars:   .FALSE.
-#  ISM2OM_regrid:      ESMF_REGRIDMETHOD_NEAREST_STOD
+  ISM2OM_regrid:      ESMF_REGRIDMETHOD_NEAREST_STOD
 
 #  OM_configFile:      /short/ks3/ROMSIceShelf_MISOMIP/ROMS/External/ocean_isomip_plus_new.in
 #  OM_stdoutFile:      /short/ks3/FISOC/ROMS_stdout.asc
