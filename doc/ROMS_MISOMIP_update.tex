@@ -1,0 +1,286 @@
+
+\documentclass[12pt]{article}
+\begin{document}
+\title{ROMS coding for grounding line evolution}
+\author{Rupert Gladstone, David Gwyther}
+\maketitle{}
+
+Here are some notes relating to recent developments to get MISOMIP simulations running. Some of these notes will find their way in to the FISOC 
+GMD paper and or FISOC manual at some point.  They are being checked in here for now just so they don't get lost!
+
+
+\section{Wetting/drying and ice overburden pressure}
+
+I think Ben tried to tell me at some point that we'd need to do something about pressure, and it may have been in reference to  issues
+summarised here, but I don't think I really got what he was talking about at the time.
+
+
+
+
+\subsection{Pressure at the ice-ocean interface}
+
+Test simulations activating wetting/drying in Ben's version of ROMS under grounded ice can give widespread flooding (wetting of dry cells) 
+under the grounded ice sheet.
+This is due to positive zeta (some kind of dynamic freesurface variable) values increasing the water column thickness above DCRIT (DCRIT being the threshold 
+water column thickness for wetting dry cells). 
+When the water column becomes active (changes from dry to wet according to DCRIT) for grounded regions the pressure need to increase to represent the 
+higher ice overburden pressure, but this was not previously implemented.
+The pressure at the ice-ocean interface, $P_{interface}$, was too low because of the assumption of floatation, even under heavily 
+grounded ice.  
+
+%GRho=g/rho_0
+%GRho0=1000.0*g/rho_0
+
+\begin{eqnarray}
+P & = & 1000. \frac{g}{\rho_0}z_w + \frac{g}{\rho_0}(\rho_a+cff2)(z_w-z_r)
+\end{eqnarray}
+
+
+The following equation comes from prsgrd32.h in the ROMS repository and seems to be calculating presure for use in the pressure gradient calculation:
+\begin{eqnarray}
+\nonumber P & = & \frac{g}{\rho_0}1000.(z_w-z_{ice})- \frac{g}{\rho_0}(\rho_a+0.5\frac{d\rho}{dz}z_{ice})z_{ice}+\frac{g}{\rho_0}(\rho_a+{cff2})(z_w-z_r) \\
+            & = & \frac{g}{\rho_0}1000z_w - \frac{g}{\rho_0}(\rho_a+1000+0.5\frac{d\rho}{dz}z_{ice})z_{ice}+\frac{g}{\rho_0}(\rho_a+{cff2})(z_w-z_r) 
+\label{eq:prsgrd32} 
+\end{eqnarray}
+The reason for the slight rearrangement in the second line is because $\rho_a$ in this equation is the ROMS rho, i.e. it is density anomaly rather than 
+actual ocean density (took me a while to figure that out).  
+The actual ocean water density in the top ROMS layer in this case is $\rho_w = 1000 + \rho_a$.  
+So now it can be seen that the middle term in equation~\ref{eq:prsgrd32} gives the pressure at the ice-ocean interface.
+%            & = & \frac{g}{\rho_0}\left(1000.(z_w-z_{ice})- (\rho+0.5\frac{d\rho}{dz}z_{ice})z_{ice}+(\rho+{cff2})(z_w-z_r)\right) 
+I think the first and last terms relate to extending 
+pressure down through the water column.  Interface pressure corresponds to equation 1 in 
+``Influence of sea ice cover and icebergs
+on circulation and water mass formation in a
+numerical circulation model of the Ross Sea,
+Antarctica''
+By Mike Dinniman et al., except for the division by $\rho_0$. The $P$ in equation~\ref{eq:prsgrd32} above is probably actually 
+$P/\rho_0$ due to some internal ROMS things vaguely related to the Boussinesq approximation that I probably do not need to understand 
+(note $\rho_0=1025$ in mod\_scalars, though maybe this gets overwritten from the .in file).
+So we have 
+\begin{eqnarray}
+ P_{interface} & = & - {g}(\rho_w+0.5\frac{d\rho}{dz}z_{ice})z_{ice}  \label{eq:DinniPress} \\ 
+%\nonumber      & = & - {g \rho z_{ice}} - \frac{g z_{ice}^2}{2} \frac{d\rho}{dz} \\
+\nonumber 
+\end{eqnarray}
+
+If we want to modify this expression in order to represent grounded ice rather than floating ice then I think 
+it should be sufficient to add a term to represent the ice above floatation,  like this:
+\begin{eqnarray}
+\nonumber P_{interface} & = &  {g \rho_i z_{iaf}} - {g \rho_w z_{ice}} - \frac{g z_{ice}^2}{2} \frac{d\rho}{dz} \\
+\nonumber 
+\end{eqnarray}
+where $\rho_i$ is the density of ice and $z_{iaf}$ is the height above floatation of the ice. 
+Note that the first two terms are both positive since $z_{iaf}$ is positive and $z_{ice}$ is 
+negative. But ROMS doesn't know enough information to calculate $z_{iaf}$ for grounded ice. 
+
+However, equation~\ref{eq:DinniPress} is an attempt to recreate ice density based on ice draft, ocean water density, 
+and the assumption of floatation.
+So a neater solution in the long run (especially for fully coupled simulations) might be to 
+pass the basal pressure from the ice sheet model and use it to replace this whole expression. 
+One problem with this idea is the asynchronicity.  If FISOC passes a rate of change of ice draft to ROMS 
+(which it currently does) then ROMS can update 
+the ice draft on the ROMS timestep, so from this perspective it is better for ROMS to calculate pressure evolution 
+(because if FISOC passes it then it will not update until the next ISM timestep, whereas the geometry is continually evolving). 
+
+An alternative in keeping with the use of DDDT (rate of change of ice draft) to update zice in ROMS is as follows:
+\begin{itemize}
+\item Add $s_{ice}$ (the height of the upper ice surface) to ROMS in the same derived type (GRID) that contains $z_{ice}$.
+\item Add DSDT (rate of change of the upper ice surface) to ROMS in the same derived type (ICESHELFVAR) that contains DDDT.
+\item Initialize $s_{ice}$ in the same way as $z_{ice}$ from netcdf (or initialise it through FISOC).
+\item Initialize DSDT to inivar (generally zero) in the same way as DDDT (or initialise it through FISOC).
+\item Pass DSDT from FISOC to ROMS at run time in the same way as DDDT.
+\item Inform ROMS of the ice density in a sensible and consistent (with FISOC and the ISM) way (or, as a temporary 
+measure, just hard code the MISOMIP value into the ice shelf mod where it already lives).
+\end{itemize}
+Now ROMS can calculate the ice overburden pressure directly without having to make assumptions about equivalent water densities: 
+\begin{eqnarray}
+\nonumber P_{interface} & = & g \rho_i (s_{ice} - z_{ice}) \\
+\label{eqn:pinterface}
+\end{eqnarray}
+
+So equation~\ref{eq:prsgrd32} would become:
+\begin{eqnarray}
+\nonumber P & = & \frac{g}{\rho_0}1000 z_w- \frac{g}{\rho_0}\rho_i (s_{ice} - z_{ice})+\frac{g}{\rho_0}(\rho+{cff2})(z_w-z_r) \\
+\nonumber 
+\end{eqnarray}
+
+One weakness of this approach is that Elmer/Ice is capable of giving the actual normal force at the bed, which 
+is not necessarily identical to the ice overburden pressure.  So this approach would be to miss out on 
+a potential advantage of Elmer/Ice.  However, Elmer/Ice is too expensive to run on the same timestep as ROMS
+so we either have to interpolate Elmer's normal force over time or let ROMS calculate the pressure field. 
+The above method is at least consistent with the approach of interpolating ice draft and passing a rate of 
+change of ice draft to ROMS.
+
+BTW I noticed there is a variable in GRID called IcePress, but it doesn't seem to get used at all.
+We can use this in the future if we decide to use ice pressure (or normal force at the 
+boundary) directly from FISOC.
+
+
+
+
+
+\subsection{Dry to wet pressure gradient}
+
+Another potential problem with directly applying the grounded ice pressure is that it could lead to 
+very high pressure gradients (sloping down from inland 
+toward the open ocean) near the dry to wet boundary (i.e. grounding line), which may upset ROMS.  
+%At the least this would likely cause very strongly negative $\zeta$ under the grounded ice.  
+%Do we want to protect this thin layer of water under the grounded ice sheet from high pressures?  
+%In fact we see very strongly negative $\zeta$ under the ice shelf near the grounding line, values of 
+%-1 to -2m.
+We might be able to do this via a limit on height above floatation (say 5m or 10m). 
+It is not yet clear whether this will be needed.  
+%The latter would be simpler, and perhaps also better, because it is 
+%independent of $\zeta$.  What do you think? Do you think something along these lines is necessary, 
+%and if so what would be the best method?
+%Dave, is it easy to add $s_{ice}$ initialisation in the same way as $z_{ice}$, i.e. 
+%reading it in through the netcdf file? 
+%Where should I look in the code (and or .in file) to set this up?
+%I will access rho\_i from mod\_iceshelf via FISOC and set it to the MISOMIP value.
+
+If we do impose a limit to height above floatation then we would need to calculate it, probably something like this: 
+\begin{eqnarray}
+\nonumber z_{iaf} & = & total thickness - floating thickness \\
+\nonumber         & = & (s_{ice} - z_{ice}) - \frac{\rho_o}{\rho_i} z_{ice} \\
+\nonumber         & = & (s_{ice} - z_{ice}) - \frac{(\rho+0.5\frac{d\rho}{dz}z_{ice})}{\rho_i} z_{ice} \\
+        & = & s_{ice} - z_{ice} - \frac{\rho}{\rho_i}z_{ice} - \frac{z_{ice}^2}{2 \rho_i}\frac{d\rho}{dz} 
+\end{eqnarray}
+where $\rho_o$ is the mean ocean water density in a hypothetical water column of depth $z_{ice}$ and 
+$\rho$ is the density in ROMS, which in this case is the ocean water density at the ice-ocean interface. 
+Then using the above expression for height above floatation the interface pressure would now be
+\begin{eqnarray}
+\nonumber P_{interface} & = &  {g \rho_i \min({5m,z_{iaf}})} - {g \rho_w z_{ice}} - \frac{g z_{ice}^2}{2} \frac{d\rho}{dz} 
+\end{eqnarray}
+
+Hang on, a simpler way:
+\begin{eqnarray}
+\nonumber z_{fl}  & = &  z_{ice} - \frac{\rho_o}{\rho_i} z_{ice}  \\
+\nonumber         & = &  z_{ice} - \frac{\rho}{\rho_i}z_{ice} - \frac{z_{ice}^2}{2 \rho_i}\frac{d\rho}{dz} 
+\end{eqnarray}
+where $z_{fl}$ is the floatation height above sea level for a given ice draft $z_{ice}$.
+This leads to a modified version of equation~\ref{eqn:pinterface}:
+\begin{eqnarray}
+P_{interface} & = & g \rho_i \left[ \min \left({z_{fl} + 2m,s_{ice}} \right)  - z_{ice} \right]
+\end{eqnarray}
+
+
+
+
+\subsection{ru and rv}
+
+Not quite sure what $ru$ and $rv$ are supposed to be, but have something to do with the pressure gradient.
+\begin{eqnarray}
+\nonumber rv & = & \frac{om\_v}{2}  \Sigma Hz \times \\
+\nonumber && \Big[\Delta P - \frac{g}{2 \rho_0}  \Big(\Sigma \rho \Delta z\_r - \frac{1}{5} ( \Delta dRx (\Delta z\_r - \frac{1}{12} \Sigma dZx) \\
+          && - \Delta dZx (\Delta \rho - \frac{1}{12}  \Sigma dRx))\Big)\Big]
+\end{eqnarray}
+Also don't know what $om\_v$, $Hz$, $z\_r$, $dZx$, $dRx$ are. 
+
+In the above, $\Sigma$ means sum over the two neighbouring points in the $j$ direction (presumably used in calculating the mean) 
+and $\Delta$ means the difference between neighbouring points in the $j$ direction.  These refer to points $j$ and $j-1$.
+
+Converting the sums to means:
+\begin{eqnarray}
+\nonumber rv & = & {om\_v} \bar{Hz} \times \\
+\nonumber && \Big[\Delta P - \frac{g}{\rho_0}  \Big(\bar{\rho} \Delta z\_r - \frac{1}{10} ( \Delta dRx (\Delta z\_r - \frac{1}{6} \bar{dZx}) \\
+          && - \Delta dZx (\Delta \rho - \frac{1}{6} \bar{dRx}))\Big)\Big]
+\end{eqnarray}
+where the bar means taking the mean across the neighbouring two points in the $j$ direction.
+Not knowing what most of these terms mean, we naively impose an upper limit on the pressure 
+difference, $\Delta P $.  Note that the pressure difference at the ice-ocean interface is approximated by:
+\begin{eqnarray}
+\Delta P_{interface}  & = & \rho_i g (H_j - H_{j-1}) \\
+               & = & \rho_i g (\Delta H)        \\
+\end{eqnarray}
+where $H$ is total ice thickness.
+
+If we assume that the high pressure differences are caused by ice thickness gradients rather than other terms, 
+we can impose a limit like this: 
+\begin{eqnarray}
+\Delta P_{max} & = & 2 \rho_i g 
+\end{eqnarray}
+This is approximately equivalent to limiting the thickness gradient in the ice to 2m per grid cell.
+
+So
+\begin{eqnarray}
+\nonumber rv & = & {om\_v} \bar{Hz} \times \\
+\nonumber && \Big[\min(2 \rho_i g,\Delta P) - \frac{g}{\rho_0}  \Big(\bar{\rho} \Delta z\_r - \frac{1}{10} ( \Delta dRx (\Delta z\_r - \frac{1}{6} \bar{dZx}) \\
+          && - \Delta dZx (\Delta \rho - \frac{1}{6} \bar{dRx}))\Big)\Big]
+\end{eqnarray}
+
+
+\subsection{DCRIT and geometric water column thickness}
+when DCRIT is set to a higher value than the geometric water column thickness (as defined in the netcdf input file 
+by the gap between bathymmetry and ice draft) under grounded ice, positive zeta values are allowed under the grounded 
+ice.  Dry cells do, it seems, feel the overburden pressure.  This can result in a kind of halo of positive $\zeta$ 
+over several cells near the grounding line.  I decided it is more physically realistic to do as Ben originally 
+suggested and set DCRIT to exactly the initial geometric water column thickness under grounded ice.
+
+
+
+
+
+
+\section{Updating draft in ROMS}
+
+When we initially activated DDDT (the rate of change of ice draft with time) ROMS 
+kept crashing with exit flag 1 (ROMS blows up).  I made some changes, some of which seem to have helped. 
+
+
+
+\subsection{Additional checks}
+
+\textbf{Preserving minimum water column thickness}.
+Given the bathymmetry does not evolve but ice draft can evolve, the possibility is open for water column 
+thickness under grounded ice to be reduced below the initial 20m.  I put in a check and correction for this 
+(hard coded in iceshelf\_vbc at time of writing, needs improving!  Maybe put it as a parameter with $\rho_i$). 
+I assume Ben had a reason for starting with a minmum 20m gap between bathymmetry and grounded ice everywhere 
+in his examples (and Dave has also implemented the same 20m gap in his processing of ocn3 and ocn4 ISOMIP+ 
+netcdf files).  So I check for water column thickness below 20m just after updating the iceshelf\_draft 
+variable, and raise iceshelf\_draft to preserve 20m water column if needed.  
+This is currently not conservative.
+
+
+\subsection{Ice draft halo}
+
+This is definitely a ROMS itnernal issue and can probably be viewed as a bug fix and 
+can now be fogotten about.  
+The main cause of the crashes with non-zero DDDT was that the halo of the zice variable was not updated.  
+This would not have caused problems for the 
+case of ice draft not being updated at run time, and if ice draft was updated in a serial run it would also not 
+have been a problem.  I assume this is why Ben did not encounter the problem: I guess he didn't carry out 
+parallel runs with an evolving ice draft.
+
+I added an additional call to mp\_exchange2d for zice immediately after updating zice from the iceshelf\_draft 
+variable (in the set\_depth code).  I also added a similar call for iceshelf\_draft, though this may be 
+superfluous. 
+
+
+
+%We could try keeping the original pressure formulation for when the water column thickness drops below some 
+%minimum value that we want to maintain, ramping up to the 
+%\begin{eqnarray}
+%&\nonumber P_{interface}  = - \frac{g \rho z_{ice}}{\rho_0} - \frac{g z_{ice}^2}{2 \rho_0} \frac{d\rho}{dz}                              & \hspace{1cm} (h+\zeta+z_{ice}) < h_{wcm} \\
+%&\nonumber P_{interface}  = \left(- \frac{g \rho z_{ice}}{\rho_0} - \frac{g z_{ice}^2}{2 \rho_0} \frac{d\rho}{dz}\right)(1-S) + P_{ISM}S & \hspace{1cm} D_{CRIT} > (h+\zeta+z_{ice}) > h_{wcm} \\
+%&\nonumber P_{interface}  = P_{ISM}                                                                                                      & \hspace{1cm} (h+\zeta+z_{ice}) >  D_{CRIT} \\ 
+%\nonumber 
+%\end{eqnarray}
+%where $P_{ISM}$ is pressure at the ice-ocean interface calculated by the ice sheet model, 
+%$h_{wcm}$ is the imposed minimum water column thickness (e.g. 20m), 
+%and $D_{CRIT}$ is the wetting/drying activation thickness (e.g. 21m).
+%$S$ is a scaling factor (between 0 and 1) given by:
+%\begin{eqnarray}
+%\nonumber S = 
+%\frac{(h+\zeta+z_{ice}) - h_{wcm}}{D_{CRIT} - h_{wcm}}  \\
+%\nonumber 
+%\end{eqnarray}
+
+%Note that I use $h+\zeta+z_{ice}$ as water column thickness.  Zeta ($\zeta$) is included because it can get large under the grounded ice, 
+%and we need $\zeta$ as part of the water column calculation in order to trigger the higher (more realistic) pressures.
+%so that to this value?  
+%I think I probably should add $\zeta$ to this.  If, under the ice, water column thickness (as defined by the difference between
+%bedrock and ice lower surface) is 20m and $\zeta$ is 0.5m, what does this mean, physically?  
+%The pressure calculation seems to go purely by the geometric water column thickness (i.e. $h+z_{ice}$) but surely we 
+%want to impose a higher pressure to stop this subglacial flooding...
+
+\end{document}
