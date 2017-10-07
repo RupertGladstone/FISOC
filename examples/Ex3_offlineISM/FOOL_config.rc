@@ -11,9 +11,8 @@
 # 
 # forcingDataFormat NYI, assume netcdf
 # 
-
-#  ForcingDir:          /short/ks3/rmg581/FISOC/examples/Ex3_offlineISM/ocn3Forcing/
-  ForcingDir:          /home/elmeruser/Work/MISOMIP_prep/ISOMIP/
+  ForcingDir:          /short/ks3/rmg581/FISOC/examples/Ex3_offlineISM/ocn3Forcing/tmp_25thSept_dsdt/
+#  ForcingDir:          /home/elmeruser/Work/MISOMIP_prep/ISOMIP/
   ForcingDataFormat:   netcdf
   ForcingBaseName:     isomip_plus_ocean3_
 
