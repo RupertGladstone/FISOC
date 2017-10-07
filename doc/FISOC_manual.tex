@@ -275,12 +275,36 @@ For example (see also the example FISOC build script):
 export CPPFLAGS="$CPPFLAGS -D ROMS_DRAFT"
 \end{lstlisting}
 At the time of writing, the relevant values are ROMS\_MASKING, ROMS\_SPHERICAL, 
-ROMS\_DDDT and ROMS\_DRAFT.  The general rule is that any of these directives that 
+ROMS\_DDDT, ROMS\_DSDT and ROMS\_DRAFT.  The general rule is that any of these directives that 
 are defined for the ROMS compilation need to be defined also for the FISOC 
 compilation. 
 
+*** need a proper description of the relevant directives for ROMS compilation: ***
+FISOC
+FISOC\_DDDT
+FISOC\_DSDT
+FISOC\_DRAFT
+FISOC\_DTDZ
 
+ICESHELF\_MORPH
+LIMIT\_BSTRESS
+ICESHELF
+LIMIT\_ICESTRESS
+MASKING
+WET\_DRY
 
+also need some discussion on relevant ROMS params in .in file.
+DCRIT = 20.0
+
+Setting FISOC\_DSDT activates the following in ROMS:
+
+In the same way that zice is added to the GRID type and used to indicate height of the lower surface of the iceshelf relative to sea level (i.e. iceshelf draft), sice is added to the GRID type to indicate height of the upper surface of the ice sheet/shelf. sice can be read from netcdf in the same was as zice.
+
+In the same way that iceshelf\_dddt is added to the ICESHELFVAR type and accessed from FISOC to set the rate of change of iceshelf draft wrt time, iceshelf\_dsdt is added to ICESHELFVAR to set the rate of change of sice with time.  If FISOC does not update iceshelf\_dsdt then the upper ice surface will remain static.
+
+The calculation of pressure at the ice-ocean interface no longer estimates the weight of the ice column based on the assumption of floatation, but rather uses the actual ice thickness to estimate pressure.  The value for ice density defined in iceshelf_mod.h is used.
+
+***put the pressure equation here***
 
 
 %\subsection{Troubleshooting}
@@ -331,23 +355,30 @@ In FISOC, there is always a 1:1 relationship between PETs and MPI processes.
 \label{sec:config}
 
 The FISOC config file is named FISOC\_config.rc, and is expected to be present 
-in the current directory.  
+in the current directory when running FISOC.  
 This is a resource file, as described by the 
 ESMF documentation.  It supports different types and also lists. 
 In principle, lists of mixed types are supported, though FISOC does not utilise this capability.
+Basic syntax highlighting for .rc files can be activated within emacs 
+(see notes in utils/emacsMode.asc in the FISOC repository).
 
-FISOC\_config.rc contains parameters specific to the coupling.  Components may also use their 
-independent means for configuration.
+FISOC\_config.rc mainly contains parameters specific to the coupling rather than to the running of 
+individual components.  
+Components should use their standard means for configuration, and component-specific configuration files 
+should be specified in the FISOC configuration file.
 
-Some of the FISOC config entries are required.
-This section describes all the valid standard (but note that model-specific non-standard entries 
-can be added as required) entries in a FISOC config file as follows:
+Some of the FISOC config entries are strictly required and some are optional.
+This section describes all the valid standard config entries. 
+Note that model-specific non-standard entries can be added if needed, and use of these 
+should be through the model-specific wrapper code.
+
+***timestepping stuff may not all be required now... two methods of timestepping, need to check this.
 
 \begin{flushleft}
-\textbf{label:}               [TYPE]   [Required?]                         \\
-Description                                                                \\
-\vspace{6pt}
-\vspace{6pt}
+%\textbf{label:}               [TYPE]   [Required?]                         \\
+%Description                                                                \\
+%\vspace{6pt}
+%\vspace{6pt}
 \textbf{ISM\_meshFile:}       [STRING] [optional]                          \\
 The name of a netcdf file containing the ISM mesh in ESMF format.          \\
 \vspace{6pt}
@@ -939,7 +970,8 @@ from the config object.
 
 \section{Pre-requisite installation notes}
 \label{app:A}
-The following commands worked to install NetCDF and ESMF on a Linux Mint system in 2015.
+The following commands worked to install NetCDF and ESMF on a Linux Mint system in 2015 
+in a suitable configuration for use with FISOC. 
 Some pre-requisites for netcdf were also installed.
 The system already had a working OpenMPI installation.
 
@@ -1002,7 +1034,7 @@ sudo apt-get install ncview
 
 # ESMF requires ESMF_DIR and probably other environment variables.  
 # These can be set at the command line or, for example, in your 
-# .bashrc file.  These might work:
+# .bashrc fileor a local script file.  These might work:
 export ESMF_DIR="/top/level/directory/for/esmf/"
 export ESMF_NETCDF="split"
 export ESMF_NETCDF_INCLUDE="/usr/local/include"
@@ -1023,7 +1055,17 @@ cd ..
 # will probably end up somewhere like this:
 export ESMFMKFILE="$ESMF_DIR/DEFAULTINSTALLDIR/lib/libO/Linux.gfortran.64.openmpi.default/esmf.mk"
 
-
+\end{lstlisting}
+\vspace{10mm}
+... or for ESMF version 7.0.0 ...
+\begin{lstlisting}[language=bash]
+wget https://sourceforge.net/projects/esmf/files/ESMF_7_0_0/esmf_7_0_0_src.tar.gz
+tar -xf esmf_7_0_0_src.tar.gz 
+\end{lstlisting}
+\vspace{10mm}
+... or for ESMF version 7.1.0 beta snapshot 14 ...
+\begin{lstlisting}[language=bash]
+git archive --remote=git://git.code.sf.net/p/esmf/esmf --format=tar --prefix=esmf/ ESMF_7_1_0_beta_snapshot_14 | tar xf -
 \end{lstlisting}
 
 \end{document}

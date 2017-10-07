@@ -20,6 +20,13 @@ ElmerGrid 1 2 FISOC_Ex5.grd
 ElmerGrid 2 2 FISOC_Ex5 -partition 1 2 0 2
 ElmerGrid 2 2 FISOC_Ex5 -partition 1 4 0 2
 
+Like in Ex1 you can also make a triangular element mesh for Ex5
+using the .geo file and gmsh (edit lc in the geo file for element 
+size):
+gmsh FISOC_Ex5.geo -1 -2
+ElmerGrid 14 2 FISOC_Ex5.msh 
+
+
 
 TODO:
 

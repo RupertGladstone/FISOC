@@ -10,14 +10,14 @@ $gravity = -9.81*yearinsec^2
 $GLTolerance = 1.0e-5
 $name = "longThinMIS_FISOC_cav"
 $m = 1.0/3.0
-$dt = 0.2*365.0/365.0
+$dt = 1.0/365.25
 $BWT = 1000.0            ! a guide thickness for the back wall
 
 
 !--------------------------------------------------------
 Header
-!  Mesh DB "/home/elmeruser/Source/FISOC/examples/Ex1_LongThinMIS" "FISOC_Ex1"
-  Mesh DB "/homeappl/home/gladston/Source/FISOC/examples/Ex1_LongThinMIS" "FISOC_Ex1"
+  Mesh DB "/home/elmeruser/Source/FISOC/examples/Ex1_LongThinMIS" "FISOC_Ex1"
+!  Mesh DB "/homeappl/home/gladston/Source/FISOC/examples/Ex1_LongThinMIS" "FISOC_Ex1"
 End
 
 
@@ -48,7 +48,7 @@ Simulation
   Simulation Type ="Transient"
   Timestepping Method = "BDF"
   BDF Order = 1
-  Timestep Intervals = 50000
+  Timestep Intervals = 1 ! 50000
   Timestep Sizes = Real $dt
   Steady State Min Iterations = 1
   Steady State Max Iterations = 1
