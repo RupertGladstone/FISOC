@@ -33,10 +33,8 @@ CONTAINS
   ! just reads in data from file and uses it to force the ocean. 
   ! 
 
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_mesh(ISM_ReqVarList,ISM_ExpFB,ISM_Mesh,&
-       FISOC_config,vm,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_mesh(FISOC_config,vm,ISM_ExpFB,ISM_Mesh,rc)
 
-    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: ISM_ReqVarList(:)
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_VM),INTENT(INOUT)           :: vm
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
@@ -51,16 +49,16 @@ CONTAINS
   END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_mesh
 
 
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_grid(ISM_ReqVarList,ISM_ExpFB,ISM_Grid,&
-       FISOC_config,vm,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_grid(FISOC_config,vm,ISM_ExpFB,ISM_Grid,rc)
 
-    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: ISM_ReqVarList(:)
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_VM),INTENT(INOUT)           :: vm
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
     TYPE(ESMF_grid),INTENT(OUT)           :: ISM_Grid
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM_ReqVarList(:)
+    CHARACTER(len=ESMF_MAXSTR)            :: label
     CHARACTER(len=ESMF_MAXSTR)            :: FOOL_configName, ISM_gridLayout
     INTEGER                               :: localPet, ISM_dt_sec
     LOGICAL                               :: verbose_coupling
@@ -73,6 +71,12 @@ CONTAINS
     rc = ESMF_FAILURE
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    label = 'FISOC_ISM_ReqVars:'
+    CALL FISOC_getListFromConfig(FISOC_config, label, ISM_ReqVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -158,7 +162,7 @@ CONTAINS
   
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,ISM_ExpFB,FISOC_config,vm,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(FISOC_config,vm,ISM_ImpFB,ISM_ExpFB,rc)
 
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ImpFB, ISM_ExpFB
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
@@ -201,7 +205,7 @@ CONTAINS
   SUBROUTINE FISOC_ISM_Wrapper_Run(FISOC_config,vm,ISM_ExpFB,ISM_ImpFB,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)      :: FISOC_config
-    TYPE(ESMF_fieldbundle),INTENT(INOUT) :: ISM_ImpFB,ISM_ExpFB
+    TYPE(ESMF_fieldbundle),INTENT(INOUT),OPTIONAL :: ISM_ImpFB,ISM_ExpFB
     TYPE(ESMF_VM),INTENT(IN)             :: vm
     INTEGER,INTENT(OUT),OPTIONAL         :: rc
 
@@ -494,17 +498,23 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Finalize(FISOC_config,localPet,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Finalize(FISOC_config,vm,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)    :: FISOC_config
+    TYPE(ESMF_VM),INTENT(IN)           :: vm
     INTEGER,INTENT(OUT),OPTIONAL       :: rc
-    INTEGER,INTENT(IN)                 :: localPet
 
+    INTEGER                            :: localPet
     LOGICAL                            :: verbose_coupling
 
     rc = ESMF_FAILURE
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
