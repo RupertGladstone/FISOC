@@ -9,7 +9,7 @@ MODULE FISOC_OM_Wrapper
   PRIVATE
 
   PUBLIC :: FISOC_OM_Wrapper_Init_Phase1,  FISOC_OM_Wrapper_Init_Phase2,  &
-       FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize
+       FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize, OM_HandleCavity
 
 CONTAINS
 
@@ -37,7 +37,7 @@ CONTAINS
 
     ! extract a list of required ocean variables from the configuration object
     label = 'FISOC_OM_ReqVars:' ! the FISOC names for the vars
-    CALL FISOC_getStringListFromConfig(FISOC_config, label, FISOC_OM_ReqVarList,rc=rc)
+    CALL FISOC_getListFromConfig(FISOC_config, label, FISOC_OM_ReqVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -345,5 +345,14 @@ CONTAINS
 
   END SUBROUTINE dummyCreateGrid
 
+  SUBROUTINE OM_HandleCavity(FISOC_config, FISOC_clock, OM_ImpFB, OM_ExpFB, localPet, rc)
+
+    TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: OM_ImpFB, OM_ExpFB
+    TYPE(ESMF_Clock),INTENT(IN)              :: FISOC_clock
+    INTEGER,INTENT(IN)                       :: localPet
+    INTEGER,INTENT(OUT),OPTIONAL             :: rc
+
+  END SUBROUTINE OM_HandleCavity
 
 END MODULE FISOC_OM_Wrapper

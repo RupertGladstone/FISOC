@@ -20,21 +20,17 @@ ifneq ($(origin ESMFMKFILE), environment)
  $(error Environment variable ESMFMKFILE was not set.)
 endif
 
-ifneq ($(origin FISOC_OM), environment)
- $(error Environment variable FISOC_OM was not set.)
-endif
-
 ifneq ($(origin FISOC_ISM), environment)
  $(error Environment variable FISOC_ISM was not set.)
 endif
 
-## if env var FISOC_MPI exists and is set to "yes" then ...
-## TODO: perhaps find something in esmfmkfile that can avoid the need to use this
-#ifeq ($(origin FISOC_MPI), environment)
-# ifeq "$(FISOC_MPI)" "yes"
-#  CPPFLAGS += -D FISOC_MPI
-# endif
-#endif
+ifneq ($(origin FISOC_AM), environment)
+ $(error Environment variable FISOC_ISM was not set.)
+endif
+
+ifneq ($(origin FISOC_OM), environment)
+ $(error Environment variable FISOC_OM was not set.)
+endif
 
 ifneq ($(origin FISOC_INSTALL_DIR), environment)
  ifneq ($(origin HOME), environment)
@@ -68,6 +64,11 @@ $(info FISOC_OM          [${FISOC_OM}])
 $(info FISOC_OM_LIBS     [${FISOC_OM_LIBS}])
 $(info FISOC_OM_LIBPATH  [${FISOC_OM_LIBPATH}])
 $(info FISOC_OM_INCLUDE  [${FISOC_OM_INCLUDE}])
+$(info )
+$(info FISOC_AM          [${FISOC_AM}])
+$(info FISOC_AM_LIBS     [${FISOC_AM_LIBS}])
+$(info FISOC_AM_LIBPATH  [${FISOC_AM_LIBPATH}])
+$(info FISOC_AM_INCLUDE  [${FISOC_AM_INCLUDE}])
 $(info )
 
 ################################################################################

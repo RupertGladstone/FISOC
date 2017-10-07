@@ -11,12 +11,37 @@ MODULE FISOC_ISM_Wrapper
   PUBLIC :: FISOC_ISM_Wrapper_Init_Phase1,  FISOC_ISM_Wrapper_Init_Phase2,  &
        FISOC_ISM_Wrapper_Run, FISOC_ISM_Wrapper_Finalize
 
+  INTERFACE FISOC_ISM_Wrapper_Init_Phase1
+     MODULE PROCEDURE FISOC_ISM_Wrapper_Init_Phase1_mesh
+     MODULE PROCEDURE FISOC_ISM_Wrapper_Init_Phase1_grid
+  END INTERFACE FISOC_ISM_Wrapper_Init_Phase1
+
 CONTAINS
+
+
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_grid(ISM_ReqVarList,ISM_ExpFB,ISM_Grid,&
+       FISOC_config,vm,rc)
+
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: ISM_ReqVarList(:)
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    TYPE(ESMF_VM),INTENT(INOUT)           :: vm
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
+    TYPE(ESMF_grid),INTENT(OUT)           :: ISM_Grid
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+
+    msg = "ERROR: Dummy subroutine called probably due to ISM_gridType error"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+         line=__LINE__, file=__FILE__, rc=rc)
+    CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_grid
+
+
 
   !--------------------------------------------------------------------------------------
   ! This dummy wrapper aims to create the dummy mesh and required variables 
   ! in the ESMF formats.  
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_dummyMesh,&
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_mesh(ISM_ReqVarList,ISM_ExpFB,ISM_dummyMesh,&
        FISOC_config,vm,rc)
 
     CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: ISM_ReqVarList(:)
@@ -65,7 +90,7 @@ CONTAINS
     
     rc = ESMF_SUCCESS
 
-  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1
+  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_mesh
   
 
   !--------------------------------------------------------------------------------------
