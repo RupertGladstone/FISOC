@@ -16,7 +16,7 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! This dummy wrapper aims to create the dummy grid and required variables 
   ! in the ESMF formats.  
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_dummyGrid,FISOC_config,vm,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(FISOC_config,vm,OM_ExpFB,OM_dummyGrid,rc)
 
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ExpFB
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
@@ -69,7 +69,7 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! This dummy wrapper aims to create the dummy grid and required variables 
   ! in the ESMF formats.  
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(OM_ImpFB,OM_ExpFB,FISOC_config,vm,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(FISOC_config,vm,OM_ImpFB,OM_ExpFB,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB, OM_ExpFB
@@ -223,15 +223,21 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_OM_Wrapper_Finalize(FISOC_config,localPet,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Finalize(FISOC_config,vm,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)    :: FISOC_config
-    INTEGER,INTENT(IN)                 :: localPet
+    TYPE(ESMF_vm),INTENT(IN)           :: vm
     INTEGER,INTENT(OUT),OPTIONAL       :: rc
 
+    INTEGER                            :: localPet
     LOGICAL                            :: verbose_coupling
 
     rc = ESMF_FAILURE
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -346,6 +352,7 @@ CONTAINS
   END SUBROUTINE dummyCreateGrid
 
   SUBROUTINE OM_HandleCavity(FISOC_config, FISOC_clock, OM_ImpFB, OM_ExpFB, localPet, rc)
+
 
     TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: OM_ImpFB, OM_ExpFB

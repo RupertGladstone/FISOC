@@ -66,7 +66,7 @@ CONTAINS
     TYPE(ESMF_VM)              :: vm
 
     CHARACTER(len=ESMF_MAXSTR) :: label, ISM_gridType
-    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: ISM_ReqVarList(:),ISM_DerVarList(:)
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: ISM_DerVarList(:)
  
     rc = ESMF_FAILURE
 
@@ -74,19 +74,12 @@ CONTAINS
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
-    ! extract a list of required ISM variables from the FISOC config object
     CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, vm=vm, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    label = 'FISOC_ISM_ReqVars:'
-    CALL FISOC_getListFromConfig(FISOC_config, label, ISM_ReqVarList,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    label = 'FISOC_ISM_DerVars:' ! also derived ISM variables
+    label = 'FISOC_ISM_DerVars:' 
     CALL FISOC_getListFromConfig(FISOC_config, label, ISM_DerVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -108,8 +101,7 @@ CONTAINS
     SELECT CASE (ISM_gridType)
 
     CASE("ESMF_grid","ESMF_Grid")
-       CALL FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_grid,&
-            FISOC_config,vm,rc=rc)
+       CALL FISOC_ISM_Wrapper_Init_Phase1(FISOC_config,vm,ISM_ExpFB,ISM_grid,rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -119,8 +111,7 @@ CONTAINS
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CASE("ESMF_mesh","ESMF_Mesh")
-       CALL FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,&
-            FISOC_config,vm,rc=rc)
+       CALL FISOC_ISM_Wrapper_Init_Phase1(FISOC_config,vm,ISM_ExpFB,ISM_mesh,rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -193,7 +184,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
-    CALL FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,ISM_ExpFB,FISOC_config,vm,rc=rc)
+    CALL FISOC_ISM_Wrapper_Init_Phase2(FISOC_config,vm,ISM_ImpFB,ISM_ExpFB,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -255,7 +246,8 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
-    CALL FISOC_ISM_Wrapper_Run(FISOC_config,vm,ISM_ExpFB,ISM_ImpFB,rc=rc)
+    CALL FISOC_ISM_Wrapper_Run(FISOC_config,vm,ISM_ImpFB=ISM_ImpFB, &
+         ISM_ExpFB=ISM_ExpFB,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
@@ -308,12 +300,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL FISOC_ISM_Wrapper_Finalize(FISOC_config,localPet,rc=rc)
+    CALL FISOC_ISM_Wrapper_Finalize(FISOC_config,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
