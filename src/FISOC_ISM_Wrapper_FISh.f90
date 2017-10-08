@@ -15,19 +15,40 @@ MODULE FISOC_ISM_Wrapper
   PUBLIC :: FISOC_ISM_Wrapper_Init_Phase1,  FISOC_ISM_Wrapper_Init_Phase2,  &
        FISOC_ISM_Wrapper_Run, FISOC_ISM_Wrapper_Finalize
 
+  INTERFACE FISOC_ISM_Wrapper_Init_Phase1
+      MODULE PROCEDURE FISOC_ISM_Wrapper_Init_Phase1_mesh
+      MODULE PROCEDURE FISOC_ISM_Wrapper_Init_Phase1_grid
+   END INTERFACE
+
 CONTAINS
 
-  !-----------------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,&
-       FISOC_config,vm,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_grid(FISOC_config,vm,ISM_ExpFB,ISM_grid,rc)
 
-    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: ISM_ReqVarList(:)
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    TYPE(ESMF_VM),INTENT(INOUT)           :: vm
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
+    TYPE(ESMF_grid),INTENT(OUT)           :: ISM_Grid
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+
+    msg = "ERROR: Dummy subroutine called probably due to ISM_gridType error"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+         line=__LINE__, file=__FILE__, rc=rc)
+    CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_grid
+
+
+  !-----------------------------------------------------------------------------------------------
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_mesh(FISOC_config,vm,ISM_ExpFB,ISM_mesh,rc)
+
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_VM),INTENT(INOUT)           :: vm
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
     TYPE(ESMF_mesh),INTENT(OUT)           :: ISM_mesh
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
+    CHARACTER(len=ESMF_MAXSTR)            :: label
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM_ReqVarList(:)
     INTEGER                               :: localPet, FISh_dt, ISM_dt, tol
     LOGICAL                               :: verbose_coupling
 
@@ -93,11 +114,11 @@ CONTAINS
    
     rc = ESMF_SUCCESS
 
-  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1
+  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_mesh
   
 
   !-----------------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(ISM_ImpFB,ISM_ExpFB,FISOC_config,vm,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase2(FISOC_config,vm,ISM_ImpFB,ISM_ExpFB,rc)
 
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ImpFB, ISM_ExpFB
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
@@ -133,7 +154,7 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_Wrapper_Run(FISOC_config,vm,ISM_ExpFB,ISM_ImpFB,rc)
 
-    TYPE(ESMF_fieldbundle) :: ISM_ImpFB,ISM_ExpFB
+    TYPE(ESMF_fieldbundle),INTENT(INOUT),OPTIONAL :: ISM_ImpFB,ISM_ExpFB
     TYPE(ESMF_config),INTENT(INOUT) :: FISOC_config
     TYPE(ESMF_VM),INTENT(IN)        :: vm
     INTEGER,INTENT(OUT),OPTIONAL    :: rc
@@ -203,15 +224,21 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_Wrapper_Finalize(FISOC_config,localPet,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Finalize(FISOC_config,vm,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)    :: FISOC_config
     INTEGER,INTENT(OUT),OPTIONAL       :: rc
-    INTEGER,INTENT(IN)                 :: localPet
+    TYPE(ESMF_VM),INTENT(IN)           :: vm
 
+    INTEGER                            :: localPet
     LOGICAL                            :: verbose_coupling
 
     rc = ESMF_FAILURE
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &

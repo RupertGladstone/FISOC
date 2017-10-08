@@ -53,7 +53,7 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! The first phase of initialisation is mainly to initialise the ocean model, and access 
   ! grid and variable initial information.
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(OM_ExpFB,OM_grid,FISOC_config,vm,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(FISOC_config,vm,OM_ExpFB,OM_grid,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_VM),INTENT(IN)              :: vm ! ESMF virtual machine (parallel context)
@@ -188,7 +188,7 @@ CONTAINS
 
   
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(OM_ImpFB,OM_ExpFB,FISOC_config,vm,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(FISOC_config,vm,OM_ImpFB,OM_ExpFB,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB, OM_ExpFB
@@ -358,12 +358,13 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_OM_Wrapper_Finalize(FISOC_config,localPet,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Finalize(FISOC_config,vm,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)    :: FISOC_config
-    INTEGER,INTENT(IN)                 :: localPet
+    TYPE(ESMF_VM),INTENT(IN)           :: vm
     INTEGER,INTENT(OUT),OPTIONAL       :: rc
 
+    INTEGER                            :: localPet
     LOGICAL                            :: verbose_coupling
 
     rc = ESMF_FAILURE
