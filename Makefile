@@ -6,7 +6,6 @@
 ## variable.                                                                  ##
 ################################################################################
 
-FISOC_EXE = FISOC_caller
 SRCDIR = src
 FFLAGS += -fbacktrace -g -O0 -fbounds-check #-Wall
 #FFLAGS += -O0 -g -fbacktrace -fcheck=all # -Wall
@@ -16,6 +15,10 @@ FFLAGS += -fbacktrace -g -O0 -fbounds-check #-Wall
 
 
 # check for presence of required env vars
+ifneq ($(origin FISOC_EXE), environment)
+ FISOC_EXE = FISOC_caller
+endif
+
 ifneq ($(origin ESMFMKFILE), environment)
  $(error Environment variable ESMFMKFILE was not set.)
 endif
@@ -24,12 +27,12 @@ ifneq ($(origin FISOC_ISM), environment)
  $(error Environment variable FISOC_ISM was not set.)
 endif
 
-ifneq ($(origin FISOC_AM), environment)
- $(error Environment variable FISOC_ISM was not set.)
-endif
-
 ifneq ($(origin FISOC_OM), environment)
  $(error Environment variable FISOC_OM was not set.)
+endif
+
+ifneq ($(origin FISOC_AM), environment)
+ $(error Environment variable FISOC_AM was not set.)
 endif
 
 ifneq ($(origin FISOC_INSTALL_DIR), environment)
@@ -47,10 +50,10 @@ include $(ESMFMKFILE)
 $(info )
 $(info ********************************************************************)
 $(info *** Building FISOC, Framework for Ice Sheet Ocean model Coupling ***)
-$(info *** Relevant variables for the build are now listed              ***)
+$(info *** Relevant parameters for the build are now listed             ***)
 $(info ********************************************************************)
 $(info )
-$(info FISOC will be installed in [${INSTALL_DIR}])
+$(info FISOC will be installed in [${INSTALL_DIR}]/[${FISOC_EXE}])
 $(info )
 $(info ESMFMKFILE        [${ESMFMKFILE}])
 $(info CPPFLAGS          [${CPPFLAGS}])
@@ -75,20 +78,22 @@ $(info )
 
 .SUFFIXES: .f90
 %.o : %.f90
-	$(ESMF_F90COMPILER) $(FFLAGS) -c $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS) $(ESMF_F90COMPILEFREENOCPP) -I$(FISOC_ISM_INCLUDE)  -I$(FISOC_OM_INCLUDE) $(CPPFLAGS) -cpp  -o $@  $<
+	$(ESMF_F90COMPILER) $(FFLAGS) -c $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS) $(ESMF_F90COMPILEFREENOCPP) -I$(FISOC_ISM_INCLUDE)  -I$(FISOC_OM_INCLUDE) -I$(FISOC_ISM_INCLUDE) $(CPPFLAGS) -cpp  -o $@  $<
 
 ################################################################################
 
-$(FISOC_EXE): $(SRCDIR)/FISOC_caller.o $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_OM.o  $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o $(SRCDIR)/FISOC_ISM.o $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o $(SRCDIR)/FISOC_coupler.o $(SRCDIR)/FISOC_utils.o
-	$(ESMF_F90LINKER) $(ESMF_F90LINKOPTS) $(ESMF_F90LINKPATHS) $(ESMF_F90LINKRPATHS) -o $@ $^ $(ESMF_F90ESMFLINKLIBS) -L$(FISOC_ISM_LIBPATH) -L$(FISOC_OM_LIBPATH) $(FISOC_ISM_LIBS) $(FISOC_OM_LIBS) $(FFLAGS)
+$(FISOC_EXE): $(SRCDIR)/FISOC_caller.o $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_OM.o  $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o $(SRCDIR)/FISOC_ISM.o $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o $(SRCDIR)/FISOC_AM.o $(SRCDIR)/FISOC_AM_Wrapper_$(FISOC_AM).o $(SRCDIR)/FISOC_coupler.o $(SRCDIR)/FISOC_utils.o
+	$(ESMF_F90LINKER) $(ESMF_F90LINKOPTS) $(ESMF_F90LINKPATHS) $(ESMF_F90LINKRPATHS) -o $@ $^ $(ESMF_F90ESMFLINKLIBS) -L$(FISOC_ISM_LIBPATH) -L$(FISOC_OM_LIBPATH) -L$(FISOC_AM_LIBPATH) $(FISOC_ISM_LIBS) $(FISOC_OM_LIBS) $(FISOC_AM_LIBS) $(FFLAGS)
 
 $(SRCDIR)/FISOC_caller.o:                   $(SRCDIR)/FISOC_parent.o $(SRCDIR)/FISOC_caller.f90
-$(SRCDIR)/FISOC_parent.o:                   $(SRCDIR)/FISOC_parent.f90 $(SRCDIR)/FISOC_OM.o  $(SRCDIR)/FISOC_ISM.o $(SRCDIR)/FISOC_coupler.o
+$(SRCDIR)/FISOC_parent.o:                   $(SRCDIR)/FISOC_parent.f90 $(SRCDIR)/FISOC_OM.o  $(SRCDIR)/FISOC_ISM.o $(SRCDIR)/FISOC_AM.o $(SRCDIR)/FISOC_coupler.o
 $(SRCDIR)/FISOC_coupler.o:                  $(SRCDIR)/FISOC_coupler.f90
 $(SRCDIR)/FISOC_ISM.o:                      $(SRCDIR)/FISOC_ISM.f90 $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o $(SRCDIR)/FISOC_utils.o
 $(SRCDIR)/FISOC_OM.o:                       $(SRCDIR)/FISOC_OM.f90 $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o  $(SRCDIR)/FISOC_utils.o
+$(SRCDIR)/FISOC_AM.o:                       $(SRCDIR)/FISOC_AM.f90 $(SRCDIR)/FISOC_AM_Wrapper_$(FISOC_AM).o  $(SRCDIR)/FISOC_utils.o
 $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o: $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).f90 $(SRCDIR)/FISOC_types.o $(SRCDIR)/FISOC_utils.o 
 $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o:   $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).f90 $(SRCDIR)/FISOC_types.o $(SRCDIR)/FISOC_utils.o
+$(SRCDIR)/FISOC_AM_Wrapper_$(FISOC_AM).o:   $(SRCDIR)/FISOC_AM_Wrapper_$(FISOC_AM).f90 $(SRCDIR)/FISOC_types.o $(SRCDIR)/FISOC_utils.o
 $(SRCDIR)/FISOC_types.o:                    $(SRCDIR)/FISOC_types.f90
 $(SRCDIR)/FISOC_utils.o:                    $(SRCDIR)/FISOC_utils.f90
 

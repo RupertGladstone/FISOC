@@ -3,9 +3,10 @@ MODULE  FISOC_parent_MOD
   
   USE ESMF
 
-  USE FISOC_ISM_MOD, ONLY : FISOC_ISM_register
   USE FISOC_coupler_MOD, ONLY : FISOC_coupler_register
+  USE FISOC_ISM_MOD, ONLY : FISOC_ISM_register
   USE FISOC_OM_MOD, ONLY : FISOC_OM_register
+  USE FISOC_AM_MOD, ONLY : FISOC_AM_register
   USE FISOC_utils_MOD
   
   IMPLICIT NONE
@@ -14,9 +15,9 @@ MODULE  FISOC_parent_MOD
   
   PUBLIC FISOC_parent_register
   
-  TYPE(ESMF_GridComp), SAVE :: FISOC_ISM, FISOC_OM
+  TYPE(ESMF_GridComp), SAVE :: FISOC_ISM, FISOC_OM, FISOC_AM
   TYPE(ESMF_CplComp),  SAVE :: FISOC_coupler
-  TYPE(ESMF_State),    SAVE :: ISM_ImpSt, ISM_ExpSt, OM_ImpSt, OM_ExpSt
+  TYPE(ESMF_State),    SAVE :: ISM_ImpSt, ISM_ExpSt, OM_ImpSt, OM_ExpSt, AM_ImpSt, AM_ExpSt
 
 CONTAINS
   
@@ -609,5 +610,6 @@ CONTAINS
     rc = ESMF_SUCCESS
     
   END SUBROUTINE FISOC_finalize
+
 
 END MODULE FISOC_parent_MOD

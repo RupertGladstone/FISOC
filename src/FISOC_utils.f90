@@ -17,7 +17,8 @@ MODULE FISOC_utils_MOD
        FISOC_shrink, FISOC_VMAllGather, Unique1DArray,         &
        FISOC_OneGrid, FISOC_cavityCheckOptions,                & 
        FISOC_getFirstFieldRank, FISOC_makeRHfromFB,            &
-       FISOC_getGridOrMeshFromFB, FISOC_regridFB
+       FISOC_getGridOrMeshFromFB, FISOC_regridFB,              &
+       FISOC_emptyFB_grid
 
   INTERFACE Unique1DArray
      MODULE PROCEDURE Unique1DArray_I4
@@ -2150,5 +2151,49 @@ print*,"need RH"
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_regridFB
+
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE FISOC_emptyFB_grid(FB)
+
+    TYPE(ESMF_fieldbundle),INTENT(INOUT) :: FB
+
+    TYPE(ESMF_grid)                      :: component_grid
+    INTEGER                              :: FieldCount,ii, rc
+    TYPE(ESMF_field),ALLOCATABLE         :: FieldList(:)
+
+
+    ! ...how many fields?...
+    CALL ESMF_FieldBundleGet(FB, fieldCount=FieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! ... get list of fields from bundle.
+    ALLOCATE(FieldList(FieldCount))
+    CALL ESMF_FieldBundleGet(FB, fieldCount=FieldCount, fieldList=FieldList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldGet(FieldList(1), grid=component_grid, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_GridDestroy(component_grid,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    DO ii = 1,FieldCount
+       CALL ESMF_FieldDestroy(FieldList(ii), rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END DO
+
+    DEALLOCATE(FieldList)
+
+  END SUBROUTINE FISOC_emptyFB_grid
 
 END MODULE FISOC_utils_MOD
