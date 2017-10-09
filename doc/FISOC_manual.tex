@@ -783,15 +783,39 @@ required variables in the FISOC config file (Section~\ref{sec:config})
 
 \subsection{FISOC examples}
 
-Example FISOC configurations can be found in the repository under FISOC\_examples. 
+Example FISOC configurations can be found in the repository under FISOC/examples. 
+
+Some of these examples use a ROMS setup which is externally defined (i.e. 
+configuration information is not contained in these subdirectories).  
+At time of writing the corresponding ROMS setups can be obtained from the 
+ROMSIceShelf development repository.
+
+Examples 4 and 5 corresponds to experiments *** in the FISOC model description paper 
+(***authors to insert reference here once discussion paper is published***).
+
 
 \subsubsection{Example 1: Long thin marine ice sheet}
-\subsubsection{Example 2: Ice cliff}
-\subsubsection{Example 3: Using FISOC to handle time evolving forcing}
-\subsubsection{Example 4: Floating only test}
+A FISOC example using Elmer/Ice and ROMS. 
+The Elmer/Ice setup is provided with the example in the subdirectory. 
+The corresponding ROMS configuration is called ICESHELF2D
 
-This corresponds to experiments *** in the FISOC model description paper 
-(***authors to insert reference here once discussion paper is published***).
+\subsubsection{Example 2: Ice cliff}
+Placeholder!  To be developed...
+
+\subsubsection{Example 3: Using FISOC to handle time evolving forcing}
+A FISOC example using offline forcing to drive ROMS. 
+This is for running the ISOMIP+ ocn3 and ocn 4 experiments.
+
+\subsubsection{Example 4: Simple floating only test}
+A FISOC example using Elmer/Ice and ROMS. 
+The Elmer/Ice setup is provided with the example in the subdirectory. 
+The corresponding ROMS configuration is called ICESHELF2D\_TOY
+
+\subsubsection{Example 5: Simple grounding line migration test}
+A FISOC example using Elmer/Ice and ROMS. 
+The Elmer/Ice setup is provided with the example in the subdirectory. 
+The corresponding ROMS configuration is called ICESHELF2D\_TOY\_GL
+
 
 
 
