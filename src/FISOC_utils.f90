@@ -1069,7 +1069,7 @@ print*,'catch error and set default if missing att'
 
 
   !--------------------------------------------------------------------------------------
-  ! convert a list of strings describning stagger location to ESMF stagger location 
+  ! convert a list of strings describing stagger location to ESMF stagger location 
   ! integer codes (for use in ESMF operations such as creating fields on a grid).
   SUBROUTINE FISOC_OM_staggerCodes(staggerLoc,staggerChar,rc)
     
