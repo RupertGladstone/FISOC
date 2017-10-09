@@ -106,6 +106,8 @@ CONTAINS
        PRINT*,""
     END IF
 
+! TODO: add check that ROMS in file exists?  Else ROMS can seg fault
+
     WRITE (OM_outputUnit,*) 'FISOC is about to call ROMS init method.'
     IF (mpic.EQ.FISOC_mpic_missing) THEN
        msg = "ERROR: not currently configured for serial ROMS simulations"
@@ -161,7 +163,8 @@ CONTAINS
 !         fieldStagger=OM_ReqVars_stagger,                          &
 !         RouteHandle=OM_haloRouteHandle,                           &
 !        TLW=TLW,TUW=TUW,                                          &
-print*,"TODO: fix roms stagger and halo..."
+!TODO: fix roms stagger and halo... may affect some types of regridding...
+
      CALL FISOC_populateFieldBundle(OM_ReqVarList,OM_ExpFB,OM_grid, &
          init_value=FISOC_missingData,                             &
          rc=rc)
@@ -303,10 +306,10 @@ print*,"TODO: fix roms stagger and halo..."
     CALL ESMF_VMBarrier(vm, rc=rc)
     WRITE (OM_outputUnit,*) 'FISOC has just called ROMS run method.'
     
-    IF (exit_flag.ne.NoError) THEN
-       write (msg, "(A,I0,A)") "WARNING: ROMS has returned non-safe exit_flag=", &
+    IF (exit_flag.NE.NoError) THEN
+       WRITE (msg, "(A,I0,A)") "ERROR: ROMS has returned non-safe exit_flag=", &
             exit_flag,", see ROMS mod_scalars.f90 for exit flag meanings."
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        RETURN
     END IF
@@ -371,10 +374,6 @@ print*,"TODO: fix roms stagger and halo..."
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!    CALL ROMS_finalize
-
-    CLOSE(unit=OM_outputUnit, ERR=102)
-
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
        PRINT*,"******************************************************************************"
@@ -384,6 +383,10 @@ print*,"TODO: fix roms stagger and halo..."
        PRINT*,"FISOC has taken care of clearing up ESMF types.  Here we just need to call the "
        PRINT*,"OM finalise method."
     END IF
+
+    CALL ROMS_finalize
+
+    CLOSE(unit=OM_outputUnit, ERR=102)
 
     rc = ESMF_SUCCESS
 
@@ -497,7 +500,7 @@ print*,"TODO: fix cavity reset somehow..."
     INTEGER, SAVE                            :: linterpCounter=0
     INTEGER                                  :: dt_ratio, ISM_dt_int
 
-    REAL(ESMF_KIND_R8)          :: linterpFactor, ISM_dt, OM_WCmin
+    REAL(ESMF_KIND_R8)          :: linterpFactor, ISM_dt, OM_WCmin, CavCorr
     TYPE(ESMF_field)            :: ISM_z_l0_previous, ISM_z_l0_linterp 
     TYPE(ESMF_field)            :: ISM_z_l0_field, OM_z_l0_field, dddt_field
     TYPE(ESMF_field)            :: OM_bed_field
@@ -598,6 +601,11 @@ print*,"TODO: fix cavity reset somehow..."
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+          CALL FISOC_ConfigDerivedAttribute(FISOC_config, CavCorr, 'OM_CavCorr',rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
           IF ( (SIZE(dddt).NE.SIZE(ISM_z_l0)) .OR.     & 
                (SIZE(dddt).NE.SIZE(OM_z_l0))  .OR.     & 
                (SIZE(dddt).NE.SIZE(OM_bed)) ) THEN
@@ -616,12 +624,11 @@ print*,"TODO: fix cavity reset somehow..."
 
           DO jj=JstrR, JendR
              DO ii=IstrR, IendR
-                dddt(ii,jj) = dddt(ii,jj) +                      &
-                     0.5*( MAX(ISM_z_l0(ii,jj),OM_bed(ii,jj)+    &
+                dddt(ii,jj) = dddt(ii,jj) +                          &
+                     CavCorr*( MAX(ISM_z_l0(ii,jj),OM_bed(ii,jj)+    &
                      OM_WCmin)-OM_z_l0(ii,jj) ) / ISM_dt
              END DO
           END DO
-print*,ISM_z_l0(4,10),OM_z_l0(4,10),OM_bed(4,10)
 
           NULLIFY(ISM_z_l0)
           NULLIFY(OM_z_l0)
@@ -954,6 +961,13 @@ print*,ISM_z_l0(4,10),OM_z_l0(4,10),OM_bed(4,10)
                   line=__LINE__, file=__FILE__, rc=rc)          
              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 # endif
+
+          CASE ('ISM_dsdt')
+             DO jj = JstrR, JendR
+                DO ii = IstrR, IendR
+                   ICESHELFVAR(1) % iceshelf_dsdt(ii,jj) = ptr(ii,jj)
+                END DO
+             END DO
              
           CASE ('ISM_z_l0','ISM_z_l0_linterp')
 # ifdef ROMS_DRAFT
