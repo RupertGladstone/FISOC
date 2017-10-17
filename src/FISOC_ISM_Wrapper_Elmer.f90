@@ -54,8 +54,11 @@ MODULE FISOC_ISM_Wrapper
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_dBdt_l0        = 'meltRate'
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_temperature_l0 = 'oceanTemperature'
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_temperature_l1 = 'oceanTemperature'
-  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_velocity_l0    = 'Velocity'
-  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l0           = 'Coordinate 3'
+!!  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_velocity_l0    = 'Velocity'
+  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_velocity_l0    = 'SSAVelocity'
+  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l0           = 'Zb'
+  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_lts          = 'Zs'
+!!  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l0           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l1           = 'Coordinate 3'
 
 
