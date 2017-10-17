@@ -3,6 +3,9 @@
 export CPPFLAGS="$CPPFLAGS -D FISOC_MPI"
 #export FISOC_MPI="yes"
 
+## optionally over-write the default executable name:
+#export FISOC_EXE="FISOC_caller"
+
 export FISOC_ISM="dummy"
 export FISOC_ISM_LIBS=""
 export FISOC_ISM_LIBPATH="$HOME"

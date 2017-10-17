@@ -6,7 +6,7 @@
 ## variable.                                                                  ##
 ################################################################################
 
-FISOC_EXE = FISOC_caller
+FISOC_EXE ?= FISOC_caller
 SRCDIR = src
 FFLAGS += -fbacktrace -g -O0 -fbounds-check #-Wall
 #FFLAGS += -O0 -g -fbacktrace -fcheck=all # -Wall
