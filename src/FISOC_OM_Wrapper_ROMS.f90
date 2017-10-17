@@ -963,12 +963,18 @@ print*,"TODO: fix cavity reset somehow..."
              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 # endif
 
-          CASE ('ISM_dsdt')
+# ifdef ROMS_DSDT
              DO jj = JstrR, JendR
                 DO ii = IstrR, IendR
                    ICESHELFVAR(1) % iceshelf_dsdt(ii,jj) = ptr(ii,jj)
                 END DO
              END DO
+# else
+             msg = "Trying to pass DSDT to ROMS but incompatible cpp"
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+                  line=__LINE__, file=__FILE__, rc=rc)          
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
              
           CASE ('ISM_z_l0','ISM_z_l0_linterp')
 # ifdef ROMS_DRAFT
