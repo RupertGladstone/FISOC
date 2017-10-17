@@ -454,6 +454,12 @@ CONTAINS
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+       CASE ("ISM_z_lts_previous")
+          CALL ISM_derive_z_lts_previous(ISM_ExpFB,rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
        CASE ("ISM_dddt","ISM_dsdt","ISM_dTdz_l0","ISM_z_l0_linterp")
 
        CASE DEFAULT
@@ -504,7 +510,7 @@ CONTAINS
 
        SELECT CASE(FISOC_ISM_DerVarList(ii))
 
-       CASE ("ISM_z_l0_previous","ISM_z_l0_linterp")
+       CASE ("ISM_z_l0_previous","ISM_z_lts_previous","ISM_z_l0_linterp")
 
        CASE ("ISM_dddt")
           CALL ISM_derive_dddt(ISM_ExpFB,FISOC_config,rc)
@@ -587,6 +593,39 @@ CONTAINS
 
 
   !------------------------------------------------------------------------------
+  ! Copy current data.  At next timestep this copy will contain "previous" data.
+  !
+  SUBROUTINE ISM_derive_z_lts_previous(ISM_ExpFB,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)            :: ISM_ExpFB
+    INTEGER, INTENT(OUT),OPTIONAL                   :: rc
+
+    TYPE(ESMF_field)           :: ISM_z_lts
+    TYPE(ESMF_field)           :: ISM_z_lts_previous
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_lts_ptr(:) 
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_lts_previous_ptr(:) 
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_lts", field=ISM_z_lts, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_lts_previous", field=ISM_z_lts_previous, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_FieldCopy(ISM_z_lts_previous, ISM_z_lts, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    RC = ESMF_SUCCESS
+
+  END SUBROUTINE ISM_derive_z_lts_previous
+
+
+  !------------------------------------------------------------------------------
   ! TODO: a lot of code duplication in the dddt and dsdt routines could do with 
   ! rationalising.
 
@@ -644,31 +683,31 @@ CONTAINS
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     INTEGER, INTENT(OUT),OPTIONAL         :: rc
     
-    TYPE(ESMF_field)           :: ISM_z_l0
-    TYPE(ESMF_field)           :: ISM_z_l0_previous
+    TYPE(ESMF_field)           :: ISM_z_lts
+    TYPE(ESMF_field)           :: ISM_z_lts_previous
     TYPE(ESMF_field)           :: ISM_dsdt
-    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:) 
-    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_previous_ptr(:) 
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_lts_ptr(:) 
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_lts_previous_ptr(:) 
     REAL(ESMF_KIND_R8),POINTER :: ISM_dsdt_ptr(:) 
     REAL(ESMF_KIND_R8)         :: ISM_dt
     INTEGER                    :: ISM_dt_int
 
     RC = ESMF_FAILURE
 
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_lts", field=ISM_z_lts, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
+    CALL ESMF_FieldGet(field=ISM_z_lts, localDe=0, farrayPtr=ISM_z_lts_ptr, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0_previous", field=ISM_z_l0_previous, rc=rc)
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_lts_previous", field=ISM_z_lts_previous, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=ISM_z_l0_previous, localDe=0, farrayPtr=ISM_z_l0_previous_ptr, rc=rc)
+    CALL ESMF_FieldGet(field=ISM_z_lts_previous, localDe=0, farrayPtr=ISM_z_lts_previous_ptr, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -688,13 +727,13 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ISM_dt = REAL(ISM_dt_int,ESMF_KIND_R8)
-    ISM_dsdt_ptr = (ISM_z_l0_ptr - ISM_z_l0_previous_ptr) / ISM_dt
+    ISM_dsdt_ptr = (ISM_z_lts_ptr - ISM_z_lts_previous_ptr) / ISM_dt
 
     ! first time we set it to zero
-    WHERE (ISM_z_l0_previous_ptr .EQ. 0.0) ISM_dsdt_ptr = 0.0
+    WHERE (ISM_z_lts_previous_ptr .EQ. 0.0) ISM_dsdt_ptr = 0.0
 
-    NULLIFY(ISM_z_l0_previous_ptr)
-    NULLIFY(ISM_z_l0_ptr)
+    NULLIFY(ISM_z_lts_previous_ptr)
+    NULLIFY(ISM_z_lts_ptr)
     NULLIFY(ISM_dsdt_ptr)
 
     RC = ESMF_SUCCESS
@@ -709,31 +748,31 @@ CONTAINS
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     INTEGER, INTENT(OUT),OPTIONAL         :: rc
     
-    TYPE(ESMF_field)           :: ISM_z_l0
-    TYPE(ESMF_field)           :: ISM_z_l0_previous
+    TYPE(ESMF_field)           :: ISM_z_lts
+    TYPE(ESMF_field)           :: ISM_z_lts_previous
     TYPE(ESMF_field)           :: ISM_dsdt
-    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:,:) 
-    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_previous_ptr(:,:) 
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_lts_ptr(:,:) 
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_lts_previous_ptr(:,:) 
     REAL(ESMF_KIND_R8),POINTER :: ISM_dsdt_ptr(:,:) 
     REAL(ESMF_KIND_R8)         :: ISM_dt
     INTEGER                    :: ISM_dt_int
 
     RC = ESMF_FAILURE
 
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_lts", field=ISM_z_lts, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
+    CALL ESMF_FieldGet(field=ISM_z_lts, localDe=0, farrayPtr=ISM_z_lts_ptr, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0_previous", field=ISM_z_l0_previous, rc=rc)
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_lts_previous", field=ISM_z_lts_previous, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=ISM_z_l0_previous, localDe=0, farrayPtr=ISM_z_l0_previous_ptr, rc=rc)
+    CALL ESMF_FieldGet(field=ISM_z_lts_previous, localDe=0, farrayPtr=ISM_z_lts_previous_ptr, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -753,10 +792,10 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ISM_dt = REAL(ISM_dt_int,ESMF_KIND_R8)
-    ISM_dsdt_ptr = (ISM_z_l0_ptr - ISM_z_l0_previous_ptr) / ISM_dt
+    ISM_dsdt_ptr = (ISM_z_lts_ptr - ISM_z_lts_previous_ptr) / ISM_dt
 
-    NULLIFY(ISM_z_l0_previous_ptr)
-    NULLIFY(ISM_z_l0_ptr)
+    NULLIFY(ISM_z_lts_previous_ptr)
+    NULLIFY(ISM_z_lts_ptr)
     NULLIFY(ISM_dsdt_ptr)
 
     RC = ESMF_SUCCESS

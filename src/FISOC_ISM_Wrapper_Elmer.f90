@@ -57,6 +57,7 @@ MODULE FISOC_ISM_Wrapper
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_velocity_l0    = 'Velocity'
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l0           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l1           = 'Coordinate 3'
+  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_lts          = 'Coordinate 3'
 
 
   ! The following mesh related properties are calculated during mesh conversion 
@@ -298,7 +299,6 @@ CONTAINS
     rc = ESMF_FAILURE
 
 ! TODO:
-! make the interface to this have correspondingarguments to the OM side (e.g. pass vm not just localpet)
 ! make sure to run only one timestep
 ! do some time step consistency checks
 
@@ -660,6 +660,15 @@ print*,"Hang on, need to get temperature exchange going too..."
              ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
           END DO
           
+       CASE ('ISM_z_lts')
+          EI_field => VariableGet( CurrentModel % Mesh % Variables, &
+               EIname_z_lts, UnFoundFatal=.TRUE.)
+          EI_fieldVals => EI_field % Values
+          EI_fieldPerm => EI_field % Perm
+          DO ii = 1,SIZE(ownedNodeIDs)
+             ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
+          END DO
+          
        CASE ('ISM_gmask')
           EI_field => VariableGet( CurrentModel % Mesh % Variables, &
                EIname_gmask, UnFoundFatal=.TRUE.)
@@ -669,12 +678,12 @@ print*,"Hang on, need to get temperature exchange going too..."
              ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
           END DO
           
-       CASE ('ISM_temperature_l0','ISM_temperature_l1','ISM_velocity_l0','ISM_z_l1','ISM_z_l0_previous')
+       CASE ('ISM_temperature_l0','ISM_temperature_l1','ISM_velocity_l0','ISM_z_l1','ISM_z_l0_previous','ISM_z_lts_previous')
           msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
                line=__LINE__, file=__FILE__, rc=rc)          
        
-       CASE ('ISM_dTdz_l0','ISM_dddt','ISM_z_l0_linterp')
+       CASE ('ISM_dTdz_l0','ISM_dddt','ISM_dsdt','ISM_z_l0_linterp')
           msg = "INFO: not extracting derived variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
                line=__LINE__, file=__FILE__, rc=rc) 
