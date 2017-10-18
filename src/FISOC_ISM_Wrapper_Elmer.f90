@@ -60,7 +60,6 @@ MODULE FISOC_ISM_Wrapper
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_lts          = 'Zs'
 !!  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l0           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l1           = 'Coordinate 3'
-  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_lts          = 'Coordinate 3'
 
 
   ! The following mesh related properties are calculated during mesh conversion 
