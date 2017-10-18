@@ -60,7 +60,7 @@ MODULE FISOC_ISM_Wrapper
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_lts          = 'Zs'
 !!  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l0           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l1           = 'Coordinate 3'
-  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_lts          = 'Coordinate 3'
+!!  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_lts          = 'Coordinate 3'
 
 
   ! The following mesh related properties are calculated during mesh conversion 
@@ -660,7 +660,7 @@ print*,"Hang on, need to get temperature exchange going too..."
           EI_fieldVals => EI_field % Values
           EI_fieldPerm => EI_field % Perm ! don't need perm for coords
           DO ii = 1,SIZE(ownedNodeIDs)
-             ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
+             ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
           END DO
           
        CASE ('ISM_z_lts')
