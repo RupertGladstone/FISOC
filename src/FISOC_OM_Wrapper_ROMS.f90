@@ -539,7 +539,7 @@ print*,"TODO: fix cavity reset somehow..."
        
        ! ISM var dddt will be used.  If an ISM export is available, which means 
        ! dddt has just been calculated, we modify dddt here to impose a 
-       ! correcting drift. The drift is designed to halve the ISM-OM 
+       ! correcting drift. The drift is designed to reduce the ISM-OM 
        ! discrepancy over one ISM timestep.
        CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_ISM_exportAvailable", alarm_ISM_exportAvailable, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &

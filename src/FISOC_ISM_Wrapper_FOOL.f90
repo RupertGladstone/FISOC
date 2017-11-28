@@ -470,8 +470,8 @@ CONTAINS
 
     ptr = TRANSPOSE(values)
 
-    ptr = ptr / ISM_dt_sec ! convert from m/yr to m/s
-!ptr = ptr/31557600.0
+!    ptr = ptr / ISM_dt_sec ! convert from m/yr to m/s
+    ptr = ptr/31557600.0
 
     DEALLOCATE(values)
 
