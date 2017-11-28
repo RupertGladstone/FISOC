@@ -1493,7 +1493,7 @@ print*,"need RH"
     ELSE
        msg = "ERROR: trying to write NetCDF output but NetCDF "// &
             "not present in this ESMF build."
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     END IF

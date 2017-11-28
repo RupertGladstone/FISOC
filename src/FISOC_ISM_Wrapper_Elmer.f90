@@ -47,21 +47,20 @@ MODULE FISOC_ISM_Wrapper
 
   REAL(ESMF_KIND_R8), PARAMETER :: Elmer_secpyr = 365.25_dp*24.0_dp*60.0_dp*60.0_dp
 
-  ! These variable names are hard coded to match the names given in the Elmer/Ice .sif
-  ! The user must ensure the names correspond.
+  ! These variable names should be given in the ISM_varNames list in the FISOC 
+  ! inpupt file.  If omitted, defaults are given here.
+  ! The user must ensure the names correspond to Elmer variable names.
   ! TODO: is this information in the manual?
-  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_gmask          = 'groundedmask'
-  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_dBdt_l0        = 'meltRate'
-  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_temperature_l0 = 'oceanTemperature'
-  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_temperature_l1 = 'oceanTemperature'
-!!  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_velocity_l0    = 'Velocity'
-  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_velocity_l0    = 'SSAVelocity'
-  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l0           = 'Zb'
-  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_lts          = 'Zs'
-!!  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l0           = 'Coordinate 3'
-  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_l1           = 'Coordinate 3'
-!!  CHARACTER(len=ESMF_MAXSTR), PARAMETER :: EIname_z_lts          = 'Coordinate 3'
-
+  CHARACTER(len=ESMF_MAXSTR) :: EIname_gmask          = 'groundedmask'
+  CHARACTER(len=ESMF_MAXSTR) :: EIname_dBdt_l0        = 'meltRate'
+  CHARACTER(len=ESMF_MAXSTR) :: EIname_temperature_l0 = 'oceanTemperature'
+  CHARACTER(len=ESMF_MAXSTR) :: EIname_temperature_l1 = 'oceanTemperature'
+  CHARACTER(len=ESMF_MAXSTR) :: EIname_velocity_l0    = 'Velocity'
+  CHARACTER(len=ESMF_MAXSTR) :: EIname_z_l0           = 'Coordinate 3'
+  CHARACTER(len=ESMF_MAXSTR) :: EIname_z_l1           = 'Coordinate 3'
+  CHARACTER(len=ESMF_MAXSTR) :: EIname_z_lts          = 'Coordinate 3'
+  ! for SSA, config should contain something like this
+  !   ISM_varNames:       'Zb' 'Zs' 'SSAVelocity'
 
   ! The following mesh related properties are calculated during mesh conversion 
   ! during initialisation, and are needed during variable transfer while 
@@ -138,6 +137,8 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ElmerSetVarNames(FISOC_config)
 
     CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -418,6 +419,64 @@ CONTAINS
   END FUNCTION TimeStepConsistent
 
 
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE  ElmerSetVarNames(FISOC_config)
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM_ReqVarList(:)
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM_varNames(:)
+    CHARACTER(len=ESMF_MAXSTR)            :: label
+    INTEGER                               :: ii, rc
+    
+    label = 'FISOC_ISM_ReqVars:'
+    CALL FISOC_getListFromConfig(FISOC_config, label, ISM_ReqVarList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    label = 'ISM_varNames:'
+    CALL FISOC_getListFromConfig(FISOC_config, label, ISM_varNames,rc=rc)
+
+    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+       msg = "ISM_varNames not found, using hard coded Elmer defaults"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    ELSE IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) THEN
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ELSE
+       DO ii=1,SIZE(ISM_ReqVarList)
+          ! Some ugly hard coding here.  Would be better to write this 
+          ! stuff to the config object, but ESMF doesn't allow much in 
+          ! the way of runtime editing of the config object.  So there 
+          ! isn't a good and obvious way of setting defaults that are 
+          ! model-specific (i.e. can't be hard coded in FISOC_utils).
+          SELECT CASE (ISM_ReqVarList(ii))
+          CASE ('OM_dBdt_l0')
+             EIname_dBdt_l0         = ISM_varNames(ii)
+          CASE ('OM_temperature_l0')
+             EIname_temperature_l0  = ISM_varNames(ii)
+          CASE ('ISM_z_l0')   
+             EIname_z_l0            = ISM_varNames(ii)
+          CASE ('ISM_z_lts')
+             EIname_z_lts           = ISM_varNames(ii)
+          CASE ('ISM_gmask')
+             EIname_gmask           = ISM_varNames(ii)
+          CASE DEFAULT
+             msg = "unknown varName "//ISM_ReqVarList(ii)
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+                  line=__LINE__, file=__FILE__, rc=rc)
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)                 
+          END SELECT
+
+       END DO
+    END IF
+    
+    IF (ALLOCATED(ISM_ReqVarList)) DEALLOCATE(ISM_ReqVarList)
+    IF (ALLOCATED(ISM_varNames)) DEALLOCATE(ISM_varNames)
+
+  END SUBROUTINE ElmerSetVarNames
 
 
   !------------------------------------------------------------------------------
