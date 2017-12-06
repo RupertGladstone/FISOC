@@ -151,8 +151,12 @@ Tells FISOC where to find key ESMF information.    \\
 \vspace{6pt}
 \textbf{FISOC\_INSTALL\_DIR}                       \\ 
 Optional.                                          \\
-Determines where FISOC\_caller will be installed. Defaults to \$HOME/bin. 
+Determines where the FISOC executable will be installed. Defaults to \$HOME/bin. 
 The user should also ensure this location is in their \$PATH. \\
+\vspace{6pt}
+\textbf{FISOC\_EXE}                                \\ 
+Optional.                                          \\
+Name of the FISOC executable.  Defaults to FISOC\_caller. \\
 \vspace{6pt}
 % now set through cpp flags
 %\textbf{FISOC\_MPI}                                \\ 
@@ -177,7 +181,7 @@ Optional.                                           \\
 Specifies the linker directives needed to link the OM library to FISOC. \\
 \vspace{6pt}
 \textbf{FISOC\_ISM}                                 \\
-Required. Possible values ``dummy'', ``Elmer''.     \\
+Required. Possible values ``dummy'', ``Elmer'', ``FISh'', ``FOOL''.     \\
 Determines which ISM component will be used.        \\
 \vspace{6pt}
 \textbf{FISOC\_ISM\_INCLUDE}                        \\ 
@@ -342,7 +346,11 @@ grep ``ifdef FISOC'' ROMS/Include/*h
 \end{lstlisting}
 
 The cpp options are described in ROMS/Include/cppdefs.h. 
-More detail of the FISOC specific options is given here.
+More detail of the FISOC specific options is given below, but to compile ROMS 
+for use with 
+existing FISOC examples, knowledge of these is not required as the header 
+files will set the required cpp directives and the header file is determined by 
+choice of ROMS application.
 
 \begin{flushleft}
 To tell ROMS to expect FISOC to provide a cavity change rate:\\
@@ -431,7 +439,8 @@ The calculation of pressure at the ice-ocean interface no longer estimates the w
 \section{Running FISOC}
 \label{sec:FISOC_SUG}
 
-The FISOC executable is called FISOC\_caller, and should be located in your path after installation. 
+The FISOC executable is by default called FISOC\_caller, and should be located in your 
+path after installation. 
 The installation is specific to the choice of component (you need to re-compile if you switch, for 
 example, from one ISM to another).  
 Beyond choice of components, all run time choices are made in the FISOC\_config.rc file
@@ -464,7 +473,7 @@ In FISOC, there is always a 1:1 relationship between PETs and MPI processes.
 %(Section~\ref{sec:FISOC_SDG}). 
 
 
-\subsection{FISOC configuration}
+\subsection{FISOC runtime configuration}
 \label{sec:config}
 
 The FISOC config file is named FISOC\_config.rc, and is expected to be present 
@@ -473,7 +482,7 @@ This is a resource file, as described by the
 ESMF documentation.  It supports different types and also lists. 
 In principle, lists of mixed types are supported, though FISOC does not utilise this capability.
 Basic syntax highlighting for .rc files can be activated within emacs 
-(see notes in utils/emacsMode.asc in the FISOC repository).
+(see notes in doc/FISOC\_emacsMode.asc in the FISOC repository).
 
 FISOC\_config.rc mainly contains parameters specific to the coupling rather than to the running of 
 individual components.  
@@ -485,18 +494,23 @@ This section describes all the valid standard config entries.
 Note that model-specific non-standard entries can be added if needed, and use of these 
 should be through the model-specific wrapper code.
 
-***timestepping stuff may not all be required now... two methods of timestepping, need to check this.
 
 \begin{flushleft}
 %\textbf{label:}               [TYPE]   [Required?]                         \\
 %Description                                                                \\
 %\vspace{6pt}
 %\vspace{6pt}
-\textbf{ISM\_meshFile:}       [STRING] [optional]                          \\
-The name of a netcdf file containing the ISM mesh in ESMF format.          \\
+%\textbf{ISM\_meshFile:}       [STRING] [optional]                          \\
+%The name of a netcdf file containing the ISM mesh in ESMF format.          \\
+%\vspace{6pt}
+\textbf{\underline{ISM options}} \\
 \vspace{6pt}
 \textbf{ISM\_configFile:}     [STRING] [optional]                          \\
 The name of the ISM-specific config file.                                  \\
+\vspace{6pt}
+\textbf{ISM\_stdoutFile:}     [STRING] [optional]                          \\
+The name of a file to which to write the ISM standard output.  May be 
+required depending on model-specific wrapper.                              \\
 \vspace{6pt}
 \textbf{FISOC\_ISM\_ReqVars:} [STRING] [required]                          \\
 List of variable names required to be provided by the ISM.                 \\
@@ -507,35 +521,102 @@ wrapper.  May also be required or unused depending on the wrapper. Must be
 same length as \textbf{FISOC\_ISM\_ReqVars}.                               \\
 \vspace{6pt}
 \textbf{FISOC\_ISM\_DerVars:} [STRING] [required]                          \\
-List of variables derived by FISOC from the ISM vars.                      \\ 
-To be calculated from ISM vars by hard coded routines in FISOC\_ISM.       \\
+List of variables derived by FISOC from the ISM variables. These are 
+calculated from ISM required variables by hard coded routines in 
+FISOC\_ISM or FISOC\_utils. This list is allowed to be empty.              \\
 \vspace{6pt}
-\textbf{ISM2OM\_vars:}        [STRING] [required***(default all?)]                          \\
-List of variables to be passed from the ISM to the OM.                     \\ 
+\textbf{ISM\_grdType:}        [STRING] [required]                          \\
+Which ESMF object to use.  Valid values are ESMF\_mesh (typically used 
+o describe unstructured meshes) and ESMF\_grid (typically used to 
+describe structured grids, supports stagered grids).                       \\
+\vspace{6pt}
+\textbf{ISM2OM\_vars:}        [STRING] [optional]                          \\
+List of variables to be passed from the ISM to the OM. Defaults to 
+all ISM variables (union of required and derived variables). If an empty 
+list is given no variables will be passed from the ISM to the OM.  This 
+can be useful for unit testing.                                            \\ 
 \vspace{6pt}
 \textbf{ISM2OM\_init\_vars:}  [LOGICAL] [optional]                         \\
 Determines whether the ISM2OM\_vars should be passed to the OM during the 
 second phase of OM initialisation.   Default is .TRUE.                     \\ 
 \vspace{6pt}
-\textbf{ISM\_grdType:}        [STRING] [required]                          \\
-Which ESMF object to use.  Valid values are ESMF\_mesh and ESMF\_grid.     \\
-\vspace{6pt}
-\vspace{6pt}
-\vspace{6pt}
+\textbf{ISM2OM\_regrid:}       [STRING] [optional]                         \\
+The ESM regridding method to use.  If not set, the default will be 
+written to the log files.  Possible values are given in the ESMF 
+documentation. 
+\url{http://www.earthsystemmodeling.org/esmf_releases/public/last/ESMF_refdoc/node9.html#SECTION090146000000000000000}
 
+\vspace{22pt}
+
+\textbf{\underline{OM options}} \\
+\vspace{6pt}
 \textbf{OM\_configFile:}      [STRING] [optional]                          \\
 The name of the ISM-specific config file.                                  \\
+\vspace{6pt}
+\textbf{OM\_stdoutFile:}     [STRING] [optional]                           \\
+The name of a file to which to write the OM standard output.  May be 
+required depending on model-specific wrapper.                              \\
 \vspace{6pt}
 \textbf{FISOC\_OM\_ReqVars:}  [STRING] [required]                          \\
 List of variable names required to be provided by the OM.                  \\
 \vspace{6pt}
 \textbf{OM\_ReqVars\_stagger:} [STRING] [optional]                         \\
-Corresponding exactly to the above, descriptions of the grid stagger for each var. \\
+Corresponding exactly to \textbf{FISOC\_OM\_ReqVars}, descriptions of the 
+grid stagger for each variable.                                            \\
 \vspace{6pt}
 \textbf{FISOC\_OM\_DerVars:}  [STRING] [required]                          \\
 List of variables derived by FISOC from the OM vars.  
-To be calculated from ISM vars by hard coded routines in FISOC\_OM.        \\
+To be calculated from OM vars by hard coded routines in FISOC\_OM.        \\
 \vspace{6pt}
+\textbf{OM\_grdType:}        [STRING] [required]                           \\
+Which ESMF object to use.  Valid values are ESMF\_mesh and ESMF\_grid.     \\
+\vspace{6pt}
+\textbf{OM2ISM\_vars:}        [STRING] [optional]                          \\
+List of variables to be passed from the OM to the ISM. Defaults to 
+all OM variables (union of required and derived variables). If an empty 
+list is given no variables will be passed from the OM to the ISM.  This 
+can be useful for unit testing.                                            \\ 
+\vspace{6pt}
+\textbf{OM2ISM\_init\_vars:}  [LOGICAL] [optional]                         \\
+Determines whether the OM2ISM\_vars should be passed to the ISM during the 
+second phase of ISM initialisation.   Default is .TRUE.                    \\ 
+\vspace{6pt}
+\textbf{OM2ISM\_regrid:}       [STRING] [optional]                         \\
+The ESMF regridding method to use.  If not set, the default will be 
+written to the log files.  Possible values are given in the ESMF 
+documentation. 
+\url{http://www.earthsystemmodeling.org/esmf_releases/public/last/ESMF_refdoc/node9.html#SECTION090146000000000000000}                                        \\
+\vspace{6pt}
+\textbf{OM\_initCavityFromISM:}  [LOGICAL] [optional]                      \\
+Switch to allow the OM to overwrite its cavity geometry with ISM\_z\_l0 
+during the second phase of initialisation.
+Defaults to .FALSE.                                                        \\
+\vspace{6pt}
+\textbf{OM\_cavityUpdate:}   [STRING] [optional]                           \\
+How to process ISM ice draft for use in OM.  Valid values are RecentIce    \\
+(default), Rate, CorrectedRate, and Linterp.                               \\
+\vspace{6pt}
+\textbf{OM\_WCmin:}  [REAL] [optional]                                     \\
+Minimum water column thickness imposed by OM.  Defaults to zero.  When 
+using ROMS, this corresponds to the ROMS DCRIT (in the ,in file) and 
+should be set to the same value.  Only used with CorrectedRate to 
+preserve a ``dry'' water column under grounded ice.                        \\
+\vspace{6pt}
+\textbf{OM\_CavCorr:}  [REAL] [optional]                                   \\
+The proportion of the OM - ISM cavity discrepancy to correct for in one 
+FISOC call to the  OM run method.  Defaults to 0.2.  Only used with 
+CorrectedRate.                                                             \\
+\vspace{6pt}
+\textbf{OM\_outputInterval:} [INTEGER][optional]                           \\
+FISOC collects OM output once every OM\_outputInterval OM timesteps. 
+Defaults to 1.  dt\_ratio/OM\_outputInterval must be integer.              \\
+\vspace{22pt}
+
+
+\textbf{\underline{Netcdf output options}}                                 \\
+Note: these are considered OM options because the output writing occurs 
+from the OM generic wrapper.  The OM import state here contains the 
+ISM variables regridded to the OM grid.                                    \\
 \textbf{OM\_writeNetcdf:}   [LOGICAL] [optional]                           \\
 Switch for dumping the OM import and export variables to NetCDF files.
 Defaults to .TRUE.                                                         \\
@@ -544,33 +625,17 @@ Defaults to .TRUE.                                                         \\
 Path to directory (must already exist) to which to write the NetCDF files. 
 Defaults to current directory.                                             \\
 \vspace{6pt}
-\textbf{OM\_initCavityFromISM:}  [LOGICAL] [optional]                      \\
-Switch to allow the OM to overwrite its cavity geometry with ISM\_z\_l0 
-during the second phase of initialisation.
-Defaults to .FALSE.                                                        \\
-\vspace{6pt}
-\textbf{OM2ISM\_vars:}        [STRING] [required***(default all?)]                          \\
-List of variables to be passed from the OM to the ISM.                     \\ 
-\vspace{6pt}
-\textbf{OM2ISM\_init\_vars:}  [LOGICAL] [optional]                         \\
-Determines whether the OM2ISM\_vars should be passed to the ISM during the 
-second phase of ISM initialisation.   Default is .TRUE.                    \\ 
-\vspace{6pt}
-\textbf{OM\_grdType:}        [STRING] [required]                           \\
-Which ESMF object to use.  Valid values are ESMF\_mesh and ESMF\_grid.     \\
-\vspace{6pt}
-\textbf{OM\_cavityUpdate:}   [STRING] [optional]                           \\
-How to process ISM ice draft for use in OM.  Valid values are RecentIce    \\
-(default), Rate, CorrectedRate, and Linterp.                               \\
-\vspace{6pt}
-\vspace{6pt}
+\textbf{OM\_NCfreq:}  [STRING] [optional]                                 \\
+Output writing frequency.
+Defaults to ``all''.  Valid values are ``all'' or ``ISM'' (only write 
+netcdf outputs after an ISM timestep).
+\vspace{22pt}
 
-\textbf{OM\_outputInterval:} [INTEGER][optional]                           \\
-FISOC collects OM output once every OM\_outputInterval OM timesteps. 
-Defaults to 1.  dt\_ratio/OM\_outputInterval must be integer.              \\
-\vspace{6pt}
+\textbf{\underline{Timestepping options}}                                  \\
 \textbf{OM\_dt\_sec:}         [INTEGER][required]                          \\
-OM timestep length in seconds.                                             \\
+OM timestep length in seconds.  When using ROMS, this may be a multiple 
+of the ROMS timestep length, in which case each FISOC call to the ROMS 
+run method will run multiple ROMS timesteps.                               \\
 \vspace{6pt}
 \textbf{dt\_ratio:}          [INTEGER][required]                           \\
 ISM/OM timestep ratio.                                                     \\
@@ -580,15 +645,24 @@ Start year and month define the start time of the coupled simulation.      \\
 \vspace{6pt}
 \textbf{start\_month:}       [INTEGER][required]                           \\
 \vspace{6pt}
-\textbf{end\_year:}          [INTEGER][required]                           \\
+\textbf{end\_year:}          [INTEGER][optional]                           \\
 End year and month define the finish time of the coupled simulation.       \\
 \vspace{6pt}
-\textbf{end\_month:}         [INTEGER][required]                           \\
+\textbf{end\_month:}         [INTEGER][optional]                           \\
 \vspace{6pt}
-\vspace{6pt}
+\textbf{runLength\_ISM\_steps:} [INTEGER][optional]                        \\
+As an alternative to specifying an end time, the run length in terms of 
+ISM timesteps may be specified.                                            \\
+\vspace{22pt}
 
+%after adding atmos model...
+%    "FISOC_dt_sec" "AM_ts" "OM_ts" "ISM_ts"
+%    "AO_cpl_ts" "AIS_cpl_ts" "OIS_cpl_ts"
+
+\textbf{\underline{General options}}                                       \\
 \textbf{verbose\_coupling:}  [LOGICAL][required]                           \\
-If true, some run time information is printed to the screen.  A log file is always 
+If true, some run time information is printed to the screen.  
+A log file is always 
 written, but writing to the log during timestepping is suppressed when 
 verbose\_coupling is false.\\
 \end{flushleft}
@@ -866,6 +940,11 @@ If the error messages to the screen are not helpful, remember to check whether u
 information has been logged.  By default this will be in files in the current directory 
 with names like PETX.FISOC.Log (where X is a process number).
 
+The ISM and OM also have their standard out directed to files named in the 
+FISOC\_config.rc file. 
+At time of writing (5/12/2017) ROMS stdout is not correctly implemented and sometimes 
+writes to fort.31.
+
 A segmentation fault has been known to occurr in the case of an incorrect path to the ROMS 
 configuration file (the .in file). 
 
@@ -901,88 +980,107 @@ required variables in the FISOC config file (Section~\ref{sec:config})
 
 \subsection{FISOC examples}
 
-Example FISOC configurations can be found in the repository under FISOC/examples. 
+Example FISOC configurations can be found in the repository in the 
+examples subdirectory. 
 
-Some of these examples use a ROMS setup which is externally defined (i.e. 
-configuration information is not contained in these subdirectories).  
-At time of writing the corresponding ROMS setups can be obtained from the 
-ROMSIceShelf development repository.
+The ROMS setup for these examples is defined in the ROMS repository, not in the 
+FISOC repository.  This is because some aspects of the ROMS setup are defined at 
+compile time and it is standard ROMS development practice to use the ROMS 
+repository for such details.  See below for specifics. 
 
-Examples 4 and 5 corresponds to experiments *** in the FISOC model description paper 
-(***authors to insert reference here once discussion paper is published***).
+The Elmer/Ice setup is defined in the FISOC 
+repository.  
+More information about running the examples can be found in 
+examples/README.
+
+In general it will be necessary to recompile ROMS and FISOC 
+when switching between different examples, but it will not be necessary 
+to recompile Elmer/Ice.
+
+Some of these examples (probably 4 and 5) will be 
+described further in the FISOC GMD paper, 
+along with presentation of outputs.
+% 4 and 5 I think?
+
 
 
 \subsubsection{Example 1: Long thin marine ice sheet}
 A FISOC example using Elmer/Ice and ROMS. 
 The Elmer/Ice setup is provided with the example in the subdirectory. 
-The corresponding ROMS configuration is called ICESHELF2D
+The corresponding ROMS header file is ROMS/Include/iceshelf2d.h, 
+the application is ICESHELF2D, and 
+the input file is ROMS/External/ocean\_iceshelf2d.in.
 
 \subsubsection{Example 2: Ice cliff}
 Placeholder!  To be developed...
 
 \subsubsection{Example 3: Using FISOC to handle time evolving forcing}
 A FISOC example using offline forcing to drive ROMS. 
-This is for running the ISOMIP+ ocn3 and ocn 4 experiments.
+This is used for running the ISOMIP+ ocean 3 and 4 experiments.
+The corresponding ROMS header file is ROMS/Include/isomip\_plus.h, 
+the application is ISOMIP\_PLUS, 
+and the input file is ROMS/External/ocean\_isomip\_plus\_ocn3.in.
 
 \subsubsection{Example 4: Simple floating only test}
 A FISOC example using Elmer/Ice and ROMS. 
 The Elmer/Ice setup is provided with the example in the subdirectory. 
-The corresponding ROMS configuration is called ICESHELF2D\_TOY
+The corresponding ROMS header file is ROMS/Include/iceshelf2d\_toy.h, 
+the application is ICESHELF2D\_TOY, 
+and the input file is ROMS/External/ocean\_iceshelf2d\_toy.in.
 
 \subsubsection{Example 5: Simple grounding line migration test}
 A FISOC example using Elmer/Ice and ROMS. 
 The Elmer/Ice setup is provided with the example in the subdirectory. 
-The corresponding ROMS configuration is called ICESHELF2D\_TOY\_GL
+The corresponding ROMS header file is ROMS/Include/iceshelf2d\_toy\_gl, 
+the application is ICESHELF2D\_TOY\_GL, 
+and the input file is ROMS/External/ocean\_iceshelf2d\_toy\_gl.in.
 
 
 
 
+%\section{Post processing}
 
-\section{Post processing}
+%It is expected that the OM and ISM components will output data in their usual formats, 
+%and that this will form the basis for most output visualisation and post-processing.
+%FISOC does however have the capcity to output both ISM and OM fields on the OM grid 
+%in netcdf format.
 
-It is expected that the OM and ISM components will output data in their usual formats, 
-and that this will form the basis for most output visualisation and post-processing.
-FISOC does however have the capcity to output both ISM and OM fields on the OM grid 
-in netcdf format.
+%Scripts for visualising these outputs may be developed at some point, but no firm 
+%plans exist.  If/when developed, they will be located in the FISOC\_pp directory.
+%There is currently (end 2016) an inflexible script and unfriendly script used as a sanity 
+%check during development.
 
-Scripts for visualising these outputs may be developed at some point, but no firm 
-plans exist.  If/when developed, they will be located in the FISOC\_pp directory.
-There is currently (end 2016) an inflexible script and unfriendly script used as a sanity 
-check during development.
-
-The script requires a recent python installation and the netcdf4-python module.
-
+%The script requires a recent python installation and the netcdf4-python module.
 
 
+%\subsection{Netcdf4-python installation notes}
 
-\subsection{Netcdf4-python installation notes}
+%Depending on your python installation, you may need to run something like this
+%before installing netcdf4-python:
+%\begin{lstlisting}
+%sudo apt-get install python-dev
+%\end{lstlisting}
+%More information about the netcdf4-python module can be found here:\\
+%\url{http://unidata.github.io/netcdf4-python/}\\
 
-Depending on your python installation, you may need to run something like this
-before installing netcdf4-python:
-\begin{lstlisting}
-sudo apt-get install python-dev
-\end{lstlisting}
-More information about the netcdf4-python module can be found here:\\
-\url{http://unidata.github.io/netcdf4-python/}\\
+%You can clone or download the latest netcdf4-python code from the GitHub 
+%repository:
+%\begin{lstlisting}
+%git clone git@github.com:Unidata/netcdf4-python.git 
+%\end{lstlisting}
+%Then build and install the netcdf4-python library like this:
+%\begin{lstlisting}
+%python setup.py build
+%python setup.py install
+%\end{lstlisting}
+%Install may require root privileges.
+%You may need to restart your shell.  
 
-You can clone or download the latest netcdf4-python code from the GitHub 
-repository:
-\begin{lstlisting}
-git clone git@github.com:Unidata/netcdf4-python.git 
-\end{lstlisting}
-Then build and install the netcdf4-python library like this:
-\begin{lstlisting}
-python setup.py build
-python setup.py install
-\end{lstlisting}
-Install may require root privileges.
-You may need to restart your shell.  
-
-A minor discrepancy between the python setup script and the way nc-config 
-retrieves relevant flags may lead to errors if mpi wrappers are used. 
-This issue should probably be considered a bug in nc-config. 
-More information (and a dirty fix) can be found here:\\
-\url{https://github.com/Unidata/netcdf4-python/issues/491}\\
+%A minor discrepancy between the python setup script and the way nc-config 
+%retrieves relevant flags may lead to errors if mpi wrappers are used. 
+%This issue should probably be considered a bug in nc-config. 
+%More information (and a dirty fix) can be found here:\\
+%\url{https://github.com/Unidata/netcdf4-python/issues/491}\\
 
 
 
@@ -999,8 +1097,8 @@ XXX should be replaced by the component's name.
 Any new OM or ISM component to be used with FISOC must first be ESMF compliant.  This basically 
 means that it should have an initialise, run and finalise routine, and that the developer can 
 provide the component's grid and variables in ESMF compatible formats through the new wrapper.
-The ESMF web site provides furtehr documentation.
-https://www.earthsystemcog.org/projects/esmf/
+The ESMF web site provides further documentation.
+\url{https://www.earthsystemcog.org/projects/esmf/}
 
 If it is found that changes to other aspects of the FISOC code are required, this should be 
 implemented in collaboration with the FISOC core developers.
