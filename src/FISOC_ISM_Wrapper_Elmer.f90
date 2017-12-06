@@ -719,7 +719,11 @@ print*,"Hang on, need to get temperature exchange going too..."
           EI_fieldVals => EI_field % Values
           EI_fieldPerm => EI_field % Perm ! don't need perm for coords
           DO ii = 1,SIZE(ownedNodeIDs)
-             ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
+             IF (ASSOCIATED(EI_fieldPerm)) THEN
+                ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
+             ELSE
+                ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
+             END IF
           END DO
           
        CASE ('ISM_z_lts')
@@ -728,7 +732,11 @@ print*,"Hang on, need to get temperature exchange going too..."
           EI_fieldVals => EI_field % Values
           EI_fieldPerm => EI_field % Perm
           DO ii = 1,SIZE(ownedNodeIDs)
-             ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
+             IF (ASSOCIATED(EI_fieldPerm)) THEN
+                ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
+             ELSE
+                ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
+             END IF
           END DO
           
        CASE ('ISM_gmask')
