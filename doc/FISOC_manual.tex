@@ -32,7 +32,7 @@
 \begin{document}
 
 \title{Framework for Ice Sheet - Ocean Coupled modelling (FISOC) Manual}
-\author{Rupert Gladstone (RupertGladstone1972@gmail.com) \and Lenneke Jong \and Ben Galton-Fenzi}
+\author{Rupert Gladstone (RupertGladstone1972@gmail.com) \and Lenneke Jong \and Ben Galton-Fenzi \and David Gwyther}
 %\date{Version 0.2, April 2016}
 \maketitle
 
@@ -44,8 +44,10 @@
 
 The ``Framework for Ice Sheet - Ocean model Coupling" (FISOC) has been written to enable Ice Sheet Models 
 (ISMs) and Ocean Models (OMs) to be run as a single executable to address the co-evolution of ice and ocean 
-properties.  it is primarily designed to deal with the situation of a floating ice shelf at the interface 
-between land ice and open ocean.
+properties.  
+It is primarily designed to handle exchange of variables between ice and ocean at the underside of a floating ice shelf.
+At time of writing (5/12/2017) exchange of variables at an ice cliff is 
+not supported, though this is a planned development.
 
 In this context an ISM simulates (part of) a marine ice sheet, including both grounded and floating parts, 
 representing the dynamic evolution over time of the ice sheet.
@@ -53,20 +55,27 @@ representing the dynamic evolution over time of the ice sheet.
 An OM simulates the sub-shelf cavity circulation under the floating part of the ice sheet, and optionally also 
 a wider ocean domain.
 
-FISOC is a set of code modules and driver built using the Earth System Modelling Framework (ESMF, 
-\url{https://www.earthsystemcog.org/projects/esmf/}). 
+FISOC comprises a set of code modules and driver built using the Earth System Modelling Framework (ESMF, 
+\url{https://www.earthsystemcog.org/projects/esmf/}), and written in Fortran 90. 
 Some knowledge of the ESMF is essentially in order to fully understand the FISOC code.  It should 
 be possible to run FISOC without knowledge of ESMF.
+FISOC is intended to be flexible: the additional development effort required to 
+couple a different ocean or ice component into the framework is minimal, so 
+long as the new component is ESMF-compatible. 
 
-A full description of the physical processes FISOC attempts to simulate are provided in (***
-ref GMD paper, not yet written).  
+FISOC initially couples the ISM Elmer/Ice to the OM ``Regional Ocean Modelling System'' (ROMS).
+A full description of the physical processes represented in FISOC in its 
+initial configuration will be described in a GMD paper (this is in 
+preparation as of 5/12/2017).
+
 This manual describes how to use FISOC with an ISM and OM for which it has been 
-developed (Section~\ref{sec:FISOC_SUG}) and also how to build additional ISM or OM components 
+developed (Section~\ref{sec:FISOC_SUG}) and also how to integrate 
+additional ISM or OM components 
 into the FISOC framework (Section~\ref{sec:FISOC_SDG}).
 
 A number of web links are given at various points in this document.  
 The links were correct at the time they were added. 
-Please contact the authors if any of these are found to be out of date. 
+Please contact the developers if any of these are found to be out of date. 
 
 
 
@@ -74,8 +83,11 @@ Please contact the authors if any of these are found to be out of date.
 \section{Installing FISOC with established components}
 \label{sec:FISOC_install}
 
-FISOC can be obtained by emailing a request to the author.  It is maintained and developed in a 
-private GitHub repository.  We intend to make this public late 2016 or early 2017.
+FISOC can be obtained by emailing a request to the developers.  
+At the time of writing (5/12/2017) it is maintained and developed in a 
+private GitHub repository.  
+This will go public when the GMD description paper is 
+submitted (inteded in 2018).
 
 FISOC has a simple build process.  The Makefile in the top level FISOC directory contains the 
 hard coded dependencies needed to build FISOC code.  The Makefile refers to certain 
@@ -87,10 +99,37 @@ in the top level FISOC directory:
 make install
 \end{lstlisting}
 
-An example script to build and install FISOC, 'buildFISOCexample.sh', is available in the top 
+An example script to build and install FISOC, ``buildFISOCexample.sh'', is available in the top 
 level FISOC directory.
 
-FISOC has been tested with GNU compilers on Linux Mint using OpenMPI. 
+FISOC has been built and used with GNU and with Intel compilers. 
+This has been carried out on different flavours of Linux. 
+The Message Passing Interface (MPI) implementation is OpenMPI. 
+In principal it should also work with MPICH, but this has not been tested at time of writing (5/12/2017). 
+
+
+
+\subsection{Switching between components}
+
+Many aspects of FISOC are runtime configurable (Section~\ref{sec:FISOC_SUG}), 
+but the choice of which component to use is a compile time option, implemented 
+by choice of model-specific wrapper. 
+This is determined by environment variables FISOC\_OM and FISOC\_ISM 
+(Section~\ref{sec:EnvVars}). 
+
+In order to test the build the dummy wrappers may be used. 
+Libraries are not needed for dummy wrappers, and the corresponding 
+environment variables can be set to any value.
+See  ``buildFISOCexample.sh'' for examples. 
+
+In addition to the dummy wrappers, undocumented ISM components 
+(as of 5/12/2017) include: 
+``FOrcing OffLine'' (FOOL), which acts as a wrapper for netcdf files 
+containing time evolving geometry forcing we want to use to force the 
+OM; 
+``Frank's Ice Shelf model'' (FISh), a very simple flowline SSA 
+ice shelf model from Frank Pattyn, used for simple testing during 
+development.
 
 
 
@@ -99,8 +138,8 @@ FISOC has been tested with GNU compilers on Linux Mint using OpenMPI.
 
 Several environment variables may be used in the build process. 
 Some of these are mandatory. 
-Variables listed as optional here may be mandatory for configuratons other than 
-``dummy''.
+Variables listed as optional here may be mandatory for some configuratons 
+other than ``dummy''.
 These environment variables are not used at run time, only during 
 the compilation/installation of FISOC.
 
@@ -115,42 +154,55 @@ Optional.                                          \\
 Determines where FISOC\_caller will be installed. Defaults to \$HOME/bin. 
 The user should also ensure this location is in their \$PATH. \\
 \vspace{6pt}
-\textbf{FISOC\_MPI}                                \\ 
-Optional. Possible value ``yes''.                  \\
-Sets preprocessor flag to tell FISOC whether this is a parallel compilation.
-Defaults to serial.                                \\
-\vspace{6pt}
+% now set through cpp flags
+%\textbf{FISOC\_MPI}                                \\ 
+%Optional. Possible value ``yes''.                  \\
+%Sets preprocessor flag to tell FISOC whether this is a parallel compilation.
+%Defaults to serial.                                \\
+%\vspace{6pt}
 \textbf{FISOC\_OM}                                 \\ 
 Required. Possible values ``dummy'', ``ROMS''.     \\
 Determines which OM component will be used.        \\
 \vspace{6pt}
-\textbf{FISOC\_OM\_INCLUDE}                       \\ 
-Optional.                                          \\
+\textbf{FISOC\_OM\_INCLUDE}                         \\ 
+Optional.                                           \\
 Specifies the path where the OM header files are located.\\
 \vspace{6pt}
-\textbf{FISOC\_OM\_LIBPATH}                       \\
-Optional.                                          \\
+\textbf{FISOC\_OM\_LIBPATH}                         \\
+Optional.                                           \\
 Specifies the path where the OM library files are located.\\
 \vspace{6pt}
-\textbf{FISOC\_OM\_LIBS}                          \\
-Optional.                                          \\
+\textbf{FISOC\_OM\_LIBS}                            \\
+Optional.                                           \\
 Specifies the linker directives needed to link the OM library to FISOC. \\
 \vspace{6pt}
-\textbf{FISOC\_ISM}                                \\
-Required. Possible values ``dummy'', ``Elmer''.    \\
-Determines which ISM component will be used.       \\
+\textbf{FISOC\_ISM}                                 \\
+Required. Possible values ``dummy'', ``Elmer''.     \\
+Determines which ISM component will be used.        \\
 \vspace{6pt}
-\textbf{FISOC\_ISM\_INCLUDE}                       \\ 
-Optional.                                          \\
+\textbf{FISOC\_ISM\_INCLUDE}                        \\ 
+Optional.                                           \\
 Specifies the path where the ISM header files are located.\\
 \vspace{6pt}
-\textbf{FISOC\_ISM\_LIBPATH}                       \\
-Optional.                                          \\
+\textbf{FISOC\_ISM\_LIBPATH}                        \\
+Optional.                                           \\
 Specifies the path where the ISM library files are located.\\
 \vspace{6pt}
-\textbf{FISOC\_ISM\_LIBS}                          \\
-Optional.                                          \\
+\textbf{FISOC\_ISM\_LIBS}                           \\
+Optional.                                           \\
 Specifies the linker directives needed to link the ISM library to FISOC. \\
+\vspace{6pt}
+\textbf{CPPFLAGS}                                   \\
+Optional.                                           \\
+Preprocessor directives may be specified here.  
+Preprocessor directives used by FISOC:              \\
+\textbf{FISOC\_MPI}                                 \\ 
+Should be defined for parallel compilation but not for 
+serial compilation.  Activates code sections specific to parallel simulations. 
+At time of writing (5/12/2017) serial compilation has not been recently tested
+and may or may not work.                            \\
+%\vspace{6pt}
+See also Section~\ref{sec:PreReqROMS} for ROMS-specific preprocessor directives.
 \end{flushleft}
 
 
@@ -185,20 +237,33 @@ See Sections~\ref{sec:PreReqElmer} and \ref{sec:PreReqROMS}.
 \subsubsection{Elmer/Ice}
 \label{sec:PreReqElmer}
 
-***how this should be written depends on whether the FISOC changes to 
-Elmer code make it in to the Elmer repository. currently FISOC contains 
-top level control structures that replace Elmer ones and the whole of 
-Elmer needs to be re-compiled.  We aim to commit these changes to the 
-main Elmer/Ice repo.***
+\textbf{Compiling Elmer/Ice for FISOC} \\
+At time of writing (5/12/2017) FISOC requires a non-standard Elmer/Ice 
+code branch. 
+The Elmer repository is here:
+\url{https://github.com/ElmerCSC/elmerfem/}.
+The standard branch used by glaciologists is the elmerice branch. 
+The branch needed for FISOC is the elmerice\_FISOC branch. 
+It is intended to merge the changes in 2018.
+You can checkout the relevant branch with a command like this:
+\begin{lstlisting}
+git clone git://www.github.com/ElmerCSC/elmerfem -b elmerice_FISOC MyLocalName
+\end{lstlisting}
 
-***ref and link Elmer/Ice
+There is nothing FISOC-specific about the Elmer/Ice build process.  
+So long as you have the FISOC-compatible code branch, you can build Elmer/Ice 
+just the same as normal. 
+The Elmer/Ice wiki has information on a standard build:
+\url{http://elmerice.elmerfem.org/wiki/doku.php?id=compilation:compilationcmake}
 
+\vspace{10pt}
+
+\textbf{Compiling FISOC with Elmer/Ice}\\
 When compiling FISOC with Elmer/Ice, FISOC needs to know where to 
 find the relevant Elmer/Ice libraries.  
 This can be done at FISOC compile time through the 
 \$FISOC\_ISM
-environment variables.  
-
+environment variables.  For example:
 
 \begin{lstlisting}
 export FISOC_ISM="Elmer"
@@ -214,21 +279,27 @@ export FISOC_ISM_LIBS="-lelmersolver"
 \subsubsection{ROMS}
 \label{sec:PreReqROMS}
 
+\textbf{Compiling ROMS for FISOC} \\
 FISOC has been developed and tested with an ice shelf enabled version of ROMS. 
 This is branched from the Rutgers ROMS repository.  Information about the Rutgers ROMS 
 can be found at \url{https://www.myroms.org/}.
 
-Development of the ice shelf enabled version  is currently ongoing in a private repository 
+Development of the ice shelf enabled version  is currently ongoing 
+in a private repository 
 (please contact the developers if you need access to this).
-A public version of the ice shelf enabled version is also available through github: 
+A public version of the ice shelf enabled version is also available 
+through github: 
 \url{https://github.com/bkgf/romsIceShelf}.  
-Please use the "FISOC\_friendly" branch.
-
-***I need to merge the deve version to the public version before releasing this!!!***
+Please use the ``FISOC\_friendly'' branch.
+At time of writing (5/12/2017) the public version is out of date and 
+the private version should be used. 
+It is intended to push changes to the public version at the time of 
+submission of the FISOC GMD paper, during 2018.
 
 Example build scripts can be found in the ROMS/Bin subdirectory of a git clone 
 from the repository mentioned above.
-It is now assumed that users are familiar with a standard ROMS build process. 
+It is assumed that users are familiar with a standard ROMS build process. 
+
 
 When compiling ROMS for use with FISOC, the following additional environment
 variables are needed:
@@ -240,18 +311,68 @@ export MY_CPP_FLAGS=" -DFISOC"
 
 It is essential to activate the option to compile the ROMS shared library, which 
 is done by setting the environment variable MAKE\_SHAREDLIB to any value. 
+The -fPIC flag is essential, and this will in general be activated 
+by MAKE\_SHAREDLIB in a makefile supplement included by a line like 
+this in the makefile:
+\begin{lstlisting}
+include $(COMPILERS)/$(OS)-$(strip $(FORT)).mk
+\end{lstlisting}
+This should simply work, but may require minor modifications on new 
+OS/compiler combinations.
 
 The shared library will be installed in the location given by the 
- \$LIBDIR environment variable. 
+ LIBDIR environment variable. 
 
-The -DFISOC flag activates preprocessor options.  This includes telling ROMS to use a 
+The -DFISOC flag activates FISOC-specific code segments.  
+This includes telling ROMS to use a 
 specific hard coded unit rather than outputting to screen.  This relies on the 
 same unit being hard coded in the FISOC ROMS wrapper, and results in the ROMS 
 messages being sent to file instead of printed to screen.
 
-By default ROMS will install the module files in the directory given by 
- \$SCRATCH\_DIR.  
+Some aspects of the ROMS setup for specific simulations are determined at 
+compile time rather than run time. 
+These are determined through cpp directives set in an application-specific 
+header file in ROMS/Include in the ROMS clone. 
+ROMS must be compiled with an ``application'' (this is set through an 
+environment variable, see example ROMS build script) that has been setup for 
+use with FISOC. 
+This should give a good indication of which applications are FISOC-compatible:
+\begin{lstlisting}
+grep ``ifdef FISOC'' ROMS/Include/*h
+\end{lstlisting}
 
+The cpp options are described in ROMS/Include/cppdefs.h. 
+More detail of the FISOC specific options is given here.
+
+\begin{flushleft}
+To tell ROMS to expect FISOC to provide a cavity change rate:\\
+FISOC\_DDDT\\
+To tell ROMS to expect FISOC to provide an upper ice surface change rate
+(at time of writing, 5/12/2017, this is required for grounding line migration 
+and is used to update the wet/dry masks based on floatation):\\
+FISOC\_DSDT\\
+To tell ROMS to expect FISOC to directly overwrite the iceshelf draft 
+(this and FISOC\_DDT are mutually exclusive):\\
+FISOC\_DRAFT\\
+To tell ROMS to expect to receive a vertical temperature gradient 
+at the ice base from FISOC: \\
+FISOC\_DTDZ\\
+If ice shelf geometry evolution is required in ROMS this options must be 
+defined:\\
+ICESHELF\_MORPH\\
+If grounding line movement is required in ROMS the following cpp options 
+must be defined:\\
+LIMIT\_BSTRESS\\
+LIMIT\_ICESTRESS\\
+WET\_DRY
+\end{flushleft}
+
+
+By default ROMS will install the module files in the directory given by 
+ SCRATCH\_DIR.  
+
+\vspace{10pt}
+\textbf{Compiling FISOC with ROMS}\\
 When compiling FISOC with ROMS, FISOC needs to know where to 
 find the relevant ROMS libraries.  
 This can be done at FISOC compile time through the 
@@ -266,9 +387,10 @@ export FISOC_OM_INCLUDE="${MY_ROMS_DIR}/Build"
 export FISOC_OM_LIBPATH="/usr/local/lib"
 \end{lstlisting}
 
-ROMS uses C preprocessor (cpp) directives to determine which parts of the code are compiled, 
-and these may vary across experiments, requiring ROMS to be compiled multiple times. 
-Some of these require matching cpp directives in the FISOC compilation process. 
+%ROMS uses C preprocessor (cpp) directives to determine which parts of the code are compiled, 
+%and these may vary across experiments, requiring ROMS to be compiled multiple times. 
+The ROMS cpp directives require matching cpp directives in the FISOC 
+compilation process. 
 These can be set for a FISOC build using the CPPFLAGS environment variable.
 For example (see also the example FISOC build script):
 \begin{lstlisting}
@@ -279,19 +401,10 @@ ROMS\_DDDT, ROMS\_DSDT and ROMS\_DRAFT.  The general rule is that any of these d
 are defined for the ROMS compilation need to be defined also for the FISOC 
 compilation. 
 
-*** need a proper description of the relevant directives for ROMS compilation: ***
-FISOC
-FISOC\_DDDT
-FISOC\_DSDT
-FISOC\_DRAFT
-FISOC\_DTDZ
 
-ICESHELF\_MORPH
-LIMIT\_BSTRESS
-ICESHELF
-LIMIT\_ICESTRESS
-MASKING
-WET\_DRY
+
+
+*** move following stuff to later section or GMD paper: ****
 
 also need some discussion on relevant ROMS params in .in file.
 DCRIT = 20.0
@@ -302,7 +415,7 @@ In the same way that zice is added to the GRID type and used to indicate height 
 
 In the same way that iceshelf\_dddt is added to the ICESHELFVAR type and accessed from FISOC to set the rate of change of iceshelf draft wrt time, iceshelf\_dsdt is added to ICESHELFVAR to set the rate of change of sice with time.  If FISOC does not update iceshelf\_dsdt then the upper ice surface will remain static.
 
-The calculation of pressure at the ice-ocean interface no longer estimates the weight of the ice column based on the assumption of floatation, but rather uses the actual ice thickness to estimate pressure.  The value for ice density defined in iceshelf_mod.h is used.
+The calculation of pressure at the ice-ocean interface no longer estimates the weight of the ice column based on the assumption of floatation, but rather uses the actual ice thickness to estimate pressure.  The value for ice density defined in iceshelf\_mod.h is used.
 
 ***put the pressure equation here***
 
@@ -387,6 +500,11 @@ The name of the ISM-specific config file.                                  \\
 \vspace{6pt}
 \textbf{FISOC\_ISM\_ReqVars:} [STRING] [required]                          \\
 List of variable names required to be provided by the ISM.                 \\
+\vspace{6pt}
+\textbf{ISM\_varNames:} [STRING] [optional]                                \\
+List of native names of variables in the ISM, for use by the model-specific 
+wrapper.  May also be required or unused depending on the wrapper. Must be 
+same length as \textbf{FISOC\_ISM\_ReqVars}.                               \\
 \vspace{6pt}
 \textbf{FISOC\_ISM\_DerVars:} [STRING] [required]                          \\
 List of variables derived by FISOC from the ISM vars.                      \\ 
@@ -846,7 +964,7 @@ sudo apt-get install python-dev
 \end{lstlisting}
 More information about the netcdf4-python module can be found here:\\
 \url{http://unidata.github.io/netcdf4-python/}\\
-\\
+
 You can clone or download the latest netcdf4-python code from the GitHub 
 repository:
 \begin{lstlisting}
