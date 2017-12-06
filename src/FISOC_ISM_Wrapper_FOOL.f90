@@ -20,7 +20,7 @@ MODULE FISOC_ISM_Wrapper
   INTEGER,PARAMETER                     :: NOYEAR = -999
   
   TYPE(ESMF_config)                     :: FOOL_config 
-!  REAL(ESMF_KIND_R8),PARAMETER          :: yearinsec = 365.25*24.*60.*60. 
+  REAL(ESMF_KIND_R8),PARAMETER          :: secperyear = 365.0*24.*60.*60. 
   INTEGER                               :: year = NOYEAR
 
 ! TODO: resolve some code duplication between init 1 and run.  Setting up file names etc. for getting the var from netcdf.
@@ -327,11 +327,16 @@ CONTAINS
        CASE ('ISM_z_l0')
           CALL readFromNC(FileName,'zice',FOOLgrid,ptr,1)
           
+       CASE ('ISM_z_lts')
+          CALL readFromNC(FileName,'sice',FOOLgrid,ptr,1)
+          
        CASE ('ISM_dddt')
-          CALL readFromNC(FileName,'dddt',FOOLgrid,ptr,ISM_dt_sec)
+          CALL readFromNC(FileName,'dddt',FOOLgrid,ptr,secperyear)
+!          CALL readFromNC(FileName,'dddt',FOOLgrid,ptr,ISM_dt_sec)
           
        CASE ('ISM_dsdt')
-          CALL readFromNC(FileName,'dsdt',FOOLgrid,ptr,ISM_dt_sec)
+          CALL readFromNC(FileName,'dsdt',FOOLgrid,ptr,secperyear)
+!          CALL readFromNC(FileName,'dsdt',FOOLgrid,ptr,ISM_dt_sec)
 
        CASE DEFAULT
           msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
@@ -415,13 +420,13 @@ CONTAINS
 
 
 
-  SUBROUTINE readFromNC(FileName,VarName,FOOLgrid,ptr,ISM_dt_sec)
+  SUBROUTINE readFromNC(FileName,VarName,FOOLgrid,ptr,scaling)
 
     REAL(ESMF_KIND_R8),POINTER,INTENT(INOUT) :: ptr(:,:)
     CHARACTER(len=ESMF_MAXSTR),INTENT(IN)    :: FileName
     CHARACTER(len=*),INTENT(IN)              :: VarName
     TYPE(ESMF_grid),INTENT(INOUT)            :: FOOLgrid
-    INTEGER,INTENT(IN)                       :: ISM_dt_sec
+    INTEGER,INTENT(IN)                       :: scaling
 
     REAL(ESMF_KIND_R8),ALLOCATABLE :: values(:,:)
     INTEGER                        :: lbnd(2), ubnd(2), NtileI, NtileJ
@@ -470,8 +475,8 @@ CONTAINS
 
     ptr = TRANSPOSE(values)
 
-!    ptr = ptr / ISM_dt_sec ! convert from m/yr to m/s
-    ptr = ptr/31557600.0
+    ptr = ptr / scaling ! e.g. to convert from m/yr to m/s
+!    ptr = ptr/31557600.0
 
     DEALLOCATE(values)
 
