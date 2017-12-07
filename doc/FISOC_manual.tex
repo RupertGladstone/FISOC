@@ -412,20 +412,15 @@ compilation.
 
 
 
-*** move following stuff to later section or GMD paper: ****
+% put this in GMD paper?
 
-also need some discussion on relevant ROMS params in .in file.
-DCRIT = 20.0
+%Setting FISOC\_DSDT activates the following in ROMS:
 
-Setting FISOC\_DSDT activates the following in ROMS:
+%In the same way that zice is added to the GRID type and used to indicate height of the lower surface of the iceshelf relative to sea level (i.e. iceshelf draft), sice is added to the GRID type to indicate height of the upper surface of the ice sheet/shelf. sice can be read from netcdf in the same was as zice.
 
-In the same way that zice is added to the GRID type and used to indicate height of the lower surface of the iceshelf relative to sea level (i.e. iceshelf draft), sice is added to the GRID type to indicate height of the upper surface of the ice sheet/shelf. sice can be read from netcdf in the same was as zice.
+%In the same way that iceshelf\_dddt is added to the ICESHELFVAR type and accessed from FISOC to set the rate of change of iceshelf draft wrt time, iceshelf\_dsdt is added to ICESHELFVAR to set the rate of change of sice with time.  If FISOC does not update iceshelf\_dsdt then the upper ice surface will remain static.
 
-In the same way that iceshelf\_dddt is added to the ICESHELFVAR type and accessed from FISOC to set the rate of change of iceshelf draft wrt time, iceshelf\_dsdt is added to ICESHELFVAR to set the rate of change of sice with time.  If FISOC does not update iceshelf\_dsdt then the upper ice surface will remain static.
-
-The calculation of pressure at the ice-ocean interface no longer estimates the weight of the ice column based on the assumption of floatation, but rather uses the actual ice thickness to estimate pressure.  The value for ice density defined in iceshelf\_mod.h is used.
-
-***put the pressure equation here***
+% The value for ice density (and a couple other things?) defined in iceshelf\_mod.h is used (overwrite these from FISOC?)
 
 
 %\subsection{Troubleshooting}
@@ -525,7 +520,7 @@ List of variables derived by FISOC from the ISM variables. These are
 calculated from ISM required variables by hard coded routines in 
 FISOC\_ISM or FISOC\_utils. This list is allowed to be empty.              \\
 \vspace{6pt}
-\textbf{ISM\_grdType:}        [STRING] [required]                          \\
+\textbf{ISM\_gridType:}        [STRING] [required]                          \\
 Which ESMF object to use.  Valid values are ESMF\_mesh (typically used 
 o describe unstructured meshes) and ESMF\_grid (typically used to 
 describe structured grids, supports stagered grids).                       \\
@@ -568,7 +563,7 @@ grid stagger for each variable.                                            \\
 List of variables derived by FISOC from the OM vars.  
 To be calculated from OM vars by hard coded routines in FISOC\_OM.        \\
 \vspace{6pt}
-\textbf{OM\_grdType:}        [STRING] [required]                           \\
+\textbf{OM\_gridType:}        [STRING] [required]                           \\
 Which ESMF object to use.  Valid values are ESMF\_mesh and ESMF\_grid.     \\
 \vspace{6pt}
 \textbf{OM2ISM\_vars:}        [STRING] [optional]                          \\
@@ -679,7 +674,9 @@ Note that the units given in Table~\ref{tab:vars} are suggested units.  FISOC do
 the user must ensure unit consistency.  There may be hard coded unit assumptions in the model specific 
 wrappers.
 
-***variable names: sort out dddt and dBdt\_l0.  consistent naming convention needed.
+Note: dBdt is probably not a suitable choice for ice shelf basal melt rate.  
+Simply m (i.e. full name OM\_m) would probably be better, to avoid confusion with dddt 
+(rate of change of ice draft).
 
 \begin{table}
   \begin{center}
@@ -691,20 +688,24 @@ wrappers.
                             & the ice ocean interface.                     &   \\ 
       ISM\_z\_l0            & Height relative to sea level of the ice      & m \\
                             & base.                                        &   \\
+      ISM\_z\_lts           & Height relative to sea level of the ice      & m \\
+                            & top surface.                                 &   \\
       ISM\_z\_l1            & Height relative to sea level of the first    &   \\
                             & ISM model level above the ice base.          & m \\
-      ISM\_z\_l0\_previous  & Height relative to sea level of the ice      &   \\
-                            & base one timestep previously.                & m \\
-      ISM\_dTdz\_l0         & Vertical temperature gradient in the ice     &   \\
-                            & at the ice base.                             & K/m \\
-      ISM\_dddt             & Rate of change of the height of the ice      &   \\
-                            & base relative to sea level with respect to   &   \\
-                            & time.                                        & m/a \\
+      ISM\_z\_l0\_previous  & Height relative to sea level of the ice      & m \\
+                            & base one ISM timestep previously.            &   \\
+      ISM\_z\_lts\_previous & Height relative to sea level of the ice      & m \\
+                            & top surface one ISM timestep previously.     &   \\
+      ISM\_dTdz\_l0         & Vertical temperature gradient in the ice     & K/m \\
+                            & at the ice base.                             &   \\
+      ISM\_dddt             & Rate of change of the ice draft with respect & m/a \\
+                            & to time.                                     &   \\
+      ISM\_dsdt             & Rate of change of the ice top surface        & m/a \\
+                            & height with respect to time.                 &   \\
       ISM\_velocity\_l0     & Ice flow velocity at the ice base            & m/a \\
-      OM\_dBdt\_l0          & Ice shelf basal melt rate                    & m/a \\
+      OM\_dBdt\_l0          & Ice shelf basal melt rate.                   & m/a \\
       OM\_temperature\_l0   & Ocean temperature at the ice ocean           &   \\
-                            & interface  ***or is this the ocean model...  &   \\
-                            & guessing the ice temperature at the interface&   \\
+                            & interface.                                   &   \\
     \end{tabular}
   \end{center}
   \caption{FISOC standard variables and typical units.  
@@ -714,13 +715,14 @@ wrappers.
 
 As a naming convention, ``z'' refers to the vertical coordinate, and ``l0'' and ``l1'' refer to the 
 model level at the ice-ocean interface (this would typically be the lowest level of the ISM or 
-the uppermost level of the OM) and one level above it, respectively.
+the uppermost level of the OM) and one level above it, respectively. ``lts'' refers to the top 
+surface of the ISM.
 
 FISOC outputting occurs on the ocean grid, and consists of dumping both the import and 
 export fields to netcdf files. 
 \textbf{FISOC\_ISM\_ReqVars} may contain variables that are required only so that they can be written 
-out on the ocean grid (typically as a sanity check) rather than actuallly being needed by the OM.
-
+out on the ocean grid (typically as a sanity or regridding check) rather 
+than actually being needed by the OM.
 
 The list of derived variables, \textbf{FISOC\_ISM\_DerVars}, indicates which variables are needed by the 
 OM but are not calculated by the ISM or its wrapper. 
@@ -740,6 +742,8 @@ ISM\_dddt.  Rate of change of depth of ice base.  This is calculated as
 ISM\_dddt = \frac{ISM\_z\_l0 - ISM\_z\_l0\_previous}{ISM\_dt}
 \end{equation}
 
+ISM\_dsdt is calculated similarly to ISM\_dddt.
+
 Not all ISM variables need to be passed to the OM, and vice versa.  
 This choice is made by the 
 user through use of configuration options ISM2OM\_vars and OM2ISM\_vars.  
@@ -749,11 +753,12 @@ in a given simulation.  An empty list can be used to avoid any variables
 being passed between components.  This can be useful during testing and 
 troubleshooting.
 
-A note on efficiency: All the ISM and OM variables are regridded and passed 
+A note on efficiency (relevant on 5/12/2017): 
+All the ISM and OM variables are currently being regridded and passed 
 to the wrapper for the opposite component.  It is at the model-specific 
 wrapper level that ISM2OM\_vars and OM2ISM\_vars are checked.  If regridding 
 becomes a significant proportion of FISOC's computational cost this 
-should be re-implemented to reducenon-essential regridding operations.
+should be re-implemented to reduce non-essential regridding operations.
 
 
 
@@ -761,17 +766,19 @@ should be re-implemented to reducenon-essential regridding operations.
 
 \subsubsection{Updating the ice shelf cavity for the OM}
 
-See the FISOC GMD paper (***ref) for more details about updating the ocean 
-representation of the ice shelf cavity. 
-Several options are available through FISOC, from the simplest option of using 
+Several options are available through FISOC for updating the OM representation 
+of the ocean cavity. 
+These vary from the simplest option of using 
 the most recent cavity geometry from the ISM to update the OM representation of 
-cavity geometry to smoother options via either interpolation in time or specifying 
-a rate of change of cavity geometry.
+cavity geometry to smoother options via either interpolation in time or 
+specifying a rate of change of cavity geometry.
 
-The options (summarised in Table~\ref{tab:cavity}) are all implemented within FISOC, 
-based on the cavity geometry 
-calculated by the ISM.  Some options are through FISOC derived variables, as described 
-in Section~\ref{sec:FISOCvars}.  The key ISM output from which all cavity options 
+The options (summarised in Table~\ref{tab:cavity}) are all implemented 
+within FISOC, based on the cavity geometry 
+calculated by the ISM.  
+Some options are through FISOC derived variables, as described 
+in Section~\ref{sec:FISOCvars}.  
+The key ISM output from which all cavity options 
 are calculated is ISM\_z\_l0.  
 
 \begin{table}
@@ -792,16 +799,22 @@ are calculated is ISM\_z\_l0.
     Cavity update options.  Note that of the possible ISM cavity variables 
     (ISM\_z\_l0, ISM\_z\_l0\_linterp, ISM\_dddt) only the required variable 
     (third column) should be passed to the OM (constrained using ISM2OM\_vars).
+    At time of writing (5/12/2017) the Rate and CorrectedRate are giving 
+    the most reliable outcomes and are recommended.
   }
   \label{tab:cavity}
 \end{table}
 
+The FISOC GMD paper will provide more  details about these approaches 
+to updating the ocean 
+representation of the ice shelf cavity, and also about the wetting and 
+drying scheme used for grounding line migration.
 
 
 
 
 \subsubsection{Grids and meshes}
-OM\_grdType and ISM\_grdType refer to the type of ESMF object to be used for holding information about 
+OM\_gridType and ISM\_gridType refer to the type of ESMF object to be used for holding information about 
 the model grid.  Typically models utilising unstructured meshes (e.g. Elmer/Ice) would use an 
 ESMF\_mesh object for holding mesh information in FISOC and models utilising structured grids 
 (e.g. ROMS) would use an ESMF\_grid object for holding grid information in FISOC.
@@ -814,10 +827,34 @@ ESMF\_mesh object for holding mesh information in FISOC and models utilising str
 
 
 \subsection{Timestepping}
-Asynchronous timestepping.
-***fill in this section we've implemented both tight coupling (ice and ocean both running 
-on the same timescale) and loose coupling (for longer time scales where the ocean is run 
-to steady state then the ice sheet continues until significant change has occurred in the cavity).
+
+Different asynchronous timestepping options are planned.
+Currently recommended (6/12/2017) is to set dt\_ratio = 1 and use the 
+ISM timestep for both the ISM and OM components. 
+ROMS will run as many timesteps as it needs to (see DT in the ROMS .in file) 
+for each call to the ROMS run method. 
+With this approach the Rate or CorrectedRate methods for cavity evolution 
+are recommended. 
+FISOC can pass the ROMS melt rate to the ISM after the call to the 
+ROMS run method. 
+It might be preferable to get ROMS to provide an average rather than a final 
+snapshot for the melt rate. This should be straightforward but is NYI.
+
+%***fill in this section we've implemented both tight coupling (ice and ocean both running 
+%on the same timescale) and loose coupling (for longer time scales where the ocean is run 
+%to steady state then the ice sheet continues until significant change has occurred in the cavity).
+
+
+
+
+\subsection{Parallelism}
+
+ESMF supports any combination of concurrent and or sequantial parallelisation. 
+FISOC is currently (6/12/2017) set up for sequential coupling, where the 
+full set of processors are used first for the ISM call then for the OM call. 
+It should not be too hard to implement something more flexible if needed 
+in the future.
+
 
 
 \subsection{Running FISOC with Elmer/Ice} 
@@ -901,34 +938,36 @@ The name of this file is given in the ROMS configuration file, the .in file.
 When running ROMS through FISOC, the full path of the .dat file must be 
 given in the .in file.
 
-\subsubsection{ROMS preprocessor directives}
-Some aspects of the ROMS configuration are controlled through preprocessor directives.  
-ROMS must be recompiled if these are changed.  
-For example, there is a file located somewhere like 
-\begin{lstlisting}
-ROMS/Include/iceshelf2d.h
-\end{lstlisting}
-This file contains statements like this:
-\begin{lstlisting}
-#define ICESHELF
-#ifdef ICESHELF
-# undef ICESHELF_2EQN_VBC
-# define ICESHELF_3EQN_VBC
-# undef ICESHELF_TEOS10
-# undef ICESHELF_MORPH
-# define LIMIT_ICESTRESS
-#endif
-\end{lstlisting}
-In some cases changes are needed to be made to FISOC corresponding with these settings. 
-These are made to the hard coded values of variables defined at the head of the ROMS 
-wrapper module, contained in the file FISOC\_OM\_Wrapper\_ROMS.F90, with the 
-parameter  attribute. 
-Currently the following are in use, and further additions may be made as required.
-\begin{lstlisting}                                                                                           
-  LOGICAL, PARAMETER :: ROMS_MASKING = .FALSE.
-  LOGICAL, PARAMETER :: ROMS_SPHERICAL = .FALSE.
-\end{lstlisting}
-If these values need to be changed FISOC will of course need to be compiled again.
+
+% this stuff should now be covered by earlier sections:
+%\subsubsection{ROMS preprocessor directives}
+%Some aspects of the ROMS configuration are controlled through preprocessor directives.  
+%ROMS must be recompiled if these are changed.  
+%For example, there is a file located somewhere like 
+%\begin{lstlisting}
+%ROMS/Include/iceshelf2d.h
+%\end{lstlisting}
+%This file contains statements like this:
+%\begin{lstlisting}
+%#define ICESHELF
+%#ifdef ICESHELF
+%# undef ICESHELF_2EQN_VBC
+%# define ICESHELF_3EQN_VBC
+%# undef ICESHELF_TEOS10
+%# undef ICESHELF_MORPH
+%# define LIMIT_ICESTRESS
+%#endif
+%\end{lstlisting}
+%In some cases changes are needed to be made to FISOC corresponding with these settings. 
+%These are made to the hard coded values of variables defined at the head of the ROMS 
+%wrapper module, contained in the file FISOC\_OM\_Wrapper\_ROMS.F90, with the 
+%parameter  attribute. 
+%Currently the following are in use, and further additions may be made as required.
+%\begin{lstlisting}                                                                                           
+%  LOGICAL, PARAMETER :: ROMS_MASKING = .FALSE.
+%  LOGICAL, PARAMETER :: ROMS_SPHERICAL = .FALSE.
+%\end{lstlisting}
+%If these values need to be changed FISOC will of course need to be compiled again.
 
 
 
@@ -1006,6 +1045,9 @@ along with presentation of outputs.
 
 \subsubsection{Example 1: Long thin marine ice sheet}
 A FISOC example using Elmer/Ice and ROMS. 
+At time of writing (7/12/2017) this has not been 
+recently used, may not work, and may be superceded by 
+example 5. 
 The Elmer/Ice setup is provided with the example in the subdirectory. 
 The corresponding ROMS header file is ROMS/Include/iceshelf2d.h, 
 the application is ICESHELF2D, and 
@@ -1020,16 +1062,20 @@ This is used for running the ISOMIP+ ocean 3 and 4 experiments.
 The corresponding ROMS header file is ROMS/Include/isomip\_plus.h, 
 the application is ISOMIP\_PLUS, 
 and the input file is ROMS/External/ocean\_isomip\_plus\_ocn3.in.
+Processed netcdf files based on those available through MISOMIP 
+are also required.  These are not currently (7/12/2017) 
+included.  Contact the developers if you want to run this example. 
 
 \subsubsection{Example 4: Simple floating only test}
-A FISOC example using Elmer/Ice and ROMS. 
+A FISOC example using Elmer/Ice and ROMS. No grounding line is included. 
 The Elmer/Ice setup is provided with the example in the subdirectory. 
 The corresponding ROMS header file is ROMS/Include/iceshelf2d\_toy.h, 
 the application is ICESHELF2D\_TOY, 
 and the input file is ROMS/External/ocean\_iceshelf2d\_toy.in.
 
 \subsubsection{Example 5: Simple grounding line migration test}
-A FISOC example using Elmer/Ice and ROMS. 
+A FISOC example using Elmer/Ice and ROMS. Similar domain to 
+example 4, but with an evolving grounding line.
 The Elmer/Ice setup is provided with the example in the subdirectory. 
 The corresponding ROMS header file is ROMS/Include/iceshelf2d\_toy\_gl, 
 the application is ICESHELF2D\_TOY\_GL, 
@@ -1038,7 +1084,17 @@ and the input file is ROMS/External/ocean\_iceshelf2d\_toy\_gl.in.
 
 
 
-%\section{Post processing}
+\section{Post processing}
+The default expectation is that standard approaches to visualising and 
+processing outputs will be used for OM and ISM components separately. 
+
+FISOC can output basic netcdf files from the OM generic wrapper 
+on the OM grid. 
+FISOC can do this for both ISM and OM variables.
+This capability is mainly recommended just for sanity checking.
+
+Options for jointly visualising/processing outputs from both components 
+will be discussed at the FISOC winter workshop 2018.
 
 %It is expected that the OM and ISM components will output data in their usual formats, 
 %and that this will form the basis for most output visualisation and post-processing.
@@ -1087,12 +1143,59 @@ and the input file is ROMS/External/ocean\_iceshelf2d\_toy\_gl.in.
 
 
 
-\section{FISOC development and incorporating new components}
+\section{FISOC development}
 \label{sec:FISOC_SDG}
 
+An overview of FISOC code structures is summarised 
+in Figure~\ref{fig:codeStruct}.
+
+\begin{figure}[t]
+  \vspace*{2mm}
+  \begin{center}
+    \includegraphics[width=17cm]{FISOC_structure.pdf}
+  \end{center}
+  \caption{FISOC code and data structures.}
+  \label{fig:codeStruct}
+\end{figure}
+
+
+
+\subsection{Incorporating new OM or ISM components}
+
 FISOC is designed such that the only code developments for new components should be the creation 
-of model-specific wrappers: FISOC\_OM\_Wrapper\_XXX.f90 or FISOC\_ISM\_Wrapper\_XXX.f90, where 
-XXX should be replaced by the component's name.
+of model-specific wrappers: \\
+FISOC\_OM\_Wrapper\_XXX.f90 \\
+ FISOC\_ISM\_Wrapper\_XXX.f90 \\
+where XXX should be replaced by the component's name.
+
+The new wrapper must contain a Fortran module with a fixed name 
+and fixed interface for the key init, run and finalise methods. 
+The precise requirements are not documented here as they may evolve 
+during continued development.  
+It is recommended to view an existing wrapper, especially the 
+PUBLIC routines.
+
+The following copy from the OM dummy wrapper (7/12/2017) gives 
+an example:
+
+\begin{lstlisting}
+MODULE FISOC_OM_Wrapper
+
+  USE ESMF
+  USE FISOC_utils_MOD
+
+  IMPLICIT NONE
+
+  PRIVATE
+
+  PUBLIC :: FISOC_OM_Wrapper_Init_Phase1,  FISOC_OM_Wrapper_Init_Phase2,  &
+       FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize, OM_HandleCavity
+
+CONTAINS
+
+...
+\end{lstlisting}
+
 
 Any new OM or ISM component to be used with FISOC must first be ESMF compliant.  This basically 
 means that it should have an initialise, run and finalise routine, and that the developer can 
@@ -1103,25 +1206,10 @@ The ESMF web site provides further documentation.
 If it is found that changes to other aspects of the FISOC code are required, this should be 
 implemented in collaboration with the FISOC core developers.
 
-If you write a new model-specific wrapper you are encouraged to submit it to the FISOC repository.
-Please contact the FISOC developers or submit a pull request through github.
+Please implement your developments in a new branch in the FISOC repository. 
+Request a merge to master when you are happy that it is stable. 
 
-The FISOC code structures are summarised in Figure~\ref{fig:codeStruct}.
- 
-***update the picture
 
-***add description here or perhaps self evident?
-
-***add section on getting help with FISOC? emphasize try component on its own first.  dont ask FISOC devs if the problem is entirely in one component.
-
-\begin{figure}[t]
-  \vspace*{2mm}
-  \begin{center}
-    \includegraphics[width=17cm]{FISOC_structure.pdf}
-  \end{center}
-  \caption{FISOC code and data structures.}
-  \label{fig:codeStruct}
-\end{figure}
 
 
 \subsection{Coding practices}
@@ -1135,10 +1223,6 @@ made public.
 New model-specific wrapper modules should ensure that the initialise, run and finalise 
 subroutines are public. 
 
-When writing new wrapper modules, the existing wrapper modules may be used as a template, 
-providing examples of the required interfaces.
-Once the FISOC code base stabilises we may provide a full description of the required interface 
-here, but for now adapting an existing wrapper module is advised.
 
 
 \subsubsection{Error handling}
@@ -1167,19 +1251,22 @@ The configuration file must be named ``FISOC\_config.rc''.
 It is compatible with ESMF config methods.  
 An ESMF\_config object is automatically created from this file at run time.
 This object is always named ``FISOC\_config'' in the FISOC code.
-New parameters may be introduced to the config file and can be accessed 
+New model-specific parameters needed by the new wrappers may be 
+introduced to the config file and can be accessed 
 within the model-specific wrapper at run time, via  ``FISOC\_config''. 
 No further coding is needed for this functionality.
 See existing model-specific wrappers (e.g. FISOC\_ISM\_Wrapper\_Elmer.f90) 
 for examples of this.
 
 The master list of standard FISOC configuration options is contained in 
-FISOC/doc/FISOC\_emacsMode.asc (the contents of this file may also be 
-pasted into your .emacs file to give minimal syntax highlighting for .rc 
-files). 
+FISOC/doc/FISOC\_emacsMode.asc and in Section~\ref{sec:config} of this 
+manual. 
 When new standard configuration options are added during development, they 
-should also be added to this file, and additionally described in 
+should also be added to both the emacsMode file and  
 Section~\ref{sec:config} of the manual.
+
+
+\subsubsection{Default values and derived attributes}
 
 The config file is intended to avoid duplication of information.  
 In the case of configuration options that can be derived from other 
