@@ -243,7 +243,7 @@ CONTAINS
     END IF
 
     IF (OM_initCavityFromISM) THEN
-       CALL CavityReset(OM_ImpFB,localPet,rc=rc)
+       CALL CavityReset(OM_ImpFB,FISOC_config,localPet,rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) & 
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -404,7 +404,7 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! Use the cavity from the ISM first stage initialisation to set the OM cavity
   !--------------------------------------------------------------------------------------
-  SUBROUTINE CavityReset(OM_ImpFB,localPet,rc)
+  SUBROUTINE CavityReset(OM_ImpFB,FISOC_config,localPet,rc)
 
     USE mod_iceshelfvar, ONLY : ICESHELFVAR
     USE mod_param, ONLY : BOUNDS, Ngrids
@@ -415,12 +415,14 @@ CONTAINS
     INTEGER,INTENT(IN)                    :: localPet
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB 
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
 
     TYPE(ESMF_FIELD)                      :: ISM_z_l0
     REAL(ESMF_KIND_R8),POINTER            :: ptr(:,:)
     INTEGER                               :: ii, jj
     INTEGER                               :: JstrR, JendR, IstrR, IendR
     INTEGER                               :: Jstr, Jend, Istr, Iend
+    REAL(ESMF_KIND_R8)                    :: OM_WCmin
 
     rc = ESMF_FAILURE
 
@@ -431,6 +433,11 @@ CONTAINS
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_WCmin, 'OM_WCmin',rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
     CALL ESMF_FieldBundleGet(OM_ImpFB, fieldname='ISM_z_l0', field=ISM_z_l0, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -440,7 +447,6 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
 
     IstrR=BOUNDS(Ngrids)%IstrR(localPet)
     IendR=BOUNDS(Ngrids)%IendR(localPet)
@@ -455,22 +461,20 @@ CONTAINS
 !    CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
     DO jj = JstrR, JendR
        DO ii = IstrR, IendR
-          IF ( ptr(ii,jj) .GT. 20_r8-GRID(Ngrids)%h(ii,jj) ) THEN
+          IF ( ptr(ii,jj) .GT. OM_WCmin-GRID(Ngrids)%h(ii,jj) ) THEN
              ICESHELFVAR(1) % iceshelf_draft(ii, jj, nstp) = ptr (ii, jj)
              ICESHELFVAR(1) % iceshelf_draft(ii, jj, nnew) = ptr (ii, jj)
              GRID(1) % zice (ii, jj) = ptr (ii, jj)
           ELSE
-             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nstp) = 20_r8-GRID(Ngrids)%h(ii,jj)
-             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nnew) = 20_r8-GRID(Ngrids)%h(ii,jj)
-             GRID(1) % zice (ii, jj) = 20_r8-GRID(Ngrids)%h(ii,jj)
+             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nstp) = OM_WCmin-GRID(Ngrids)%h(ii,jj)
+             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nnew) = OM_WCmin-GRID(Ngrids)%h(ii,jj)
+             GRID(1) % zice (ii, jj) = OM_WCmin-GRID(Ngrids)%h(ii,jj)
           END IF
        END DO
     END DO
+
 !    CALL set_depth(Ngrids,localPet)
-print*,"TODO: fix cavity reset somehow..."
 !check draft is not below bedrock
-!ask ben what is needed to init roms from ism geometry
-!can we just set zice from draft in ROMS?
 
     IF (ASSOCIATED(ptr)) THEN
        NULLIFY(ptr)
@@ -984,14 +988,6 @@ print*,"TODO: fix cavity reset somehow..."
              ! the current draft.  We only update the new draft from the ISM.
              ! The OM var zice will be set internally by the OM based on the iceshelf_draft.
              CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
-!print*,"OM draft"
-!DO jj = JstrR, JendR
-!  print*,ICESHELFVAR(1) % iceshelf_draft(:,jj,nnew)
-!END DO
-!print*,"sending draft"
-!DO jj = JstrR, JendR
-!print*,ptr(:,jj)
-!END DO
              DO jj = JstrR, JendR
                 DO ii = IstrR, IendR
                    ICESHELFVAR(1) % iceshelf_draft(ii,jj,nnew) = ptr(ii,jj)
