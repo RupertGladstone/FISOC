@@ -41,7 +41,7 @@
   OM_configFile:      /home/elmeruser/Source/ROMSIceShelf_devel/ROMS/External/ocean_iceshelf2d_toy_gl.in
 #  OM_configFile:      /short/ks3/rmg581/ROMSIceShelf_devel/ROMS/External/ocean_iceshelf2d_toy_gl.in
   OM_stdoutFile:      ./ROMS_stdout.asc
-  OM_writeNetcdf:     .TRUE.
+  OM_writeNetcdf:     .FALSE.
   OM_NCfreq:          all
   output_dir:         FISOCoutputs
   OM_cavityUpdate:    CorrectedRate # Linterp
@@ -57,8 +57,8 @@
   OM2ISM_regrid:      ESMF_REGRIDMETHOD_BILINEAR
 
   OM_outputInterval:  1
-  OM_dt_sec:          3000 
-  dt_ratio:           864 # 288   # 86400 secperday / 1200 sec = 72  86400 secperday / 300 sec = 288    ! om_dt = 3000 and dt_ratio = 864 implies ism_dt 30 days
+  OM_dt_sec:          2592000 # 864 * 3000 = 2592000. Convert from seconds to days and you get 30 days.  
+  dt_ratio:           1
   start_year:         1
   start_month:        1
 #  end_year:           1000
