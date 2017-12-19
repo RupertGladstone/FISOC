@@ -17,7 +17,9 @@ MODULE FISOC_utils_MOD
        FISOC_shrink, FISOC_VMAllGather, Unique1DArray,         &
        FISOC_OneGrid, FISOC_cavityCheckOptions,                & 
        FISOC_getFirstFieldRank, FISOC_makeRHfromFB,            &
-       FISOC_getGridOrMeshFromFB, FISOC_regridFB
+       FISOC_getGridOrMeshFromFB, FISOC_regridFB,              &
+       FISOC_GridCompRun
+  
 
   INTERFACE Unique1DArray
      MODULE PROCEDURE Unique1DArray_I4
@@ -59,6 +61,61 @@ MODULE FISOC_utils_MOD
 CONTAINS
   
 
+
+  !------------------------------------------------------------------------------
+  ! 
+  ! wrapper for the ESMF method allows simple time profiling.
+  ! Wraps the failfast error checks too.
+  SUBROUTINE FISOC_GridCompRun(FISOC_gc, ImpSt, ExpSt, profiling, &
+               vm, FISOC_clock, phase, cumulatedCPUtime)
+    TYPE(ESMF_GridComp),INTENT(INOUT)       :: FISOC_gc
+    TYPE(ESMF_State),INTENT(INOUT)          :: ImpSt, ExpSt
+    LOGICAL,INTENT(IN)                      :: profiling
+    TYPE(ESMF_vm),INTENT(IN)                :: vm
+    TYPE(ESMF_clock),INTENT(INOUT),OPTIONAL :: FISOC_clock
+    INTEGER,INTENT(IN),OPTIONAL             :: phase
+    REAL,INTENT(INOUT),OPTIONAL             :: cumulatedCPUtime
+
+    INTEGER                                 :: rc, urc
+    REAL                                    :: preCallTime, postCallTime
+
+    IF (profiling) THEN
+       IF (.NOT. (PRESENT(cumulatedCPUtime))) THEN
+          msg = "ERROR: profiling set to true but time not present"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+    END IF
+    
+    CALL ESMF_VMBarrier(vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+    IF (profiling) CALL cpu_time(preCallTime)
+
+    CALL ESMF_GridCompRun(FISOC_gc, &
+         importState=ImpSt, exportState=ExpSt, &
+         clock=FISOC_clock, phase=phase, rc=rc, userRc=urc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_VMBarrier(vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+    IF (profiling) THEN
+       CALL cpu_time(postCallTime)
+       cumulatedCPUtime = cumulatedCPUtime + (postCallTime - preCallTime)
+    END IF
+
+  END SUBROUTINE FISOC_GridCompRun
 
   !------------------------------------------------------------------------------
   ! 
@@ -980,6 +1037,19 @@ CONTAINS
 
     SELECT CASE(label)
 
+    CASE('profiling')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='profiling:', rc=rc_local)
+       IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+          derivedAttribute = .FALSE.
+          msg = "WARNING: profiling not found, setting to .FALSE."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+       
     CASE('ISM2OM_init_vars')
        CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='ISM2OM_init_vars:', rc=rc_local)
        IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN

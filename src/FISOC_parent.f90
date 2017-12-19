@@ -17,6 +17,7 @@ MODULE  FISOC_parent_MOD
   TYPE(ESMF_GridComp), SAVE :: FISOC_ISM, FISOC_OM
   TYPE(ESMF_CplComp),  SAVE :: FISOC_coupler
   TYPE(ESMF_State),    SAVE :: ISM_ImpSt, ISM_ExpSt, OM_ImpSt, OM_ExpSt
+  REAL,                SAVE :: OM_time=0.0, ISM_time=0.0, AM_time=0.0
 
 CONTAINS
   
@@ -301,11 +302,12 @@ CONTAINS
     TYPE(ESMF_State)     :: ISM_ImpSt, ISMExpSt, OM_ImpSt, OM_ExpSt
     TYPE(ESMF_Alarm)     :: alarm_OM, alarm_ISM
     TYPE(ESMF_Alarm)     :: alarm_ISM_exportAvailable, alarm_OM_output
-    LOGICAL              :: verbose_coupling
+    LOGICAL              :: verbose_coupling, profiling
     TYPE(ESMF_config)    :: config
     INTEGER              :: urc, localPet
     TYPE(ESMF_VM)        :: vm
     INTEGER(ESMF_KIND_I8):: advanceCount
+    CHARACTER(len=ESMF_MAXSTR) :: OM_time_str, ISM_time_str
 
     rc = ESMF_FAILURE
 
@@ -323,6 +325,11 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+    
+    CALL FISOC_ConfigDerivedAttribute(config, profiling, 'profiling', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     CALL ESMF_ConfigGetAttribute(config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -375,7 +382,7 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-    
+
     mainTimeStepping: DO WHILE (.NOT. ESMF_ClockIsStopTime(FISOC_clock, rc=rc))
 
        IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
@@ -397,24 +404,13 @@ CONTAINS
        END IF
        
        IF (ESMF_AlarmIsRinging(alarm_OM, rc=rc)) THEN
-!          msg = "FISOC parent run: calling OM"
-!          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-!               line=__LINE__, file=__FILE__, rc=rc)
-          CALL ESMF_GridCompRun(FISOC_OM, &
-               importState=OM_ImpSt, exportState=OM_ExpSt, &
-               clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-          IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-          CALL ESMF_VMBarrier(vm, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-          
+          IF (verbose_coupling) THEN
+             msg = "FISOC parent run: calling OM"
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+                  line=__LINE__, file=__FILE__, rc=rc)
+          END IF
+          CALL FISOC_GridCompRun(FISOC_OM, OM_ImpSt, OM_ExpSt, profiling, &
+               vm, FISOC_clock=FISOC_clock, phase=1, cumulatedCPUtime=OM_time)
           CALL ESMF_cplCompRun(FISOC_coupler, &
                importState=OM_ExpSt, exportState=ISM_ImpSt, &
                clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
@@ -432,24 +428,13 @@ CONTAINS
        END IF
        
        IF (ESMF_AlarmIsRinging(alarm_ISM, rc=rc)) THEN
-          msg = "FISOC parent run: calling ISM"
-          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-               line=__LINE__, file=__FILE__, rc=rc)
-          CALL ESMF_GridCompRun(FISOC_ISM, &
-               importState=ISM_ImpSt, exportState=ISM_ExpSt, &
-               clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-          IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-          CALL ESMF_VMBarrier(vm, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-
+          IF (verbose_coupling) THEN
+             msg = "FISOC parent run: calling ISM"
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+                  line=__LINE__, file=__FILE__, rc=rc)
+          END IF
+          CALL FISOC_GridCompRun(FISOC_ISM, ISM_ImpSt, ISM_ExpSt, profiling, &
+               vm, FISOC_clock=FISOC_clock, phase=1, cumulatedCPUtime=ISM_time)
           CALL ESMF_cplCompRun(FISOC_coupler, &
                importState=ISM_ExpSt, exportState=OM_ImpSt, &
                clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
@@ -472,6 +457,22 @@ CONTAINS
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
        CALL ESMF_VMBarrier(vm, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+    
+       IF (profiling) THEN
+          WRITE(OM_time_str,  *) OM_time
+          WRITE(ISM_time_str, *) ISM_time
+          msg = "OM elapsed CPU time is "//OM_time_str
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          msg = "ISM elapsed CPU time is "//ISM_time_str
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+       END IF
+
+       CALL ESMF_LogFlush(rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
