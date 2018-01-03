@@ -8,12 +8,6 @@
 
 FISOC_EXE ?= FISOC_caller
 SRCDIR = src
-FFLAGS += -fbacktrace -g -O0 -fbounds-check #-Wall
-#FFLAGS += -O0 -g -fbacktrace -fcheck=all # -Wall
-#FFLAGS += -fbacktrace -g -debug -DD  -O0 # -inline-debug-info
-#FFLAGS += -g -check all -fpe0 -warn -traceback -debug extended
-#FFLAGS += -O3 -xHost #-ipo
-
 
 # check for presence of required env vars
 ifneq ($(origin ESMFMKFILE), environment)
@@ -51,9 +45,11 @@ $(info *** Relevant variables for the build are now listed              ***)
 $(info ********************************************************************)
 $(info )
 $(info FISOC will be installed in [${INSTALL_DIR}])
+$(info FISOC executable will be called [${FISOC_EXE}])
 $(info )
 $(info ESMFMKFILE        [${ESMFMKFILE}])
 $(info CPPFLAGS          [${CPPFLAGS}])
+$(info FFLAGS            [${FFLAGS}])
 $(info )
 $(info FISOC_ISM         [${FISOC_ISM}])
 $(info FISOC_ISM_LIBS    [${FISOC_ISM_LIBS}])
