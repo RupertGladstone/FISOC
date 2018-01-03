@@ -3,11 +3,10 @@
 export CPPFLAGS="$CPPFLAGS -D FISOC_MPI"
 #export FISOC_MPI="yes"
 
-export FFLAGS=" += -fbacktrace -g -O0 -fbounds-check" #-Wall
-#FFLAGS += -O0 -g -fbacktrace -fcheck=all # -Wall
-#FFLAGS += -fbacktrace -g -debug -DD  -O0 # -inline-debug-info
-#FFLAGS += -g -check all -fpe0 -warn -traceback -debug extended
-#FFLAGS += -O3 -xHost #-ipo
+export FFLAGS="$FFLAGS += -fbacktrace -g -O0 -fbounds-check" #-Wall"
+#export FFLAGS=" -O0 -g -fbacktrace -fcheck=all" # -Wall -debug -DD  -O0" # -inline-debug-info"
+#export FFLAGS=" -g -check all -fpe0 -warn -traceback -debug extended"
+#export FFLAGS=" -O3 -xHost " #-ipo"
 
 ## optionally over-write the default executable name:
 #export FISOC_EXE="FISOC_caller"
