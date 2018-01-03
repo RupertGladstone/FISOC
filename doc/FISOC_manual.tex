@@ -989,7 +989,7 @@ configuration file (the .in file).
 
 Note that DMUMPS error codes, should they occur, can be found in the MUMPS user guide.
 MUMPS is often used by Elmer/Ice.
-http://mumps.enseeiht.fr/doc/userguide\_5.0.1.pdf
+\url{http://mumps.enseeiht.fr/}
 
 Errors like the following can ocurr (in the log files) when the number of processes is 
 not consistent with the number of component partitons (this example involves ROMS):
@@ -1147,12 +1147,17 @@ will be discussed at the FISOC winter workshop 2018.
 \label{sec:FISOC_SDG}
 
 An overview of FISOC code structures is summarised 
-in Figure~\ref{fig:codeStruct}.
+in Figure~\ref{fig:codeStruct}.  
+Structural changes would be needed to introduce a new type 
+of component, e.g. an atmosphere model.
+Implementing an alternative ISM or OM should require no changes 
+to existing FISOC code, just an additional model-specific wrapper.
 
 \begin{figure}[t]
   \vspace*{2mm}
   \begin{center}
-    \includegraphics[width=17cm]{FISOC_structure.pdf}
+    \includegraphics[width=17cm]{FISOC_structure2.pdf}
+%    \includegraphics[width=17cm]{FISOC_structure.pdf}
   \end{center}
   \caption{FISOC code and data structures.}
   \label{fig:codeStruct}

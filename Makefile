@@ -25,7 +25,7 @@ ifneq ($(origin FISOC_ISM), environment)
 endif
 
 ifneq ($(origin FISOC_AM), environment)
- $(error Environment variable FISOC_ISM was not set.)
+ $(error Environment variable FISOC_AM was not set.)
 endif
 
 ifneq ($(origin FISOC_OM), environment)

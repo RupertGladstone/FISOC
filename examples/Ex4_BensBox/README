@@ -1,11 +1,11 @@
 
-Note that example 5 is a variant on example 4 and does not have its own README, instead being summarised here.
+Note that example 5 is a variant on example 4.
 
-Uses one of the userfunctions from Ex1:
+Uses one of the userfunctions from Ex1 which must be copied and compiled:
 cp ../Ex1_LongThinMIS/FISOC_Elmer_geometries.f90 .
 elmerf90 FISOC_Elmer_geometries.f90 -o FISOC_Elmer_geometries.so
 
-Grid creation is similar to Ex1 too, see Ex1 README.
+Grid creation is similar to Ex1 too, see also Ex1 README.
 
 To make the mesh:
 ElmerGrid 1 2 FISOC_Ex4.grd
@@ -13,22 +13,20 @@ ElmerGrid 1 2 FISOC_Ex4.grd
 To partition the mesh for parallel runs (4 partitions):
 ElmerGrid 2 2 FISOC_Ex4 -partition 1 4 0 2
 
-Ex5 (like Ex4 but with grounded section):
-cp ../Ex1_LongThinMIS/FISOC_Elmer_geometries.f90 .
-elmerf90 FISOC_Elmer_geometries.f90 -o FISOC_Elmer_geometries.so
-ElmerGrid 1 2 FISOC_Ex5.grd
-ElmerGrid 2 2 FISOC_Ex5 -partition 1 2 0 2
-ElmerGrid 2 2 FISOC_Ex5 -partition 1 4 0 2
-
 Like in Ex1 you can also make a triangular element mesh for Ex5
 using the .geo file and gmsh (edit lc in the geo file for element 
 size):
-gmsh FISOC_Ex5.geo -1 -2
-ElmerGrid 14 2 FISOC_Ex5.msh 
+gmsh FISOC_Ex4.geo -1 -2
+ElmerGrid 14 2 FISOC_Ex4.msh 
+Of course you need gmsh installed to do this.  Can be partitioned 
+in the same way as the regular quad mesh.
 
 
+*** much of the info below may be out of date (12/12/2017), so stop reading here! ***
 
-TODO:
+TODO: read the info below in case any is useful, then delete.
+
+Old TODO:
 
 fix om hack to set 20m water column depth
 

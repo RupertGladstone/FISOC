@@ -1,0 +1,23 @@
+
+Uses one of the userfunctions from Ex1 which must be copied and compiled:
+cp ../Ex1_LongThinMIS/FISOC_Elmer_geometries.f90 .
+elmerf90 FISOC_Elmer_geometries.f90 -o FISOC_Elmer_geometries.so
+
+Grid creation is similar to Ex1 too, see also Ex1 README.
+
+ElmerGrid 1 2 FISOC_Ex5.grd
+ElmerGrid 2 2 FISOC_Ex5 -partition 1 2 0 2
+ElmerGrid 2 2 FISOC_Ex5 -partition 1 24 0 2
+
+Like in Ex1 you can also make a triangular element mesh for Ex5
+using the .geo file and gmsh (edit lc in the geo file for element 
+size):
+gmsh FISOC_Ex5.geo -1 -2
+ElmerGrid 14 2 FISOC_Ex5.msh 
+Of course you need gmsh installed to do this.  Can be partitioned 
+in the same way as the regular quad mesh.
+
+There is also a .geo file for a refined (near the grounding line) mesh.
+gmsh FISOC_Ex5_RM.geo -1 -2
+Using metis might give a better partitioning in this case.
+ElmerGrid 2 2 FISOC_Ex5_RM -metis 24 4
