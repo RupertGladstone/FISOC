@@ -35,6 +35,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+
     ! extract a list of required ocean variables from the configuration object
     label = 'FISOC_OM_ReqVars:' ! the FISOC names for the vars
     CALL FISOC_getListFromConfig(FISOC_config, label, FISOC_OM_ReqVarList,rc=rc)
