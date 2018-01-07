@@ -157,6 +157,9 @@ CONTAINS
     CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_BodyID, label='ISM_BodyID:', rc=rc)
     UseFootprint = .FALSE.
     IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+       msg = "ISM_BodyID not found, expecting Elmer footprint."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+            line=__LINE__, file=__FILE__, rc=rc)
        UseFootprint = .TRUE.
     ELSEIF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) THEN       
@@ -822,6 +825,9 @@ print*,"Hang on, need to get temperature exchange going too..."
     label = "ISM_ProjVector:"
     CALL FISOC_getListFromConfig(FISOC_config,label,ISM_ProjVector,rc)
     IF  (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+       msg = "ISM_ProjVector not found, assuming downwards."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+            line=__LINE__, file=__FILE__, rc=rc)
        ALLOCATE(ISM_ProjVector(3))
        ISM_ProjVector = (/0.0_dp, 0.0_dp, -1.0_dp/)   
     ELSEIF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
