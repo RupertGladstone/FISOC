@@ -37,6 +37,12 @@ PROGRAM FISOC_main
        line=__LINE__, file=__FILE__)) THEN
      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   END IF
+
+  CALL ESMF_LogSet(flush=.TRUE., rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
   msg = "Initialised ESMF framework"  
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
