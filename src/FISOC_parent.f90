@@ -81,8 +81,8 @@ CONTAINS
        PRINT*,""
        PRINT*,"************************************************************************************"
        PRINT*,"This is a verbose run, set by the verbose_coupling flag in the FISOC_config.rc file."
-       PRINT*,"(this affects only printing to screen, not writing to the log file(s), which occurs "
-       PRINT*,"in any case)"
+       PRINT*,"(this mainly affects printing to screen, but also increases verbosity of the log    "
+       PRINT*,"file(s), and dumping of vtk grid files.                                             "
        PRINT*,"************************************************************************************"
        PRINT*,""
     END IF
