@@ -33,10 +33,10 @@ try:
     copyfile("../../examples/Ex1_LongThinMIS/FISOC_Elmer_geometries.f90", "./FISOC_Elmer_geometries.f90")
 except Exception, e:
     exit(repr(e))
-#try:    
-#    call(["elmerf90","FISOC_Elmer_geometries.f90", "-o FISOC_Elmer_geometries.so"])
-#except Exception, e:
-#    exit(repr(e))
+try:    
+    call(["elmerf90","FISOC_Elmer_geometries.f90", "-o FISOC_Elmer_geometries.so"])
+except Exception, e:
+    exit(repr(e))
 
 print "\nCopy the required example 5 solver input files and mesh files for Elmer/Ice..."
 try:
@@ -73,12 +73,12 @@ try:
     f.close()
 except Exception, e:
     exit(repr(e))
-#try:
-#    f_stdout = open("./FISOC_Ex5a_stdout.asc", "w")
-#    call(["mpirun", "-np", "2", "ElmerSolver"],stdout = f_stdout)
-#    f_stdout.close()
-#except Exception, e:
-#    exit(repr(e))
+try:
+    f_stdout = open("./FISOC_Ex5a_stdout.asc", "w")
+    call(["mpirun", "-np", "2", "ElmerSolver"],stdout = f_stdout)
+    f_stdout.close()
+except Exception, e:
+    exit(repr(e))
 
 print "\nVerify metrics for Ex5a..."
 try:
