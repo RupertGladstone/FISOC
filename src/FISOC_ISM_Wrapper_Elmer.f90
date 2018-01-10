@@ -920,11 +920,11 @@ print*,"change comments about EI vars at top when resolved..."
 
     ALLOCATE(nodeCoords(EI_numNodes*2))
 
-    CALL getNodeCoords(nodeCoords,ElmerMesh,ISM_ProjVector)
+    CALL getNodeCoords(nodeCoords,ElmerMesh,ISM_ProjVector,EI_numNodes)
 
     CALL uniquifyGlobalNodeIDs(nodeIDs_global,nodeCoords,vm)
 
-    CALL locallyOwnedNodes(localPet,EI_NodeIDs)
+    CALL locallyOwnedNodes(localPet)
 
     ! TODO (probably not urgent, maybe not needed at all)
     ! Note that ElmerMesh%ParallelInfo%GlobalDOFs may already contain global unique node ids 
@@ -1185,9 +1185,9 @@ print*,"node ordering to go here if needed..."
 
 
   !------------------------------------------------------------------------------
-  SUBROUTINE locallyOwnedNodes(localPet,EI_NodeIDs)
+  SUBROUTINE locallyOwnedNodes(localPet)
 
-    INTEGER,INTENT(IN) :: localPet,EI_NodeIDs(:)
+    INTEGER,INTENT(IN) :: localPet
     INTEGER :: LON_count, ii
     
     ! How many of the nodes are locally owned?
