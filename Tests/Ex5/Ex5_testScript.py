@@ -141,13 +141,4 @@ try:
 except Exception, e:
     exit(repr(e))
 
-# could also do 5b stand alone Elmer
-# could also test Elmer through FISOC without coupling
-# could also run standard coupled 5b here
-# could also run ROMS stand alone and coupled but without exchange...
-
-# add this script to repo
-# add the ROMS .in filename file to repo
-# add output .dat files to repo and a simple comparison here (mean squares difference or some similar norm)
-
 print "\n"
