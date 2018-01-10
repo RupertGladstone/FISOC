@@ -10,7 +10,7 @@ $gravity = -9.81*yearinsec^2
 $GLTolerance = 1.0e-4
 $name = "BensBoxISM_5b"
 $m = 1.0/3.0
-$dt = 30.0/365.25 ! /864.0 !/86400
+$dt = 3.0/365.25 ! /864.0 !/86400
 
 
 !--------------------------------------------------------
@@ -486,9 +486,23 @@ Solver 16
   Operator 2 = height
 End
 
+Solver 17
+!  Exec Solver = String "never"
+  Exec Solver = "After Timestep"
+  Equation = "SaveMetrics"
+  Procedure = "SaveData" "SaveScalars"
+  Filename = File "metrics_Ex5b.dat"
+  Parallel Reduce = Logical True
+  Variable 1 = Temperature
+  Operator 1 = int
+!  Coefficient 1 = Heat Capacity
+  Variable 2 = Temperature
+  Operator 2 = volume
+End
+
 !--------------------------------------------------------
 Equation 1
-  Active Solvers(10) = 1 3 5 7 8 9 10 13 15 16
+  Active Solvers(11) = 1 3 5 7 8 9 10 13 15 16 17
   Flow Solution Name = String "Flow Solution"
   Convection = Computed
 End

@@ -51,8 +51,8 @@ Simulation
   BDF Order = 1
   Timestep Intervals = 4000
   Timestep Sizes = Real $dt
-  Steady State Min Iterations = 1
-  Steady State Max Iterations = 20	
+  Steady State Min Iterations = 3
+  Steady State Max Iterations = 3
   Output Intervals = 1
   Initialize Dirichlet Conditions = Logical False
   Output File = "$name".result" !"
@@ -265,7 +265,7 @@ Solver 6
   Linear System Direct Method = MUMPS
   Mumps percentage increase working space = Integer 200
   Nonlinear System Max Iterations = 50
-  Nonlinear System Convergence Tolerance  = 1.0e-5
+  Nonlinear System Convergence Tolerance  = 1.0e-4
   Nonlinear System Newton After Iterations = 100
   Nonlinear System Newton After Tolerance = 1.0e-05
   Nonlinear System Relaxation Factor = 0.8
@@ -331,14 +331,14 @@ Solver 9
   Linear System Solver = "Iterative"
   Linear System Iterative Method = "BiCGStab"
   Linear System Max Iterations = 100
-  Linear System Convergence Tolerance = 1.0E-06
+  Linear System Convergence Tolerance = 1.0E-05
   Linear System Abort Not Converged = True
   Linear System Preconditioning = "ILU0"
   Linear System Residual Output = 1
-  Steady State Convergence Tolerance = 1.0E-04
-  Nonlinear System Convergence Tolerance = 1.0E-05
+  Steady State Convergence Tolerance = 1.0E-03
+  Nonlinear System Convergence Tolerance = 1.0E-04
   Nonlinear System Max Iterations = 50
-  Nonlinear System Relaxation Factor = Real 9.999E-01
+  Nonlinear System Relaxation Factor = Real 0.9
   ! uses the contact algorithm (aka Dirichlet algorithm)
   !-----------------------------------------------------
   Apply Dirichlet = Logical True
@@ -464,9 +464,23 @@ Solver 15
   Operator 2 = height
 End
 
+Solver 16
+!  Exec Solver = String "never"
+  Exec Solver = "After Timestep"
+  Equation = "SaveMetrics"
+  Procedure = "SaveData" "SaveScalars"
+  Filename = File "metrics_Ex5a.dat"
+  Parallel Reduce = Logical True
+  Variable 1 = temperature
+  Operator 1 = int
+!  Coefficient 1 = Heat Capacity
+  Variable 2 = temperature
+  Operator 2 = volume
+End
+
 !--------------------------------------------------------
 Equation 1
-  Active Solvers(9) = 1 4 6 7 8 9 12 14 15
+  Active Solvers(10) = 1 4 6 7 8 9 12 14 15 16
   Flow Solution Name = String "Flow Solution"
   Convection = Computed
 End
