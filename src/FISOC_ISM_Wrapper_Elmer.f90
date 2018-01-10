@@ -62,15 +62,20 @@ MODULE FISOC_ISM_Wrapper
   ! for SSA, config should contain something like this
   !   ISM_varNames:       'Zb' 'Zs' 'SSAVelocity'
 
+
+
+
   ! The following mesh related properties are calculated during mesh conversion 
   ! during initialisation, and are needed during variable transfer while 
   ! timestepping.
 
-!***many of these might not need to be module scope, need revising
+  ! EI_NodeIDs contains unique node ids used in transferring ocean field 
+  ! data from esmf fields to Elmer variables
+  INTEGER, ALLOCATABLE :: EI_NodeIDs(:)
 
-  ! How many nodes on the curret PET for the required mesh boundary (typically lower surface)
-  INTEGER  :: EI_numNodes 
-  INTEGER, ALLOCATABLE :: EI_NodeIDs(:), EI_ElementIDs(:), nodeOwners(:)
+! TODO: some of these vars below might not need to be module scope, need revising
+  INTEGER, ALLOCATABLE :: EI_ElementIDs(:)
+  INTEGER, ALLOCATABLE :: nodeOwners(:)
 
   ! This is an array of Elmer node IDs for the current partition that are owned by 
   ! the local pet.  This is needed for mapping Elmer data on to the ESMF mesh.
@@ -662,12 +667,6 @@ CONTAINS
 print*,"Hang on, need to get temperature exchange going too..."
 !             EI_field => VariableGet( CurrentModel % Mesh % Variables, &
 !                  EIname_temperature_l0, UnFoundFatal=.TRUE.)
-!             EI_fieldVals => EI_field % Values
-!             EI_fieldPerm => EI_field % Perm
-!             DO ii = 1,EI_numNodes
-!                EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(EI_firstNodeThisPET+ii-1)
-!                EI_fieldVals(EI_fieldPerm(EI_nodeIds(ii))) = ptr(ii)
-!             END DO
 
           CASE ('OM_turnips')
              msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
@@ -834,6 +833,7 @@ print*,"Hang on, need to get temperature exchange going too..."
     TYPE(mesh_t)                     :: ElmerMesh
     INTEGER                          :: localPet, petCount
     INTEGER                          :: ii, nodeIndex
+    INTEGER                          :: EI_numNodes 
 
     INTEGER,ALLOCATABLE              :: ESMF_elemTypes(:)
     INTEGER,ALLOCATABLE              :: elemConn(:), ElementIDs_global(:)
@@ -1111,11 +1111,12 @@ print*,"change comments about EI vars at top when resolved..."
 
 
   !------------------------------------------------------------------------------
-  SUBROUTINE getNodeCoords(nodeCoords,ElmerMesh,ISM_ProjVector)
+  SUBROUTINE getNodeCoords(nodeCoords,ElmerMesh,ISM_ProjVector,EI_numNodes)
     
     REAL(ESMF_KIND_R8),DIMENSION(:),INTENT(OUT) :: nodeCoords
     TYPE(mesh_t), INTENT(IN)                    :: ElmerMesh
     REAL(ESMF_KIND_R8),DIMENSION(3),INTENT(IN)  :: ISM_ProjVector
+    INTEGER,INTENT(IN)                          :: EI_numNodes 
 
     INTEGER  :: ii, nodeIndex
 
@@ -1674,6 +1675,7 @@ print*,"node ordering to go here if needed..."
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
     INTEGER                          :: numQuadElems, numTriElems, numTotElems
     INTEGER                          :: localPet, petCount, numElems
+    INTEGER                          :: EI_numNodes 
 
 
     rc = ESMF_FAILURE
