@@ -6,6 +6,7 @@ from sys import exit
 import numpy as np
 import os
 
+
 print "\n----------------------------------------------------------------------------------------"
 print "FISOC test script.  Uses example 5."
 print "Runs on 2 procs. Takes a few minutes."
@@ -76,6 +77,7 @@ except Exception, e:
 try:
     f_stdout = open("./FISOC_Ex5a_stdout.asc", "w")
     call(["mpirun", "-np", "2", "ElmerSolver"],stdout = f_stdout)
+#    call(["srun", "ElmerSolver"],stdout = f_stdout)
     f_stdout.close()
 except Exception, e:
     exit(repr(e))
@@ -114,6 +116,7 @@ except Exception, e:
 try:
     f_stdout = open("./FISOC_Ex5b_stdout.asc", "w")
     call(["mpirun", "-np", "2", "FISOC_caller"],stdout = f_stdout)
+#    call(["srun", "FISOC_caller"],stdout = f_stdout)
     f_stdout.close()
 except Exception, e:
     exit(repr(e))
