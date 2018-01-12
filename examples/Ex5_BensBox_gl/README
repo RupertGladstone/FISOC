@@ -21,3 +21,9 @@ There is also a .geo file for a refined (near the grounding line) mesh.
 gmsh FISOC_Ex5_RM.geo -1 -2
 Using metis might give a better partitioning in this case.
 ElmerGrid 2 2 FISOC_Ex5_RM -metis 24 4
+
+ROMS should have been compiled with -DFISOC and the 
+iceshelf2d_toy_gl application.  Copy the ocean_iceshelf2d_toy_gl.in 
+file from the ROMS repository (probably under ROMS/External/) or edit 
+the FISOC_config.rc file to point to it.  You may also need to edit 
+VARNAME in the .in file to give the full path.
