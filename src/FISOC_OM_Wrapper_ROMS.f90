@@ -429,11 +429,15 @@ CONTAINS
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
 
     TYPE(ESMF_FIELD)                      :: ISM_z_l0
-    REAL(ESMF_KIND_R8),POINTER            :: ptr(:,:)
+    REAL(ESMF_KIND_R8),POINTER            :: ISM_z_l0_ptr(:,:)
     INTEGER                               :: ii, jj
     INTEGER                               :: JstrR, JendR, IstrR, IendR
     INTEGER                               :: Jstr, Jend, Istr, Iend
     REAL(ESMF_KIND_R8)                    :: OM_WCmin
+# ifdef ROMS_DSDT
+    TYPE(ESMF_FIELD)                      :: ISM_z_lts
+    REAL(ESMF_KIND_R8),POINTER            :: ISM_z_lts_ptr(:,:)
+# endif
 
     rc = ESMF_FAILURE
 
@@ -453,11 +457,21 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL ESMF_FieldGet(ISM_z_l0, farrayPtr=ptr, rc=rc)
+    CALL ESMF_FieldGet(ISM_z_l0, farrayPtr=ISM_z_l0_ptr, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+# ifdef ROMS_DSDT
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldname='ISM_z_lts', field=ISM_z_lts, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(ISM_z_lts, farrayPtr=ISM_z_lts_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
 
     IstrR=BOUNDS(Ngrids)%IstrR(localPet)
     IendR=BOUNDS(Ngrids)%IendR(localPet)
@@ -472,10 +486,13 @@ CONTAINS
 !    CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
     DO jj = JstrR, JendR
        DO ii = IstrR, IendR
-          IF ( ptr(ii,jj) .GT. OM_WCmin-GRID(Ngrids)%h(ii,jj) ) THEN
-             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nstp) = ptr (ii, jj)
-             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nnew) = ptr (ii, jj)
-             GRID(1) % zice (ii, jj) = ptr (ii, jj)
+# ifdef ROMS_DSDT
+          GRID(1) % sice (ii, jj) = ISM_z_lts_ptr (ii, jj)
+# endif
+          IF ( ISM_z_l0_ptr(ii,jj) .GT. OM_WCmin-GRID(Ngrids)%h(ii,jj) ) THEN
+             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nstp) = ISM_z_l0_ptr (ii, jj)
+             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nnew) = ISM_z_l0_ptr (ii, jj)
+             GRID(1) % zice (ii, jj) = ISM_z_l0_ptr (ii, jj)
           ELSE
              ICESHELFVAR(1) % iceshelf_draft(ii, jj, nstp) = OM_WCmin-GRID(Ngrids)%h(ii,jj)
              ICESHELFVAR(1) % iceshelf_draft(ii, jj, nnew) = OM_WCmin-GRID(Ngrids)%h(ii,jj)
@@ -487,8 +504,13 @@ CONTAINS
 !    CALL set_depth(Ngrids,localPet)
 !check draft is not below bedrock
 
-    IF (ASSOCIATED(ptr)) THEN
-       NULLIFY(ptr)
+# ifdef ROMS_DSDT
+    IF (ASSOCIATED(ISM_z_lts_ptr)) THEN
+       NULLIFY(ISM_z_lts_ptr)
+    END IF
+# endif
+    IF (ASSOCIATED(ISM_z_l0_ptr)) THEN
+       NULLIFY(ISM_z_l0_ptr)
     END IF
     
     msg = "Ocean cavity reset.  Masks may be needed (NYI)"
