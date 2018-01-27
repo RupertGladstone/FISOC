@@ -417,6 +417,8 @@ CONTAINS
   
 
   !------------------------------------------------------------------------------
+  ! Fields that need to be derived before the call to the ISM run method.
+  !
   SUBROUTINE FISOC_ISM_calcDerivedFields_pre(ISM_ExpFB,FISOC_config,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
@@ -460,7 +462,8 @@ CONTAINS
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-       CASE ("ISM_dddt","ISM_dsdt","ISM_dTdz_l0","ISM_z_l0_linterp")
+       CASE ("ISM_dddt","ISM_dsdt","ISM_dTdz_l0","ISM_z_l0_linterp","ISM_z_lts")
+          ! Allow vars that will be derived after the ISM run call
 
        CASE DEFAULT
           msg="ERROR: derived variable name not recognised: "//FISOC_ISM_DerVarList(ii)
@@ -479,6 +482,8 @@ CONTAINS
 
 
   !------------------------------------------------------------------------------
+  ! Fields that need to be derived after the call to the ISM run method.
+  !
   SUBROUTINE FISOC_ISM_calcDerivedFields_post(ISM_ExpFB,FISOC_config,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
@@ -511,6 +516,13 @@ CONTAINS
        SELECT CASE(FISOC_ISM_DerVarList(ii))
 
        CASE ("ISM_z_l0_previous","ISM_z_lts_previous","ISM_z_l0_linterp")
+          ! ignore vars that should have been derived before the ISM run call
+
+       CASE ("ISM_z_lts")
+          CALL ISM_derive_z_lts(ISM_ExpFB,FISOC_config,rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        CASE ("ISM_dddt")
           CALL ISM_derive_dddt(ISM_ExpFB,FISOC_config,rc)
@@ -547,8 +559,62 @@ CONTAINS
 
 
   !------------------------------------------------------------------------------
+  ! If ice thickness and lower surface elevation are available we can calculate 
+  ! the upper surface elevation.
+  SUBROUTINE ISM_derive_z_lts(ISM_ExpFB,FISOC_config,rc)
+    
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    INTEGER, INTENT(OUT),OPTIONAL         :: rc
+    
+    TYPE(ESMF_field)           :: ISM_z_lts, ISM_thick, ISM_z_l0
+    REAL(ESMF_KIND_R8),POINTER :: ISM_z_lts_ptr(:), ISM_thick_ptr(:), &
+         ISM_z_l0_ptr(:)
+
+
+    RC = ESMF_FAILURE
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_lts", field=ISM_z_lts, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_z_lts, localDe=0, farrayPtr=ISM_z_lts_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_thick", field=ISM_thick, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=ISM_thick, localDe=0, farrayPtr=ISM_thick_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ISM_z_lts_ptr = ISM_z_l0_ptr + ISM_thick_ptr
+
+    NULLIFY(ISM_z_lts_ptr)
+    NULLIFY(ISM_z_l0_ptr)
+    NULLIFY(ISM_thick_ptr)
+
+    RC = ESMF_SUCCESS
+
+  END SUBROUTINE ISM_derive_z_lts
+
+
+  !------------------------------------------------------------------------------
   ! Copy current data.  At next timestep this copy will contain "previous" data.
-  !
+  ! TODO: make this generic; should only need one "previous" subroutine
   SUBROUTINE ISM_derive_z_l0_previous(ISM_ExpFB,rc)
 
     TYPE(ESMF_fieldBundle),INTENT(INOUT)            :: ISM_ExpFB

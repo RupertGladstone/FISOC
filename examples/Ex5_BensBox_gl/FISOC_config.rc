@@ -24,12 +24,13 @@
 #  Regrid_method:      ESMF_REGRIDMETHOD_NEAREST_STOD
 
   ISM_configFile:     FISOC_Ex5b.sif
-#  FISOC_ISM_ReqVars:  ISM_temperature_l0 ISM_temperature_l1 ISM_velocity_l0 ISM_z_l0 ISM_z_l1
-#  FISOC_ISM_DerVars:  ISM_z_l0_previous ISM_dTdz_l0 ISM_dddt  
-  FISOC_ISM_ReqVars:  ISM_z_l0 ISM_gmask # ISM_temperature_l0 ISM_temperature_l1
-  FISOC_ISM_DerVars:  ISM_dddt ISM_z_l0_previous # ISM_z_l0_linterp # ISM_dTdz_l0
+  FISOC_ISM_ReqVars:  ISM_z_l0 ISM_thick ISM_gmask 
+  FISOC_ISM_varNames: 'Coordinate 3' Depth groundedmask 
+  FISOC_ISM_DerVars:  ISM_z_lts ISM_z_l0_previous ISM_z_lts_previous ISM_dddt ISM_dsdt 
+
+# ISM_z_l0_linterp # ISM_dTdz_l0
 #  ISM2OM_vars:        
-  ISM2OM_vars:        ISM_dddt # ISM_dTdz_l0 # ISM_z_l0_linterp # 
+  ISM2OM_vars:        ISM_dddt ISM_dsdt # ISM_dTdz_l0 # ISM_z_l0_linterp # 
   ISM2OM_init_vars:   .FALSE.
   ISM_stdoutFile:     ./EI_out
   ISM_gridType:       ESMF_mesh
@@ -46,11 +47,9 @@
   FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0 OM_z_l0 OM_bed
 #  FISOC_OM_DerVars:   
   OM_ReqVars_stagger: CENTER CENTER CENTER CENTER
-#  OM2ISM_vars:        
   OM2ISM_vars:        OM_dBdt_l0
 #  OM2ISM_init_vars:   .FALSE.  NYI
-  OM_initCavityFromISM: .FALSE.
-#  OM_initCavityFromISM: .TRUE.
+  OM_initCavityFromISM: .TRUE.
   OM_gridType:        ESMF_grid
   OM_WCmin:           20.0
   OM2ISM_regrid:      ESMF_REGRIDMETHOD_BILINEAR
