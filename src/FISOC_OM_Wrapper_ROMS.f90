@@ -306,7 +306,7 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     OM_dt_sec_float = REAL(OM_dt_sec,ESMF_KIND_R8)
 
-    WRITE (OM_outputUnit,*) 'FISOC is about to call ROMS run method.'
+    WRITE (OM_outputUnit,*) 'FISOC is about to call ROMS run method, period (sec): ',OM_dt_sec_float
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        msg = "Calling ROMS run method now."
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
