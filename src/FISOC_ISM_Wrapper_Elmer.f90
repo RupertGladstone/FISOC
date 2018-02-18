@@ -401,7 +401,7 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-!    CALL ElmerSolver_finalize()
+    CALL ElmerSolver_finalize()
 
     CLOSE(unit=ISM_outputUnit, ERR=102)
 
