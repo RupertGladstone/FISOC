@@ -110,27 +110,11 @@ CONTAINS
 
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       
-       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_temperature_l0", field=ISM_temperature_l0, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-       CALL ESMF_FieldGet(field=ISM_temperature_l0, localDe=0, farrayPtr=ISM_temperature_l0_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-       PRINT*,"Temperature field size in x direction is ",SIZE(ISM_temperature_l0_ptr(:,1))
-       PRINT*,"Temperature field size in y direction is ",SIZE(ISM_temperature_l0_ptr(1,:))
-       PRINT*,"Show a few rows of data... we originally set the regridding to fill with zeros where source (ISM)"
-       PRINT*,"grid doesn't cover destination (OM) grid."
-       PRINT*,"Row 1 data:  ",ISM_temperature_l0_ptr(1,:)
-       PRINT*,"Row 2 data:  ",ISM_temperature_l0_ptr(2,:)
-       PRINT*,"Row 3 data:  ",ISM_temperature_l0_ptr(3,:)
-       PRINT*,"Row 11 data: ",ISM_temperature_l0_ptr(11,:)
-       PRINT*,""
-       
+      
+      PRINT*,""
+      PRINT*,"See the ROMS wrapper for examples of accessing variables in ESMF structures"
+      PRINT*,""
+      
     END IF
     
   END SUBROUTINE FISOC_OM_Wrapper_Init_Phase2
@@ -150,6 +134,11 @@ CONTAINS
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)
 
     rc_local = ESMF_FAILURE
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -185,42 +174,6 @@ CONTAINS
           PRINT*,"collect OM outputs.  Just run the OM one timestep."
        END IF
 
-    END IF
-
-    ! Lets get pointers to the depth of the ice base and the temperature gradient.  These we 
-    ! get fromthe OM import state, which contains the ISM export fields on the ocean grid.
-    IF (PRESENT(OM_ImpFB)) THEN
-
-       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
-       CALL ESMF_FieldGet(field=ISM_z_l0, localDe=0, farrayPtr=ISM_z_l0_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_dTdz_l0", field=ISM_dTdz_l0, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
-       CALL ESMF_FieldGet(field=ISM_dTdz_l0, localDe=0, farrayPtr=ISM_dTdz_l0_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
-
-    IF (PRESENT(OM_ExpFB)) THEN
-       ! Lets get a pointer to the basal melt rate.  This we get from the OM export field bundle, which 
-       ! contains the OM variables to be exported to the ISM.
-       CALL ESMF_FieldBundleGet(OM_ExpFB, fieldName="OM_dBdt_l0", field=OM_dBdt_l0, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
-       CALL ESMF_FieldGet(field=OM_dBdt_l0, localDe=0, farrayPtr=OM_dBdt_l0_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
     
     rc_local = ESMF_SUCCESS
@@ -278,8 +231,8 @@ CONTAINS
     NULLIFY (coordY,coordX)
 
     ! number of grid points
-    nx = 200  
-    ny = 50 
+    nx = 10  
+    ny = 5 
 
     ! domain size
     Lx = 300000.
