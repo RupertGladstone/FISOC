@@ -5,6 +5,9 @@ TODO: check this file for anything useful then remove from repo.
 
 Summary of FISOC examples
 
+Note that the domain size for ROMS for these examples is typically 
+set in ROMS/Functionals/ana_grid.h
+
 Example 1.  Long thin Marine Ice Sheet.  To be run coupled with the ROMS 
 iceshelf2d case.  To test the coupling in an almost flowline like mode, 
 with no rotation in the ocean.  Same domain as the default FISh setup.

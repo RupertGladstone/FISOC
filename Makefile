@@ -8,12 +8,6 @@
 
 FISOC_EXE ?= FISOC_caller
 SRCDIR = src
-FFLAGS += -fbacktrace -g -O0 -fbounds-check #-Wall
-#FFLAGS += -O0 -g -fbacktrace -fcheck=all # -Wall
-#FFLAGS += -fbacktrace -g -debug -DD  -O0 # -inline-debug-info
-#FFLAGS += -g -check all -fpe0 -warn -traceback -debug extended
-#FFLAGS += -O3 -xHost #-ipo
-
 
 # check for presence of required env vars
 ifneq ($(origin ESMFMKFILE), environment)
@@ -44,38 +38,45 @@ endif
 
 include $(ESMFMKFILE)
 
-$(info )
-$(info ********************************************************************)
-$(info *** Building FISOC, Framework for Ice Sheet Ocean model Coupling ***)
-$(info *** Relevant variables for the build are now listed              ***)
-$(info ********************************************************************)
-$(info )
-$(info FISOC will be installed in [${INSTALL_DIR}])
-$(info )
-$(info ESMFMKFILE        [${ESMFMKFILE}])
-$(info CPPFLAGS          [${CPPFLAGS}])
-$(info )
-$(info FISOC_ISM         [${FISOC_ISM}])
-$(info FISOC_ISM_LIBS    [${FISOC_ISM_LIBS}])
-$(info FISOC_ISM_LIBPATH [${FISOC_ISM_LIBPATH}])
-$(info FISOC_ISM_INCLUDE [${FISOC_ISM_INCLUDE}])
-$(info )
-$(info FISOC_OM          [${FISOC_OM}])
-$(info FISOC_OM_LIBS     [${FISOC_OM_LIBS}])
-$(info FISOC_OM_LIBPATH  [${FISOC_OM_LIBPATH}])
-$(info FISOC_OM_INCLUDE  [${FISOC_OM_INCLUDE}])
-$(info )
-$(info FISOC_AM          [${FISOC_AM}])
-$(info FISOC_AM_LIBS     [${FISOC_AM_LIBS}])
-$(info FISOC_AM_LIBPATH  [${FISOC_AM_LIBPATH}])
-$(info FISOC_AM_INCLUDE  [${FISOC_AM_INCLUDE}])
-$(info )
-
 ################################################################################
 
 .SUFFIXES: .f90
 %.o : %.f90
 	$(ESMF_F90COMPILER) $(FFLAGS) -c $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS) $(ESMF_F90COMPILEFREENOCPP) -I$(FISOC_ISM_INCLUDE)  -I$(FISOC_OM_INCLUDE) $(CPPFLAGS) -cpp  -o $@  $<
+
+info:
+	$(info )
+	$(info ********************************************************************)
+	$(info *** Building FISOC, Framework for Ice Sheet Ocean model Coupling ***)
+	$(info *** Relevant variables for the build are now listed              ***)
+	$(info ********************************************************************)
+	$(info )
+	$(info FISOC will be installed in [${INSTALL_DIR}])
+	$(info FISOC executable will be called [${FISOC_EXE}])
+	$(info )
+	$(info ESMFMKFILE        [${ESMFMKFILE}])
+	$(info CPPFLAGS          [${CPPFLAGS}])
+	$(info FFLAGS            [${FFLAGS}])
+	$(info Additional ESMF Fortran compilation flags)
+	$(info ...               [${ESMF_F90COMPILEOPTS}])
+	$(info Additional ESMF Fortran link flags)
+	$(info ...               [${ESMF_F90LINKOPTS}])
+	$(info )
+	$(info FISOC_ISM         [${FISOC_ISM}])
+	$(info FISOC_ISM_LIBS    [${FISOC_ISM_LIBS}])
+	$(info FISOC_ISM_LIBPATH [${FISOC_ISM_LIBPATH}])
+	$(info FISOC_ISM_INCLUDE [${FISOC_ISM_INCLUDE}])
+	$(info )
+	$(info FISOC_OM          [${FISOC_OM}])
+	$(info FISOC_OM_LIBS     [${FISOC_OM_LIBS}])
+	$(info FISOC_OM_LIBPATH  [${FISOC_OM_LIBPATH}])
+	$(info FISOC_OM_INCLUDE  [${FISOC_OM_INCLUDE}])
+	$(info )
+	$(info FISOC_AM          [${FISOC_AM}])
+	$(info FISOC_AM_LIBS     [${FISOC_AM_LIBS}])
+	$(info FISOC_AM_LIBPATH  [${FISOC_AM_LIBPATH}])
+	$(info FISOC_AM_INCLUDE  [${FISOC_AM_INCLUDE}])
+	$(info )
 
 ################################################################################
 
@@ -94,8 +95,8 @@ $(SRCDIR)/FISOC_utils.o:                    $(SRCDIR)/FISOC_utils.f90
 
 ################################################################################
 
-install: $(FISOC_EXE)
-	cp $(FISOC_EXE) $(INSTALL_DIR)/$(FISOC_EXE)
+install: info $(FISOC_EXE) 
+	cp $(FISOC_EXE) $(INSTALL_DIR)/$(FISOC_EXE) 
 
 .PHONY: clean
 

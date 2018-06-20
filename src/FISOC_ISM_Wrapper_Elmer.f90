@@ -56,21 +56,27 @@ MODULE FISOC_ISM_Wrapper
   CHARACTER(len=ESMF_MAXSTR) :: EIname_temperature_l0 = 'oceanTemperature'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_temperature_l1 = 'oceanTemperature'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_velocity_l0    = 'Velocity'
+  CHARACTER(len=ESMF_MAXSTR) :: EIname_thick          = 'Depth'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_z_l0           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_z_l1           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_z_lts          = 'Coordinate 3'
   ! for SSA, config should contain something like this
   !   ISM_varNames:       'Zb' 'Zs' 'SSAVelocity'
 
+
+
+
   ! The following mesh related properties are calculated during mesh conversion 
   ! during initialisation, and are needed during variable transfer while 
   ! timestepping.
 
-!***many of these might not need to be module scope, need revising
+  ! EI_NodeIDs contains unique node ids used in transferring ocean field 
+  ! data from esmf fields to Elmer variables
+  INTEGER, ALLOCATABLE :: EI_NodeIDs(:)
 
-  ! How many nodes on the curret PET for the required mesh boundary (typically lower surface)
-  INTEGER  :: EI_numNodes 
-  INTEGER, ALLOCATABLE :: EI_NodeIDs(:), EI_ElementIDs(:), nodeOwners(:)
+! TODO: some of these vars below might not need to be module scope, need revising
+  INTEGER, ALLOCATABLE :: EI_ElementIDs(:)
+  INTEGER, ALLOCATABLE :: nodeOwners(:)
 
   ! This is an array of Elmer node IDs for the current partition that are owned by 
   ! the local pet.  This is needed for mapping Elmer data on to the ESMF mesh.
@@ -132,6 +138,22 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       msg = "Initialising Elmer/Ice"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
+
     label = 'FISOC_ISM_ReqVars:'
     CALL FISOC_getListFromConfig(FISOC_config, label, ISM_ReqVarList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -140,33 +162,27 @@ CONTAINS
 
     CALL ElmerSetVarNames(FISOC_config)
 
-    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
     ! FISOC tells Elmer which .sif to use
     CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_configFile_FISOC, label='ISM_configFile:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ISM_configFile_Elmer = ""
+!    ISM_configFile_Elmer = ""
     ISM_configFile_Elmer = ISM_configFile_FISOC 
 
     ! information to get the appropriate surface for the Elmer mesh.
     CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_BodyID, label='ISM_BodyID:', rc=rc)
     UseFootprint = .FALSE.
     IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+       msg = "ISM_BodyID not found, expecting Elmer footprint."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+            line=__LINE__, file=__FILE__, rc=rc)
        UseFootprint = .TRUE.
     ELSEIF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) THEN       
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
-    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
@@ -184,6 +200,12 @@ CONTAINS
     OPEN(unit=ISM_outputUnit, file=ISM_stdoutFile, STATUS='REPLACE', ERR=101)
     MessageUnit = ISM_outputUnit
 
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       msg = "Initialising Elmer/Ice parallel environment"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
+
     CALL Initialise_Elmer_ParEnv(vm,rc=rc)
 
     ! initialise Elmer, and pull out the footprint before extrusion if we don't 
@@ -197,8 +219,18 @@ CONTAINS
 !            inputFileName=ISM_configFile_Elmer) 
 !       CALL Elmer2ESMF_meshFootprint(Elmer_mesh,ISM_mesh,vm,rc=rc)
     ELSE
+       IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+          msg = "Calling Elmer/ice independent initialisation"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+       END IF
        CALL ElmerSolver_init(ParEnvInitialised=.TRUE., &
             inputFileName=ISM_configFile_Elmer) 
+       IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+          msg = "Converting Elmer/Ice mesh to ESMF"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+       END IF
        CALL Elmer2ESMF_mesh(FISOC_config,ISM_BodyID,ISM_mesh,vm,rc=rc)
     END IF
 
@@ -213,6 +245,12 @@ CONTAINS
        END IF
     END IF
 
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       msg = "Initialising Elmer/Ice fields for coupling"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
+
     CALL FISOC_populateFieldBundle(ISM_ReqVarList,ISM_ExpFB,ISM_mesh,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -223,6 +261,12 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       msg = "Initialising Elmer/Ice: first phase complete"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
 
     rc = ESMF_SUCCESS
 
@@ -316,7 +360,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    IF (verbose_coupling) THEN
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
        PRINT*,"******************************************************************************"
        PRINT*,"************        ISM wrapper.  Run method.           **********************"
@@ -357,7 +401,7 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-!    CALL ElmerSolver_finalize()
+    CALL ElmerSolver_finalize()
 
     CLOSE(unit=ISM_outputUnit, ERR=102)
 
@@ -624,12 +668,6 @@ CONTAINS
 print*,"Hang on, need to get temperature exchange going too..."
 !             EI_field => VariableGet( CurrentModel % Mesh % Variables, &
 !                  EIname_temperature_l0, UnFoundFatal=.TRUE.)
-!             EI_fieldVals => EI_field % Values
-!             EI_fieldPerm => EI_field % Perm
-!             DO ii = 1,EI_numNodes
-!                EI_fieldVals(EI_fieldPerm(nodeIds(ii))) = ptr(EI_firstNodeThisPET+ii-1)
-!                EI_fieldVals(EI_fieldPerm(EI_nodeIds(ii))) = ptr(ii)
-!             END DO
 
           CASE ('OM_turnips')
              msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
@@ -726,6 +764,19 @@ print*,"Hang on, need to get temperature exchange going too..."
              END IF
           END DO
           
+       CASE ('ISM_thick')
+          EI_field => VariableGet( CurrentModel % Mesh % Variables, &
+               EIname_thick, UnFoundFatal=.TRUE.)
+          EI_fieldVals => EI_field % Values
+          EI_fieldPerm => EI_field % Perm ! don't need perm for coords
+          DO ii = 1,SIZE(ownedNodeIDs)
+             IF (ASSOCIATED(EI_fieldPerm)) THEN
+                ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
+             ELSE
+                ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
+             END IF
+          END DO
+          
        CASE ('ISM_z_lts')
           EI_field => VariableGet( CurrentModel % Mesh % Variables, &
                EIname_z_lts, UnFoundFatal=.TRUE.)
@@ -791,11 +842,12 @@ print*,"Hang on, need to get temperature exchange going too..."
     TYPE(ESMF_VM),INTENT(IN)         :: vm
     INTEGER,INTENT(OUT),OPTIONAL     :: rc
 
-    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: label
+    CHARACTER(len=ESMF_MAXSTR)       :: label
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: ISM_ProjVector(:)
     TYPE(mesh_t)                     :: ElmerMesh
     INTEGER                          :: localPet, petCount
     INTEGER                          :: ii, nodeIndex
+    INTEGER                          :: EI_numNodes 
 
     INTEGER,ALLOCATABLE              :: ESMF_elemTypes(:)
     INTEGER,ALLOCATABLE              :: elemConn(:), ElementIDs_global(:)
@@ -803,9 +855,6 @@ print*,"Hang on, need to get temperature exchange going too..."
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:)
     INTEGER                          :: numQuadElems, numTriElems, numElems
 
-    msg = "Elmer to ESMF mesh format conversion"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-         line=__LINE__, file=__FILE__)
 
     ! We can access the main Elmer derived types from here.  We assume there is
     ! one mesh in this Elmer simulation.
@@ -822,6 +871,9 @@ print*,"Hang on, need to get temperature exchange going too..."
     label = "ISM_ProjVector:"
     CALL FISOC_getListFromConfig(FISOC_config,label,ISM_ProjVector,rc)
     IF  (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+       msg = "ISM_ProjVector not found, assuming downwards."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+            line=__LINE__, file=__FILE__, rc=rc)
        ALLOCATE(ISM_ProjVector(3))
        ISM_ProjVector = (/0.0_dp, 0.0_dp, -1.0_dp/)   
     ELSEIF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -841,11 +893,9 @@ print*,"Hang on, need to get temperature exchange going too..."
          ELMER_ELEMENT_TRIANGLE_CUBIC/))
     numElems    = numQuadElems+numTriElems
     
-
     ! Some explanation of Nodes variables:
     ! NodeIDs is a unique list of all the Elmer IDs on this partition/body
     ! EI_numNodes is the number of nodes on this partition/body
-
 
     ALLOCATE(elemConn(4*numQuadElems+3*numTriElems))
     ALLOCATE(ESMF_elemTypes(numElems))
@@ -854,7 +904,7 @@ print*,"Hang on, need to get temperature exchange going too..."
 
     ALLOCATE(EI_ElementIDs(numElems))
     ALLOCATE(EI_NodeIDs(4*numQuadElems+3*numTriElems))
-    ! 
+
     CALL findNodesAndElements(ElmerMesh,BodyID, (/ &
          ELMER_ELEMENT_QUADRIL_BILINEAR, ELMER_ELEMENT_QUADRIL_QUADRAT, &
          ELMER_ELEMENT_QUADRIL_QUADRAT2,ELMER_ELEMENT_QUADRIL_CUBIC, &
@@ -867,6 +917,7 @@ print*,"Hang on, need to get temperature exchange going too..."
 
     EI_numNodes = SIZE(EI_NodeIDs)
     ALLOCATE(NodeIDs(EI_numNodes))
+    ALLOCATE(NodeIDs_global(EI_numNodes))
 
 print*,"change comments about EI vars at top when resolved..."
 
@@ -882,11 +933,12 @@ print*,"change comments about EI vars at top when resolved..."
     nodeOwners=localPet
 
     ALLOCATE(nodeCoords(EI_numNodes*2))
-    CALL getNodeCoords(nodeCoords,ElmerMesh,ISM_ProjVector)
+
+    CALL getNodeCoords(nodeCoords,ElmerMesh,ISM_ProjVector,EI_numNodes)
 
     CALL uniquifyGlobalNodeIDs(nodeIDs_global,nodeCoords,vm)
 
-    ownedNodeIDs = locallyOwnedNodes(nodeOwners,localPet,EI_NodeIDs)
+    CALL locallyOwnedNodes(localPet)
 
     ! TODO (probably not urgent, maybe not needed at all)
     ! Note that ElmerMesh%ParallelInfo%GlobalDOFs may already contain global unique node ids 
@@ -908,9 +960,9 @@ print*,"change comments about EI vars at top when resolved..."
 
     CALL CreateArrayMappingRouteHandles(ESMF_ElmerMesh,nodeIDs_global,vm)
 
-    DEALLOCATE(elemConn)
-    DEALLOCATE(nodeIds_global)
-    DEALLOCATE(nodeCoords)
+    IF (ALLOCATED(elemConn)) DEALLOCATE(elemConn)
+    IF (ALLOCATED(nodeIds_global)) DEALLOCATE(nodeIds_global)
+    IF (ALLOCATED(nodeCoords)) DEALLOCATE(nodeCoords)
     
   END SUBROUTINE Elmer2ESMF_mesh
   !------------------------------------------------------------------------------
@@ -997,7 +1049,9 @@ print*,"change comments about EI vars at top when resolved..."
     CALL ESMF_ArrayGet(DummyArr_ESMF,  farrayPtr=ptr_ESMF, rc=rc)
     ptr_Elmer=0.0
     ptr_ESMF=0.0
-
+    IF (ASSOCIATED(ptr_Elmer)) NULLIFY(ptr_Elmer)
+    IF (ASSOCIATED(ptr_ESMF)) NULLIFY(ptr_ESMF)
+    
     ! Create the route handles for later use 
     CALL ESMF_ArrayRedistStore(DummyArr_ESMF, DummyArr_Elmer, &
          RH_ESMF2Elmer, ignoreUnmatchedIndices=.TRUE., rc=rc)
@@ -1071,11 +1125,12 @@ print*,"change comments about EI vars at top when resolved..."
 
 
   !------------------------------------------------------------------------------
-  SUBROUTINE getNodeCoords(nodeCoords,ElmerMesh,ISM_ProjVector)
+  SUBROUTINE getNodeCoords(nodeCoords,ElmerMesh,ISM_ProjVector,EI_numNodes)
     
     REAL(ESMF_KIND_R8),DIMENSION(:),INTENT(OUT) :: nodeCoords
     TYPE(mesh_t), INTENT(IN)                    :: ElmerMesh
     REAL(ESMF_KIND_R8),DIMENSION(3),INTENT(IN)  :: ISM_ProjVector
+    INTEGER,INTENT(IN)                          :: EI_numNodes 
 
     INTEGER  :: ii, nodeIndex
 
@@ -1144,10 +1199,9 @@ print*,"node ordering to go here if needed..."
 
 
   !------------------------------------------------------------------------------
-  FUNCTION locallyOwnedNodes(nodeOwners,localPet,EI_NodeIDs)
+  SUBROUTINE locallyOwnedNodes(localPet)
 
-    INTEGER,DIMENSION(:),ALLOCATABLE ::  locallyOwnedNodes
-    INTEGER,INTENT(IN) :: localPet,nodeOwners(:),EI_NodeIDs(:)
+    INTEGER,INTENT(IN) :: localPet
     INTEGER :: LON_count, ii
     
     ! How many of the nodes are locally owned?
@@ -1157,17 +1211,17 @@ print*,"node ordering to go here if needed..."
           LON_count = LON_count + 1
        END IF
     END DO
-    ALLOCATE(locallyOwnedNodes(LON_count))
+    ALLOCATE(ownedNodeIDs(LON_count))
 
     LON_count = 0
     DO ii = 1,SIZE(EI_NodeIDs)
        IF (nodeOwners(ii).EQ.localPet) THEN
           LON_count = LON_count + 1
-          locallyOwnedNodes(LON_count) = EI_NodeIDs(ii)
+          ownedNodeIDs(LON_count) = EI_NodeIDs(ii)
        END IF
     END DO
 
-  END FUNCTION locallyOwnedNodes
+  END SUBROUTINE locallyOwnedNodes
 
   
   !------------------------------------------------------------------------------
@@ -1257,7 +1311,7 @@ print*,"node ordering to go here if needed..."
     ! Some nodes will occur on multiple elements.  We only want a 
     ! unique list of nodes here.
     CALL  Unique1DArray(NodeIDs_real)
-    DEALLOCATE(EI_NodeIDs)
+    IF (ALLOCATED(EI_NodeIDs))  DEALLOCATE(EI_NodeIDs)
     ALLOCATE(EI_NodeIDs(SIZE(NodeIDs_real)))
     EI_NodeIDs = NINT(NodeIDs_real)
 
@@ -1423,6 +1477,7 @@ print*,"node ordering to go here if needed..."
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(EI_nodeIDs_all_temp(SIZE(EI_nodeIDs_all)))
     EI_nodeIDs_all_temp = EI_nodeIDs_all
 
     CALL FISOC_VMAllGather(vm,nodeOwners,nodeOwners_all,rc=rc)
@@ -1464,7 +1519,7 @@ print*,"node ordering to go here if needed..."
 !                      EI_nodeIDs_all(matching_nodes_indices(ii)) = EI_nodeIDs_all_temp(index_all)
                    END IF
                 END DO matchingNodes
-                DEALLOCATE(matching_nodes_indices)
+                IF (ALLOCATED(matching_nodes_indices)) DEALLOCATE(matching_nodes_indices)
              END IF
           END DO NodesLoop
           nNodes_prevPETs = nNodes_prevPETs + nNodes_PETpp
@@ -1499,13 +1554,13 @@ print*,"node ordering to go here if needed..."
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    DEALLOCATE(sendOffsets)
-    DEALLOCATE(nNodes_arr)
-    DEALLOCATE(IDs_global_all)
-    DEALLOCATE(EI_nodeIDs_all)
-    DEALLOCATE(EI_nodeIDs_all_temp)
-    DEALLOCATE(nodeOwners_all)
-    DEALLOCATE(nodeCoords_all)
+    IF (ALLOCATED(sendOffsets))         DEALLOCATE(sendOffsets)
+    IF (ALLOCATED(nNodes_arr))          DEALLOCATE(nNodes_arr)
+    IF (ALLOCATED(IDs_global_all))      DEALLOCATE(IDs_global_all)
+    IF (ALLOCATED(EI_nodeIDs_all))      DEALLOCATE(EI_nodeIDs_all)
+    IF (ALLOCATED(EI_nodeIDs_all_temp)) DEALLOCATE(EI_nodeIDs_all_temp)
+    IF (ALLOCATED(nodeOwners_all))      DEALLOCATE(nodeOwners_all)
+    IF (ALLOCATED(nodeCoords_all))      DEALLOCATE(nodeCoords_all)
 
   END SUBROUTINE uniquifyGlobalNodeIDs
 
@@ -1573,9 +1628,9 @@ print*,"node ordering to go here if needed..."
     
     firstItemThisPET = firstItemID(localPET+1)
 
-    DEALLOCATE(firstItemID)
-    DEALLOCATE(numItemsAllPETS)
-    DEALLOCATE(numItemsArr)
+    IF (ALLOCATED(firstItemID))     DEALLOCATE(firstItemID)
+    IF (ALLOCATED(numItemsAllPETS)) DEALLOCATE(numItemsAllPETS)
+    IF (ALLOCATED(numItemsArr))     DEALLOCATE(numItemsArr)
 
   END FUNCTION firstItemThisPET
 
@@ -1628,12 +1683,13 @@ print*,"node ordering to go here if needed..."
     INTEGER,INTENT(OUT),OPTIONAL     :: rc
 
     INTEGER                          :: ii, nodeIndex
-    CHARACTER(len=ESMF_MAXSTR)       :: subroutineName = "Elmer2ESMF_meshFoorprint"
+    CHARACTER(len=ESMF_MAXSTR)       :: subroutineName = "Elmer2ESMF_meshFootprint"
     INTEGER,ALLOCATABLE              :: ESMF_elementTypeList(:),elementIDlist(:),elementIDlist_global(:)
     INTEGER,ALLOCATABLE              :: elemConn(:), nodeIds(:), nodeIds_global(:)
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
     INTEGER                          :: numQuadElems, numTriElems, numTotElems
     INTEGER                          :: localPet, petCount, numElems
+    INTEGER                          :: EI_numNodes 
 
 
     rc = ESMF_FAILURE
@@ -1746,13 +1802,13 @@ print*,"node ordering to go here if needed..."
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    DEALLOCATE(ESMF_elementTypeList)
-    DEALLOCATE(elementIDlist)
-    DEALLOCATE(elementIDlist_global)
-    DEALLOCATE(elemConn)
-    DEALLOCATE(nodeIds)
-    DEALLOCATE(nodeIds_global)
-    DEALLOCATE(nodeCoords)
+    IF (ALLOCATED(ESMF_elementTypeList)) DEALLOCATE(ESMF_elementTypeList)
+    IF (ALLOCATED(elementIDlist)) DEALLOCATE(elementIDlist)
+    IF (ALLOCATED(elementIDlist_global)) DEALLOCATE(elementIDlist_global)
+    IF (ALLOCATED(elemConn)) DEALLOCATE(elemConn)
+    IF (ALLOCATED(nodeIds)) DEALLOCATE(nodeIds)
+    IF (ALLOCATED(nodeIds_global)) DEALLOCATE(nodeIds_global)
+    IF (ALLOCATED(nodeCoords)) DEALLOCATE(nodeCoords)
 
     rc = ESMF_SUCCESS
  
