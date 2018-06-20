@@ -1,0 +1,55 @@
+### Example FISOC_config.rc file. Uncommented lines are required entries. ###
+### Stefanie Mack 2018-05-21                                              ###
+
+
+### ISM options ###
+#  ISM_configFile:         ISM.sif
+#  ISM_stdoutFile:         ISM.out
+  FISOC_ISM_ReqVars:      ISM_z_l0
+#  ISM_varNames:           IceShelfDraft
+  FISOC_ISM_DerVars:      ISM_z_l0_previous
+  ISM_gridType:           ESMF_mesh
+#  ISM2OM_vars:            h
+#  ISM2OM_init_vars:       .TRUE.
+#  ISM2OM_regrid:          ESMF_REGRIDMETHOD_BILINEAR
+
+
+### OM options ###
+#  OM_configFile:          ocean_iceshelf2d.in
+#  OM_stdoutFile:          ROMS.out
+  FISOC_OM_ReqVars:       OM_dBdt_l0 OM_temperature_l0
+#  OM_ReqVars_stagger: 
+  FISOC_OM_DerVars:  
+  OM_gridType:
+#  OM2ISM_vars:
+#  OM2ISM_init_vars:
+#  OM2ISM_regrid:
+#  OM_initCavityFromISM:   .FALSE.
+#  OM_cavityUpdate:        Rate
+#  OM_WCmin:               10
+#  OM_cavCorr:             0.2
+#  OM_outputInterval:      1
+
+
+### NETCDF output options ###
+#  OM_writeNetcdf:         .TRUE.
+#  output_dir:             $HOME/Simulations/Output/
+#  OM_NCfreq:              "all"
+
+
+### Timestepping options ###
+  OM_dt_sec:              600
+  dt_ratio:               100
+  start_year:             2010
+  start_month:            9
+  end_year:               2012
+  end_month:              2
+#  runLength_ISM_steps:    10000
+
+
+### General options ###
+  verbose_coupling:       .TRUE.
+
+### Variable definitions and possible values ###
+### To be completed later ###
+

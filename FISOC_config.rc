@@ -1,0 +1,55 @@
+### Dummy-dummy FISOC_config.rc file. Uncommented lines are required entries. ###
+### Modified by Stefanie Mack, 2018-05-21                                     ###
+
+
+### ISM options ###
+#  ISM_configFile:         ISM.sif
+#  ISM_stdoutFile:         ISM.out
+  FISOC_ISM_ReqVars:      ISM_z_l0
+#  ISM_varNames:           IceShelfDraft
+  FISOC_ISM_DerVars:      ISM_z_l0_previous
+  ISM_gridType:           ESMF_mesh
+  ISM2OM_vars:            ISM_z_l0
+  ISM2OM_init_vars:       .FALSE.
+  ISM2OM_regrid:          ESMF_REGRIDMETHOD_NEAREST_STOD
+
+
+### OM options ###
+  OM_configFile:          /home1/slmack/ROMSIceShelf_devel/ROMS/External/ocean_isomip_plus_sm.in
+  OM_stdoutFile:          ROMS.out
+  FISOC_OM_ReqVars:       OM_dBdt_l0 OM_temperature_l0 OM_z_l0 OM_bed
+  OM_ReqVars_stagger:     CENTER CENTER CENTER CENTER
+#  FISOC_OM_DerVars:       OM_dBdt_l0
+  OM_gridType:            ESMF_grid
+  OM2ISM_vars:            OM_dBdt_l0
+#  OM2ISM_init_vars:
+  OM2ISM_regrid:          ESMF_REGRIDMETHOD_BILINEAR
+  OM_initCavityFromISM:   .FALSE.
+  OM_cavityUpdate:        RecentIce
+  OM_WCmin:               0.0
+#  OM_cavCorr:             0.2
+  OM_outputInterval:      1
+
+
+### NETCDF output options ###
+  OM_writeNetcdf:         .FALSE.
+  output_dir:             $HOME/FISOC
+  OM_NCfreq:              all
+
+
+### Timestepping options ###
+  OM_dt_sec:              1200
+  dt_ratio:               1
+  start_year:             1
+  start_month:            1
+  end_year:               100
+  end_month:              1
+#  runLength_ISM_steps:    10000
+
+
+### General options ###
+  verbose_coupling:       .TRUE.
+
+### Variable definitions and possible values ###
+### To be completed later ###
+
