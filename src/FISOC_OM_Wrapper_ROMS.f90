@@ -72,23 +72,24 @@ CONTAINS
 
     first = .TRUE.
 
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     CALL ESMF_ConfigGetAttribute(FISOC_config, OM_stdoutFile, label='OM_stdoutFile:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    WRITE (OM_stdoutFile, "(a,I0)") TRIM(OM_stdoutFile), localPet
     OPEN(unit=OM_outputUnit, file=OM_stdoutFile, STATUS='REPLACE', ERR=101)
-    
+
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, OM_configFile, label='OM_configFile:', rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -106,9 +107,11 @@ CONTAINS
        PRINT*,""
     END IF
 
-! TODO: add check that ROMS in file exists?  Else ROMS can seg fault
+! TODO: add check that ROMS .in file exists?  Else ROMS can seg fault
 
-    WRITE (OM_outputUnit,*) 'FISOC is about to call ROMS init method.'
+    IF (localPet.EQ.0) THEN
+       WRITE (OM_outputUnit,*) 'FISOC is about to call ROMS init method.'
+    END IF
     IF (mpic.EQ.FISOC_mpic_missing) THEN
        msg = "ERROR: not currently configured for serial ROMS simulations"
        ! TODO: check whether ROMS needs a dummy mpic in serial configuration
@@ -128,8 +131,10 @@ CONTAINS
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
     END IF
-    WRITE (OM_outputUnit,*) 'FISOC has just called ROMS init method.'
-    
+    IF (localPet.EQ.0) THEN
+       WRITE (OM_outputUnit,*) 'FISOC has just called ROMS init method.'
+    END IF
+
     ! extract a list of required ocean variables from the configuration object
     label = 'FISOC_OM_ReqVars:' ! the FISOC names for the vars
     CALL FISOC_getListFromConfig(FISOC_config, label, OM_ReqVarList,rc=rc)
@@ -300,12 +305,16 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     OM_dt_sec_float = REAL(OM_dt_sec,ESMF_KIND_R8)
 
-    WRITE (OM_outputUnit,*) 'FISOC is about to call ROMS run method.'
+    IF (localPet.EQ.0) THEN
+       WRITE (OM_outputUnit,*) 'FISOC is about to call ROMS run method.'
+    END IF
     CALL ESMF_VMBarrier(vm, rc=rc)
     CALL ROMS_run(OM_dt_sec_float)
     CALL ESMF_VMBarrier(vm, rc=rc)
-    WRITE (OM_outputUnit,*) 'FISOC has just called ROMS run method.'
-    
+    IF (localPet.EQ.0) THEN
+       WRITE (OM_outputUnit,*) 'FISOC has just called ROMS run method.'
+    END IF
+
     IF (exit_flag.NE.NoError) THEN
        WRITE (msg, "(A,I0,A)") "ERROR: ROMS has returned non-safe exit_flag=", &
             exit_flag,", see ROMS mod_scalars.f90 for exit flag meanings."
@@ -385,9 +394,15 @@ CONTAINS
        PRINT*,"OM finalise method."
     END IF
 
+    IF (localPet.EQ.0) THEN
+       WRITE (OM_outputUnit,*) 'FISOC is about to call ROMS finalize.'
+    END IF
     CALL ROMS_finalize
+    IF (localPet.EQ.0) THEN
+       WRITE (OM_outputUnit,*) 'FISOC has just called ROMS finalize.'
+    END IF
 
-    CLOSE(unit=OM_outputUnit, ERR=102)
+!    CLOSE(unit=OM_outputUnit, ERR=102)
 
     rc = ESMF_SUCCESS
 
