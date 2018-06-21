@@ -1,0 +1,49 @@
+ #
+ # This example FISOC_config file can be used to test the FISOC dummy wrappers, as a 
+ # partial test of the buld process.
+ #
+ # This is "Resource File" (.rc file), a type of configuration file, for use with ESMF.  
+ # This .rc file contains configuration information for FISOC.
+ #
+ # Syntax:
+ # It contains a list of <label,value> pairs.
+ # The colon after the label is required. 
+ # 
+
+  ISM_configFile:     dummy
+  FISOC_ISM_ReqVars:  ISM_dddt # ISM_z_l0
+  FISOC_ISM_DerVars:  #ISM_z_l0_previous ISM_dddt 
+  ISM2OM_vars:        ISM_dddt
+  ISM_stdoutFile:     EI_out
+  ISM_gridType:       ESMF_mesh
+  ISM2OM_init_vars:   .FALSE.
+  ISM2OM_regrid:      ESMF_REGRIDMETHOD_NEAREST_STOD
+
+  OM_configFile:      dummy
+  OM_stdoutFile:      ./ROMS_stdout.asc
+  OM_writeNetcdf:     .FALSE.
+  OM_NCfreq:          all
+  output_dir:         output
+
+  FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0 OM_z_l0 OM_bed
+  OM_ReqVars_stagger: CENTER CENTER CENTER CENTER
+  OM2ISM_vars:        
+  OM_initCavityFromISM: .FALSE.
+  OM_gridType:        ESMF_grid
+  OM_cavityUpdate:    Rate
+  OM_WCmin:           20.0
+  OM_CavCorr:         0.1
+
+  OM_dt_sec:          2000
+  dt_ratio:           1
+
+  start_year:	      1
+  start_month:        1
+#  end_year:           1
+#  end_month:          2
+  runLength_ISM_steps: 10
+
+#  verbose_coupling:   .FALSE.
+  verbose_coupling:   .TRUE.
+
+

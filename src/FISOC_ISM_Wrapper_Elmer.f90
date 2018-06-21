@@ -59,6 +59,7 @@ MODULE FISOC_ISM_Wrapper
   CHARACTER(len=ESMF_MAXSTR) :: EIname_temperature_l0 = 'oceanTemperature'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_temperature_l1 = 'oceanTemperature'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_velocity_l0    = 'Velocity'
+  CHARACTER(len=ESMF_MAXSTR) :: EIname_thick          = 'Depth'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_z_l0           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_z_l1           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_z_lts          = 'Coordinate 3'
@@ -358,7 +359,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    IF (verbose_coupling) THEN
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
        PRINT*,"******************************************************************************"
        PRINT*,"************        ISM wrapper.  Run method.           **********************"
@@ -399,7 +400,7 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-!    CALL ElmerSolver_finalize()
+    CALL ElmerSolver_finalize()
 
     CLOSE(unit=ISM_outputUnit, ERR=102)
 
@@ -752,6 +753,19 @@ print*,"Hang on, need to get temperature exchange going too..."
        CASE ('ISM_z_l0')
           EI_field => VariableGet( CurrentModel % Mesh % Variables, &
                EIname_z_l0, UnFoundFatal=.TRUE.)
+          EI_fieldVals => EI_field % Values
+          EI_fieldPerm => EI_field % Perm ! don't need perm for coords
+          DO ii = 1,SIZE(ownedNodeIDs)
+             IF (ASSOCIATED(EI_fieldPerm)) THEN
+                ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
+             ELSE
+                ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
+             END IF
+          END DO
+          
+       CASE ('ISM_thick')
+          EI_field => VariableGet( CurrentModel % Mesh % Variables, &
+               EIname_thick, UnFoundFatal=.TRUE.)
           EI_fieldVals => EI_field % Values
           EI_fieldPerm => EI_field % Perm ! don't need perm for coords
           DO ii = 1,SIZE(ownedNodeIDs)
