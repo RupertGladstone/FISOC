@@ -847,7 +847,7 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ConfigDerivedAttributeInteger(FISOC_config, derivedAttribute, label,rc)
+  RECURSIVE SUBROUTINE FISOC_ConfigDerivedAttributeInteger(FISOC_config, derivedAttribute, label,rc)
     
     CHARACTER(len=*),INTENT(IN)           :: label
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
