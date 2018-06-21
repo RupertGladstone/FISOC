@@ -48,9 +48,12 @@ MODULE FISOC_ISM_Wrapper
   REAL(ESMF_KIND_R8), PARAMETER :: Elmer_secpyr = 365.25_dp*24.0_dp*60.0_dp*60.0_dp
 
   ! These variable names should be given in the ISM_varNames list in the FISOC 
-  ! inpupt file.  If omitted, defaults are given here.
-  ! The user must ensure the names correspond to Elmer variable names.
+  ! config file.  If omitted, defaults are given here.  In either case the user 
+  ! must ensure these names correspond to Elmer variable names.
   ! TODO: is this information in the manual?
+  ! For Elmer SSA runs, FISOC config should contain something like this:
+  !  FISOC_ISM_ReqVars:  ISM_z_l0 ISM_z_lts 
+  !  ISM_varNames:       'Zb' 'Zs'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_gmask          = 'groundedmask'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_dBdt_l0        = 'meltRate'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_temperature_l0 = 'oceanTemperature'
@@ -60,11 +63,7 @@ MODULE FISOC_ISM_Wrapper
   CHARACTER(len=ESMF_MAXSTR) :: EIname_z_l0           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_z_l1           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR) :: EIname_z_lts          = 'Coordinate 3'
-  ! for SSA, config should contain something like this
-  !   ISM_varNames:       'Zb' 'Zs' 'SSAVelocity'
-
-
-
+  CHARACTER(len=ESMF_MAXSTR) :: EIname_H_l0           = 'depth'
 
   ! The following mesh related properties are calculated during mesh conversion 
   ! during initialisation, and are needed during variable transfer while 
@@ -401,7 +400,7 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-!    CALL ElmerSolver_finalize()
+    CALL ElmerSolver_finalize()
 
     CLOSE(unit=ISM_outputUnit, ERR=102)
 

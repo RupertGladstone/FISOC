@@ -443,9 +443,9 @@ CONTAINS
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
-    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_outputInterval, label='OM_outputInterval:', rc=rc)
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_outputInterval, label='OM_outputInterval', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
+         line=__LINE__, file=__FILE__, rcToReturn=rc)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     IF (MOD(dt_ratio,OM_outputInterval).NE.0) THEN
@@ -691,7 +691,7 @@ CONTAINS
     rc = ESMF_FAILURE
 
     ! get number of cumulator steps: ts_ratio / OM_outputInterval
-    CALL FISOC_ConfigDerivedAttributeInteger(FISOC_config, OM_cum_steps, 'OM_cum_steps', rc=rc)
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_cum_steps, 'OM_cum_steps', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -847,7 +847,7 @@ CONTAINS
 
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ConfigDerivedAttributeInteger(FISOC_config, derivedAttribute, label,rc)
+  RECURSIVE SUBROUTINE FISOC_ConfigDerivedAttributeInteger(FISOC_config, derivedAttribute, label,rc)
     
     CHARACTER(len=*),INTENT(IN)           :: label
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
@@ -861,27 +861,39 @@ CONTAINS
     SELECT CASE(label)
 
     CASE('ISM_dt_sec')
-       CALL ESMF_ConfigGetAttribute(FISOC_config, dt_ratio, label='dt_ratio:', rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__, rcToReturn=rc)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       CALL ESMF_ConfigGetAttribute(FISOC_config, OM_dt_sec, label='OM_dt_sec:', rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__, rcToReturn=rc)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       derivedAttribute = OM_dt_sec * dt_ratio
+      CALL ESMF_ConfigGetAttribute(FISOC_config, dt_ratio, label='dt_ratio:', rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      CALL ESMF_ConfigGetAttribute(FISOC_config, OM_dt_sec, label='OM_dt_sec:', rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      derivedAttribute = OM_dt_sec * dt_ratio
+    CASE('OM_outputInterval')
+      CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_outputInterval:', rc=rc)
+      IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+        derivedAttribute = 1
+        msg = "WARNING: OM_outputInterval not found, setting to 1."
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__)
+      ELSE
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      END IF
     CASE('OM_cum_steps')
        CALL ESMF_ConfigGetAttribute(FISOC_config, dt_ratio, label='dt_ratio:', rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__, rcToReturn=rc)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       CALL ESMF_ConfigGetAttribute(FISOC_config, OM_outputInterval, label='OM_outputInterval:', rc=rc)
+       CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_outputInterval, label='OM_outputInterval', rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__, rcToReturn=rc)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        derivedAttribute = dt_ratio / OM_outputInterval
     CASE DEFAULT
-       msg = 'ERROR: unrecognised derived config attribute label '
+       msg = 'ERROR: unrecognised derived config attribute label '//label
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)

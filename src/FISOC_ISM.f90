@@ -129,13 +129,14 @@ CONTAINS
 
 
     ! Calculate values for derived variables from the model-specific ISM vars.
-    CALL FISOC_ISM_calcDerivedFields(ISM_ExpFB,FISOC_config,rc)
+    CALL FISOC_ISM_calcDerivedFields(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! we only add the fields to the import state as a way of letting the coupler get hold of the 
-    ! grid.  There must be a better way to do this.
+    ! grid.  There must be a better way to do this. 
+    ! [edit: there is now, see email from Gerhard Theurich]
     CALL ESMF_StateAdd(ISM_ImpSt, (/ISM_ExpFB/), rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -241,7 +242,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     
-    CALL FISOC_ISM_calcDerivedFields_pre(ISM_ExpFB,FISOC_config,rc)
+    CALL FISOC_ISM_calcDerivedFields_pre(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
@@ -252,7 +253,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     
-    CALL FISOC_ISM_calcDerivedFields_post(ISM_ExpFB,FISOC_config,rc)
+    CALL FISOC_ISM_calcDerivedFields_post(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
@@ -403,14 +404,15 @@ CONTAINS
 
 
   !------------------------------------------------------------------------------
-  SUBROUTINE FISOC_ISM_calcDerivedFields(ISM_ExpFB,FISOC_config,rc)
+  SUBROUTINE FISOC_ISM_calcDerivedFields(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    TYPE(ESMF_clock),INTENT(IN)            :: FISOC_clock
     INTEGER, INTENT(OUT),OPTIONAL          :: rc
     
-    CALL FISOC_ISM_calcDerivedFields_pre(ISM_ExpFB,FISOC_config,rc)
-    CALL FISOC_ISM_calcDerivedFields_post(ISM_ExpFB,FISOC_config,rc)
+    CALL FISOC_ISM_calcDerivedFields_pre(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
+    CALL FISOC_ISM_calcDerivedFields_post(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
 
   END SUBROUTINE FISOC_ISM_calcDerivedFields
 
@@ -419,10 +421,11 @@ CONTAINS
   !------------------------------------------------------------------------------
   ! Fields that need to be derived before the call to the ISM run method.
   !
-  SUBROUTINE FISOC_ISM_calcDerivedFields_pre(ISM_ExpFB,FISOC_config,rc)
+  SUBROUTINE FISOC_ISM_calcDerivedFields_pre(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    TYPE(ESMF_clock),INTENT(IN)            :: FISOC_clock
     INTEGER, INTENT(OUT),OPTIONAL          :: rc
 
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: FISOC_ISM_DerVarList(:),FISOC_ISM_ReqVarList(:)
@@ -451,13 +454,15 @@ CONTAINS
        SELECT CASE(FISOC_ISM_DerVarList(ii))
 
        CASE ("ISM_z_l0_previous")
-          CALL ISM_derive_z_l0_previous(ISM_ExpFB,rc)
+!          CALL ISM_derive_z_l0_previous(ISM_ExpFB,rc)
+          CALL ISM_derive_previous("ISM_z_l0", "ISM_z_l0_previous",ISM_ExpFB,rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        CASE ("ISM_z_lts_previous")
-          CALL ISM_derive_z_lts_previous(ISM_ExpFB,rc)
+!          CALL ISM_derive_z_lts_previous(ISM_ExpFB,rc)
+          CALL ISM_derive_previous("ISM_z_lts", "ISM_z_lts_previous",ISM_ExpFB,rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -484,10 +489,11 @@ CONTAINS
   !------------------------------------------------------------------------------
   ! Fields that need to be derived after the call to the ISM run method.
   !
-  SUBROUTINE FISOC_ISM_calcDerivedFields_post(ISM_ExpFB,FISOC_config,rc)
+  SUBROUTINE FISOC_ISM_calcDerivedFields_post(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    TYPE(ESMF_clock),INTENT(IN)            :: FISOC_clock
     INTEGER, INTENT(OUT),OPTIONAL          :: rc
 
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: FISOC_ISM_DerVarList(:),FISOC_ISM_ReqVarList(:)
@@ -515,6 +521,7 @@ CONTAINS
 
        SELECT CASE(FISOC_ISM_DerVarList(ii))
 
+          ! These are handled elsewhere, hence the empty case
        CASE ("ISM_z_l0_previous","ISM_z_lts_previous","ISM_z_l0_linterp")
           ! ignore vars that should have been derived before the ISM run call
 
@@ -524,14 +531,24 @@ CONTAINS
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+!       CASE ("ISM_z_lts")
+          ! Needed if we have only ice thikness and lower surface height 
+          ! from the ice sheet model.
+!          CALL ISM_derive_z_lts(ISM_ExpFB,FISOC_config,rc)
+!          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!               line=__LINE__, file=__FILE__)) &
+!               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
        CASE ("ISM_dddt")
-          CALL ISM_derive_dddt(ISM_ExpFB,FISOC_config,rc)
+!          CALL ISM_derive_rate("ISM_z_l0","ISM_z_l0_previous",  &
+!               "ISM_dddt",ISM_ExpFB,FISOC_config,rc)
+          CALL ISM_derive_dddt(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        CASE ("ISM_dsdt")
-          CALL ISM_derive_dsdt(ISM_ExpFB,FISOC_config,rc)
+          CALL ISM_derive_dsdt(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -614,7 +631,39 @@ CONTAINS
 
   !------------------------------------------------------------------------------
   ! Copy current data.  At next timestep this copy will contain "previous" data.
-  ! TODO: make this generic; should only need one "previous" subroutine
+  !
+  SUBROUTINE ISM_derive_previous(varName,varName_previous,ISM_ExpFB,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
+    INTEGER, INTENT(OUT),OPTIONAL         :: rc
+    CHARACTER(len=*),INTENT(IN)           :: varName,varName_previous
+
+    TYPE(ESMF_field)           :: var, var_previous
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName=TRIM(varName), field=var, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName=TRIM(varName_previous), field=var_previous, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_FieldCopy(var_previous, var, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    RC = ESMF_SUCCESS
+
+  END SUBROUTINE ISM_derive_previous
+
+
+  !------------------------------------------------------------------------------
+  ! Copy current data.  At next timestep this copy will contain "previous" data.
+  !
+  ! TODO: remove this once the generic routine derive_previous is tested
   SUBROUTINE ISM_derive_z_l0_previous(ISM_ExpFB,rc)
 
     TYPE(ESMF_fieldBundle),INTENT(INOUT)            :: ISM_ExpFB
@@ -622,36 +671,21 @@ CONTAINS
 
     TYPE(ESMF_field)           :: ISM_z_l0
     TYPE(ESMF_field)           :: ISM_z_l0_previous
-    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:) 
-    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_previous_ptr(:) 
 
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!    CALL ESMF_FieldGet(field=ISM_z_l0, farrayPtr=ISM_z_l0_ptr, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0_previous", field=ISM_z_l0_previous, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!    CALL ESMF_FieldGet(field=ISM_z_l0_previous, localDe=0, farrayPtr=ISM_z_l0_previous_ptr, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     CALL ESMF_FieldCopy(ISM_z_l0_previous, ISM_z_l0, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-!    ISM_z_l0_previous_ptr = ISM_z_l0_ptr
-
-!    NULLIFY(ISM_z_l0_previous_ptr)
-!    NULLIFY(ISM_z_l0_ptr)
 
     RC = ESMF_SUCCESS
 
@@ -699,11 +733,12 @@ CONTAINS
   ! dsdt, short for ds/dt, is the rate of change of upper ice surface with time, 
   ! for use by ocean model.
   !
-  SUBROUTINE ISM_derive_dsdt(ISM_ExpFB,FISOC_config,rc)
+  SUBROUTINE ISM_derive_dsdt(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
 
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
-    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    INTEGER, INTENT(OUT),OPTIONAL         :: rc
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
+    TYPE(ESMF_clock),INTENT(IN)            :: FISOC_clock
+    INTEGER, INTENT(OUT),OPTIONAL          :: rc
 
     INTEGER                :: rank
     
@@ -719,13 +754,13 @@ CONTAINS
     SELECT CASE (rank)
 
     CASE(1)
-       CALL  ISM_derive_dsdt_1D(ISM_ExpFB,FISOC_config,rc=rc)
+       CALL  ISM_derive_dsdt_1D(ISM_ExpFB,FISOC_config,FISOC_clock,rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        
     CASE(2)
-       CALL  ISM_derive_dsdt_2D(ISM_ExpFB,FISOC_config,rc=rc)
+       CALL  ISM_derive_dsdt_2D(ISM_ExpFB,FISOC_config,FISOC_clock,rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -743,11 +778,12 @@ CONTAINS
 
   
   !------------------------------------------------------------------------------
-  SUBROUTINE ISM_derive_dsdt_1D(ISM_ExpFB,FISOC_config,rc)
+  SUBROUTINE ISM_derive_dsdt_1D(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
     
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
-    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    INTEGER, INTENT(OUT),OPTIONAL         :: rc
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
+    TYPE(ESMF_clock),INTENT(IN)            :: FISOC_clock
+    INTEGER, INTENT(OUT),OPTIONAL          :: rc
     
     TYPE(ESMF_field)           :: ISM_z_lts
     TYPE(ESMF_field)           :: ISM_z_lts_previous
@@ -757,6 +793,7 @@ CONTAINS
     REAL(ESMF_KIND_R8),POINTER :: ISM_dsdt_ptr(:) 
     REAL(ESMF_KIND_R8)         :: ISM_dt
     INTEGER                    :: ISM_dt_int
+    INTEGER(ESMF_KIND_I8)      :: advancecount
 
     RC = ESMF_FAILURE
 
@@ -796,7 +833,11 @@ CONTAINS
     ISM_dsdt_ptr = (ISM_z_lts_ptr - ISM_z_lts_previous_ptr) / ISM_dt
 
     ! first time we set it to zero
-    WHERE (ISM_z_lts_previous_ptr .EQ. 0.0) ISM_dsdt_ptr = 0.0
+    CALL ESMF_ClockGet(FISOC_clock, advanceCount=advanceCount, rc=rc)
+    IF (advanceCount.LE.1) THEN
+       ISM_dsdt_ptr = 0.0
+    END IF
+!    WHERE (ISM_z_lts_previous_ptr .EQ. 0.0) ISM_dsdt_ptr = 0.0
 
     NULLIFY(ISM_z_lts_previous_ptr)
     NULLIFY(ISM_z_lts_ptr)
@@ -808,11 +849,12 @@ CONTAINS
 
 
   !------------------------------------------------------------------------------
-  SUBROUTINE ISM_derive_dsdt_2D(ISM_ExpFB,FISOC_config,rc)
+  SUBROUTINE ISM_derive_dsdt_2D(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
     
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
-    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    INTEGER, INTENT(OUT),OPTIONAL         :: rc
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
+    TYPE(ESMF_clock),INTENT(IN)            :: FISOC_clock
+    INTEGER, INTENT(OUT),OPTIONAL          :: rc
     
     TYPE(ESMF_field)           :: ISM_z_lts
     TYPE(ESMF_field)           :: ISM_z_lts_previous
@@ -822,6 +864,7 @@ CONTAINS
     REAL(ESMF_KIND_R8),POINTER :: ISM_dsdt_ptr(:,:) 
     REAL(ESMF_KIND_R8)         :: ISM_dt
     INTEGER                    :: ISM_dt_int
+    INTEGER(ESMF_KIND_I8)      :: advancecount
 
     RC = ESMF_FAILURE
 
@@ -860,6 +903,12 @@ CONTAINS
     ISM_dt = REAL(ISM_dt_int,ESMF_KIND_R8)
     ISM_dsdt_ptr = (ISM_z_lts_ptr - ISM_z_lts_previous_ptr) / ISM_dt
 
+    ! first time we set it to zero
+    CALL ESMF_ClockGet(FISOC_clock, advanceCount=advanceCount, rc=rc)
+    IF (advanceCount.LE.1) THEN
+       ISM_dsdt_ptr = 0.0
+    END IF
+
     NULLIFY(ISM_z_lts_previous_ptr)
     NULLIFY(ISM_z_lts_ptr)
     NULLIFY(ISM_dsdt_ptr)
@@ -870,14 +919,64 @@ CONTAINS
 
 
   !------------------------------------------------------------------------------
-  ! dddt, short for dd/dt, is the rate of change of depth (or draft) with time, 
-  ! for use by ocean model.
   !
-  SUBROUTINE ISM_derive_dddt(ISM_ExpFB,FISOC_config,rc)
+  SUBROUTINE ISM_derive_rate(varName,varName_previous,varName_rate, &
+       ISM_ExpFB,FISOC_config,rc)
 
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    CHARACTER(len=*),INTENT(IN)           :: varName,varName_previous,varName_rate
     INTEGER, INTENT(OUT),OPTIONAL         :: rc
+
+    INTEGER                :: rank
+    
+    rc = ESMF_FAILURE
+    rank = 0
+
+    CALL FISOC_getFirstFieldRank(ISM_ExpFB,rank,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+
+    SELECT CASE (rank)
+
+    CASE(1)
+       CALL  ISM_derive_rate_1D(varName,varName_previous,varName_rate, &
+            ISM_ExpFB,FISOC_config,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,  &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+    CASE(2)
+       CALL  ISM_derive_rate_2D(varName,varName_previous,varName_rate, &
+            ISM_ExpFB,FISOC_config,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,  &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+    CASE DEFAULT
+       msg = "ERROR: dimension of array ptr NYI"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END SELECT
+    
+    RC = ESMF_SUCCESS
+
+  END SUBROUTINE ISM_derive_rate
+
+
+  !------------------------------------------------------------------------------
+  ! dddt, short for dd/dt, is the rate of change of depth (or draft) with time, 
+  ! for use by ocean model.
+  !
+  SUBROUTINE ISM_derive_dddt(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
+    TYPE(ESMF_clock),INTENT(IN)            :: FISOC_clock
+    INTEGER, INTENT(OUT),OPTIONAL          :: rc
 
     INTEGER                :: rank
     
@@ -893,13 +992,13 @@ CONTAINS
     SELECT CASE (rank)
 
     CASE(1)
-       CALL  ISM_derive_dddt_1D(ISM_ExpFB,FISOC_config,rc=rc)
+       CALL  ISM_derive_dddt_1D(ISM_ExpFB,FISOC_config,FISOC_clock,rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        
     CASE(2)
-       CALL  ISM_derive_dddt_2D(ISM_ExpFB,FISOC_config,rc=rc)
+       CALL  ISM_derive_dddt_2D(ISM_ExpFB,FISOC_config,FISOC_clock,rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -917,11 +1016,12 @@ CONTAINS
 
   
   !------------------------------------------------------------------------------
-  SUBROUTINE ISM_derive_dddt_1D(ISM_ExpFB,FISOC_config,rc)
+  SUBROUTINE ISM_derive_dddt_1D(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
     
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
-    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    INTEGER, INTENT(OUT),OPTIONAL         :: rc
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
+    TYPE(ESMF_clock),INTENT(IN)            :: FISOC_clock
+    INTEGER, INTENT(OUT),OPTIONAL          :: rc
     
     TYPE(ESMF_field)           :: ISM_z_l0
     TYPE(ESMF_field)           :: ISM_z_l0_previous
@@ -931,6 +1031,7 @@ CONTAINS
     REAL(ESMF_KIND_R8),POINTER :: ISM_dddt_ptr(:) 
     REAL(ESMF_KIND_R8)         :: ISM_dt
     INTEGER                    :: ISM_dt_int
+    INTEGER(ESMF_KIND_I8)      :: advancecount
 
     RC = ESMF_FAILURE
 
@@ -970,7 +1071,10 @@ CONTAINS
     ISM_dddt_ptr = (ISM_z_l0_ptr - ISM_z_l0_previous_ptr) / ISM_dt
 
     ! first time we set it to zero
-    WHERE (ISM_z_l0_previous_ptr .EQ. 0.0) ISM_dddt_ptr = 0.0
+    CALL ESMF_ClockGet(FISOC_clock, advanceCount=advanceCount, rc=rc)
+    IF (advanceCount.LE.1) THEN
+       ISM_dddt_ptr = 0.0
+    END IF
 
     NULLIFY(ISM_z_l0_previous_ptr)
     NULLIFY(ISM_z_l0_ptr)
@@ -982,11 +1086,12 @@ CONTAINS
 
 
   !------------------------------------------------------------------------------
-  SUBROUTINE ISM_derive_dddt_2D(ISM_ExpFB,FISOC_config,rc)
+  SUBROUTINE ISM_derive_dddt_2D(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
     
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
-    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    INTEGER, INTENT(OUT),OPTIONAL         :: rc
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
+    TYPE(ESMF_clock),INTENT(IN)            :: FISOC_clock
+    INTEGER, INTENT(OUT),OPTIONAL          :: rc
     
     TYPE(ESMF_field)           :: ISM_z_l0
     TYPE(ESMF_field)           :: ISM_z_l0_previous
@@ -996,6 +1101,7 @@ CONTAINS
     REAL(ESMF_KIND_R8),POINTER :: ISM_dddt_ptr(:,:) 
     REAL(ESMF_KIND_R8)         :: ISM_dt
     INTEGER                    :: ISM_dt_int
+    INTEGER(ESMF_KIND_I8)      :: advancecount
 
     RC = ESMF_FAILURE
 
@@ -1033,6 +1139,12 @@ CONTAINS
 
     ISM_dt = REAL(ISM_dt_int,ESMF_KIND_R8)
     ISM_dddt_ptr = (ISM_z_l0_ptr - ISM_z_l0_previous_ptr) / ISM_dt
+
+    ! first time we set it to zero
+    CALL ESMF_ClockGet(FISOC_clock, advanceCount=advanceCount, rc=rc)
+    IF (advanceCount.LE.1) THEN
+       ISM_dddt_ptr = 0.0
+    END IF
 
     NULLIFY(ISM_z_l0_previous_ptr)
     NULLIFY(ISM_z_l0_ptr)
