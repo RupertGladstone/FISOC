@@ -400,7 +400,7 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-    CALL ElmerSolver_finalize()
+    CALL ElmerSolver_finalize(PreserveParEnv=.TRUE.)
 
     CLOSE(unit=ISM_outputUnit, ERR=102)
 
@@ -556,7 +556,9 @@ CONTAINS
     ParEnv % MyPE = localPet
     OutputPE = ParEnv % MyPe
     ParEnv % PEs  = petCount
-    ParEnv % ActiveComm = MPI_COMM_WORLD ! or mpic_dup
+    ELMER_COMM_WORLD = mpic_dup
+    ParEnv % ActiveComm = ELMER_COMM_WORLD
+!    ParEnv % ActiveComm = MPI_COMM_WORLD ! or mpic_dup
     Parenv % NumOfNeighbours = 0
     ParEnv % Initialized = .TRUE.
 
