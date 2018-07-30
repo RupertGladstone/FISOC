@@ -400,7 +400,7 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-    CALL ElmerSolver_finalize(PreserveParEnv=.TRUE.)
+    CALL ElmerSolver_finalize(PreserveParEnvOpt=.TRUE.)
 
     CLOSE(unit=ISM_outputUnit, ERR=102)
 
