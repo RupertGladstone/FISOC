@@ -20,7 +20,8 @@ MODULE FISOC_ISM_Wrapper
   INTEGER,PARAMETER                     :: NOYEAR = -999
   
   TYPE(ESMF_config)                     :: FOOL_config 
-  REAL(ESMF_KIND_R8),PARAMETER          :: secperyear = 365.0*24.*60.*60. 
+!  REAL(ESMF_KIND_R8),PARAMETER          :: secperyear = 365.0*24.*60.*60. 
+  INTEGER,PARAMETER                     :: secperyear = 365.0*24.*60.*60. 
   INTEGER                               :: year = NOYEAR
 
 ! TODO: resolve some code duplication between init 1 and run.  Setting up file names etc. for getting the var from netcdf.
