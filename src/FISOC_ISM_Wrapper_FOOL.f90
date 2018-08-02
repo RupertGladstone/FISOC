@@ -331,12 +331,12 @@ CONTAINS
           CALL readFromNC(FileName,'sice',FOOLgrid,ptr,1)
           
        CASE ('ISM_dddt')
-          CALL readFromNC(FileName,'dddt',FOOLgrid,ptr,secperyear)
-!          CALL readFromNC(FileName,'dddt',FOOLgrid,ptr,ISM_dt_sec)
+!          CALL readFromNC(FileName,'dddt',FOOLgrid,ptr,secperyear)
+          CALL readFromNC(FileName,'dddt',FOOLgrid,ptr,ISM_dt_sec)
           
        CASE ('ISM_dsdt')
-          CALL readFromNC(FileName,'dsdt',FOOLgrid,ptr,secperyear)
-!          CALL readFromNC(FileName,'dsdt',FOOLgrid,ptr,ISM_dt_sec)
+!          CALL readFromNC(FileName,'dsdt',FOOLgrid,ptr,secperyear)
+          CALL readFromNC(FileName,'dsdt',FOOLgrid,ptr,ISM_dt_sec)
 
        CASE DEFAULT
           msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))

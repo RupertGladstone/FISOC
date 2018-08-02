@@ -6,15 +6,15 @@ export FISOC_MPI="yes"
 ## optionally over-write the default executable name:
 #export FISOC_EXE="FISOC_caller"
 
-export FISOC_ISM="dummy"
-export FISOC_ISM_LIBS=""
-export FISOC_ISM_LIBPATH="$HOME"
-export FISOC_ISM_INCLUDE="$HOME"
-
-#export FISOC_ISM="FOOL"
+#export FISOC_ISM="dummy"
 #export FISOC_ISM_LIBS=""
 #export FISOC_ISM_LIBPATH="$HOME"
 #export FISOC_ISM_INCLUDE="$HOME"
+
+export FISOC_ISM="FOOL"
+export FISOC_ISM_LIBS=""
+export FISOC_ISM_LIBPATH="$HOME"
+export FISOC_ISM_INCLUDE="$HOME"
 
 #export FISOC_ISM="FISh"
 #export FISOC_ISM_LIBS="-lFISh"
@@ -41,7 +41,7 @@ export FISOC_OM="ROMS"
 export FISOC_OM_LIBS="-loceanM"
 export FISOC_OM_INCLUDE="${MY_ROMS_DIR}/Build"
 export FISOC_OM_LIBPATH="${MY_ROMS_DIR}/Lib/FISOC"
-export FISOC_INSTALL_DIR="/nobackupp2/slmack/FISOC/ROMSdummy"
+export FISOC_INSTALL_DIR="/nobackupp2/slmack/FISOC/ROMSFOOL"
 
 # These ROMS_ preprocessor keywords correspond to a relevant subset of 
 # the preprocessor keywords in the ROMS .in file.
