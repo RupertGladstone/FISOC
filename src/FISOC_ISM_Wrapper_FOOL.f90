@@ -22,7 +22,7 @@ MODULE FISOC_ISM_Wrapper
   TYPE(ESMF_config)                     :: FOOL_config 
 !  REAL(ESMF_KIND_R8),PARAMETER          :: secperyear = 365.0*24.*60.*60. 
   INTEGER,PARAMETER                     :: secperyear = 365.0*24.*60.*60. 
-  INTEGER                               :: year = NOYEAR
+  INTEGER                               :: year = NOYEAR, ISM_stepCounter = 1
 
 ! TODO: resolve some code duplication between init 1 and run.  Setting up file names etc. for getting the var from netcdf.
 ! TODO: hard code timestep check instead of hard coding timestep itself.  Put expected timestep in config file.
@@ -219,6 +219,8 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
+    ISM_stepCounter = ISM_stepCounter + 1
+
     CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -279,9 +281,11 @@ CONTAINS
     TYPE(ESMF_grid)                :: FOOLgrid
     INTEGER                        :: nn, ISM_dt_sec
     REAL(ESMF_KIND_R8),POINTER     :: ptr(:,:)
-    INTEGER                        :: fieldCount, rc
+    INTEGER                        :: fieldCount, rc, numForcingFiles
     TYPE(ESMF_Field),ALLOCATABLE   :: fieldList(:)
-    CHARACTER(len=ESMF_MAXSTR)     :: fieldName, fileName
+    TYPE(ESMF_Field)               :: field
+    CHARACTER(len=ESMF_MAXSTR)     :: fieldName, fileName, label
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM_varNames(:), ISM_reqVars(:)
 
     CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt_sec, 'ISM_dt_sec',rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -289,6 +293,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     CALL makeFileName(FOOL_config,fileName)
+
+    CALL ESMF_ConfigGetAttribute(FOOL_config, NumForcingFiles, label='NumForcingFiles:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! get a list of fields and their names from the ISM export field bundle
     fieldCount = 0
@@ -308,53 +317,91 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-
-    fieldLoop: DO nn = 1,fieldCount
-       
-       ! access the FISOC version of the current field
-       CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-       ! access the netcdf file for the current field
-       SELECT CASE (TRIM(ADJUSTL(fieldName)))
-
-       CASE ('ISM_z_l0')
+    ! if var names are defined we don't need to use hard coded values
+    label = 'ISM_varNames:'
+    CALL FISOC_getListFromConfig(FISOC_config, label, ISM_varNames,rc=rc)
+    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+      msg = "ISM_varNames not found, using hard coded defaults"
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      
+      fieldLoop: DO nn = 1,fieldCount
+        
+        ! access the FISOC version of the current field
+        CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+        CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+         
+        ! access the netcdf file for the current field
+        SELECT CASE (TRIM(ADJUSTL(fieldName)))
+          
+        CASE ('ISM_z_l0')
           CALL readFromNC(FileName,'zice',FOOLgrid,ptr,1)
           
-       CASE ('ISM_z_lts')
+        CASE ('ISM_z_lts')
           CALL readFromNC(FileName,'sice',FOOLgrid,ptr,1)
           
-       CASE ('ISM_dddt')
+        CASE ('ISM_dddt')
           CALL readFromNC(FileName,'dddt',FOOLgrid,ptr,secperyear)
-!          CALL readFromNC(FileName,'dddt',FOOLgrid,ptr,ISM_dt_sec)
           
-       CASE ('ISM_dsdt')
+        CASE ('ISM_dsdt')
           CALL readFromNC(FileName,'dsdt',FOOLgrid,ptr,secperyear)
-!          CALL readFromNC(FileName,'dsdt',FOOLgrid,ptr,ISM_dt_sec)
-
-       CASE DEFAULT
+          
+        CASE DEFAULT
           msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
                line=__LINE__, file=__FILE__, rc=rc)
           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          
+        END SELECT
+        
+      END DO fieldLoop
+      
+    ELSE IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) THEN
+      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-       END SELECT
-
-    END DO fieldLoop
-
+    ! If var names are defined we don't need to use hard coded values.
+    ! Here we just loop over required vars.
+    ELSE
+      label = 'ISM_reqVars:'
+      CALL FISOC_getListFromConfig(FISOC_config, label, ISM_reqVars,rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) THEN
+        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      END IF
+      DO nn = 1,SIZE(ISM_ReqVars)
+        field = FISOC_FieldListGetField(FieldList,ISM_reqVars(nn),rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        CALL ESMF_FieldGet(field, farrayPtr=ptr, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)        
+        IF (numForcingFiles.EQ.1) THEN
+          CALL readFromNC(FileName,ISM_varNames(nn),FOOLgrid,ptr,1,ISM_stepCounter)
+        ELSE
+          CALL readFromNC(FileName,ISM_varNames(nn),FOOLgrid,ptr,1)
+        END IF
+      END DO
+    END IF
+    
+    IF (ALLOCATED(ISM_ReqVars)) DEALLOCATE(ISM_ReqVars)
+    IF (ALLOCATED(ISM_varNames)) DEALLOCATE(ISM_varNames)
+         
     NULLIFY(ptr)
-
+    
     rc = ESMF_SUCCESS
-
+    
   END SUBROUTINE getFieldDataFromISM
-
+  
 
 !    CALL ESMF_ClockGet(clock, startTime, currTime
 !    advanceCount, rc=rc)
@@ -412,7 +459,12 @@ CONTAINS
     END IF
 
     WRITE (fileNumber, "(I0)") year
-    fileName = TRIM(ADJUSTL(ForcingDir))//TRIM(ADJUSTL(ForcingBaseName))//TRIM(ADJUSTL(fileNumber))//".nc"
+
+    IF (NumForcingFiles.GT.1) THEN
+      fileName = TRIM(ADJUSTL(ForcingDir))//TRIM(ADJUSTL(ForcingBaseName))//TRIM(ADJUSTL(fileNumber))//".nc"
+    ELSE
+      fileName = TRIM(ADJUSTL(ForcingDir))//TRIM(ADJUSTL(ForcingBaseName))//".nc"
+    END IF
 
     ! Increment year for next time (we assume here the ISM timestep is 1 year)
     year = year + 1
@@ -421,13 +473,14 @@ CONTAINS
 
 
 
-  SUBROUTINE readFromNC(FileName,VarName,FOOLgrid,ptr,scaling)
+  SUBROUTINE readFromNC(FileName,VarName,FOOLgrid,ptr,scaling,timeStep)
 
     REAL(ESMF_KIND_R8),POINTER,INTENT(INOUT) :: ptr(:,:)
     CHARACTER(len=ESMF_MAXSTR),INTENT(IN)    :: FileName
     CHARACTER(len=*),INTENT(IN)              :: VarName
     TYPE(ESMF_grid),INTENT(INOUT)            :: FOOLgrid
     INTEGER,INTENT(IN)                       :: scaling
+    INTEGER,INTENT(IN),OPTIONAL              :: timeStep
 
     REAL(ESMF_KIND_R8),ALLOCATABLE :: values(:,:)
     INTEGER                        :: lbnd(2), ubnd(2), NtileI, NtileJ
@@ -465,11 +518,18 @@ CONTAINS
     
     status = nf90_inq_varid(ncid, VarName, varid)
     IF(status /= nf90_NoErr) CALL handle_err(status)
-
-    status = nf90_get_var(ncid, varid, values,  &
-         start = (/ lby, lbx /),                      &
-         count = (/ ny,  nx  /)                        )
-    IF(status /= nf90_NoErr) CALL handle_err(status)
+    
+    IF (PRESENT(TimeStep)) THEN
+      status = nf90_get_var(ncid, varid, values,      &
+           start = (/ lby, lbx, TimeStep /),          &
+           count = (/ ny,  nx,  1        /)            )
+      IF(status /= nf90_NoErr) CALL handle_err(status)
+    ELSE
+      status = nf90_get_var(ncid, varid, values,      &
+           start = (/ lby, lbx /),                    &
+           count = (/ ny,  nx  /)                      )
+      IF(status /= nf90_NoErr) CALL handle_err(status)
+    END IF
 
     status = nf90_close(ncid)
     IF(status /= nf90_NoErr) CALL handle_err(status)

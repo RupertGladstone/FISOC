@@ -18,7 +18,7 @@ MODULE FISOC_utils_MOD
        FISOC_OneGrid, FISOC_cavityCheckOptions,                & 
        FISOC_getFirstFieldRank, FISOC_makeRHfromFB,            &
        FISOC_getGridOrMeshFromFB, FISOC_regridFB,              &
-       FISOC_GridCompRun
+       FISOC_GridCompRun, FISOC_FieldListGetField
   
 
   INTERFACE Unique1DArray
@@ -116,6 +116,38 @@ CONTAINS
     END IF
 
   END SUBROUTINE FISOC_GridCompRun
+
+
+  !------------------------------------------------------------------------------
+  ! get a field from a field list by name
+  TYPE(ESMF_field) FUNCTION FISOC_FieldListGetField(FieldList,FieldName,rc)
+
+    TYPE(ESMF_field),DIMENSION(:) :: FieldList
+    CHARACTER(len=*)              :: FieldName
+    INTEGER,INTENT(OUT)           :: rc
+
+    CHARACTER(len=ESMF_MAXSTR)    :: FieldName_nn
+    INTEGER                       :: nn, FieldCount
+
+    rc = ESMF_FAILURE
+
+    FieldCount = SIZE(FieldList)
+
+
+    DO nn = 1,FieldCount
+      CALL ESMF_FieldGet(fieldList(nn), name=FieldName_nn, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      IF (FieldName.EQ.FieldName_nn) THEN
+        FISOC_FieldListGetField = FieldList(nn)
+        rc = ESMF_SUCCESS
+        RETURN
+      END IF
+    END DO
+
+  END FUNCTION FISOC_FieldListGetField
+
 
   !------------------------------------------------------------------------------
   ! 

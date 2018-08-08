@@ -176,7 +176,6 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-
     ! get a list of field names from the ISM export bundle
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldCount=ISM_ExpFieldCount, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -359,7 +358,6 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
 
     ! get a list of field names from the OM export bundle
     CALL ESMF_FieldBundleGet(OM_ExpFB, fieldCount=OM_ExpFieldCount, rc=rc)
@@ -711,15 +709,6 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-!print*,"remove this"
-!CALL ESMF_FieldGet(ISM_ExpFieldList(ii), farrayPtr=optr, rc=rc)
-!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!     line=__LINE__, file=__FILE__)) &
-!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!print*,fieldName,shape(optr)
-!print*,MINVAL(optr),MAXVAL(optr)
-!nullify(optr)
 
        CALL ESMF_FieldRegrid(ISM_ExpFieldList(ii),OM_ImpFieldList(ii), &
             routehandle=ISM2OM_regridRouteHandle, zeroregion= ESMF_REGION_TOTAL, &
