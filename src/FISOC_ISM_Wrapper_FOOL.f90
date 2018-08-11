@@ -55,14 +55,14 @@ CONTAINS
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_VM),INTENT(INOUT)           :: vm
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
-    TYPE(ESMF_grid),INTENT(OUT)           :: ISM_Grid
+    TYPE(ESMF_grid),INTENT(INOUT)         :: ISM_Grid
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM_ReqVarList(:)
     CHARACTER(len=ESMF_MAXSTR)            :: label
     CHARACTER(len=ESMF_MAXSTR)            :: FOOL_configName, ISM_gridLayout
     INTEGER                               :: localPet, ISM_dt_sec
-    LOGICAL                               :: verbose_coupling
+    LOGICAL                               :: verbose_coupling, ISM_UseOMGrid
 
     CHARACTER(len=ESMF_MAXSTR)   :: fileName
     TYPE(ESMF_grid)              :: FOOLgrid
@@ -107,31 +107,46 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_ConfigGetAttribute(FOOL_config, ISM_gridLayout, label='ISM_gridLayout:', rc=rc)
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_UseOMGrid, 'ISM_UseOMGrid',rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    SELECT CASE(ISM_gridLayout)
-
-    CASE ('isomip_plus')
-       msg = "Creating ISM ISOMIP+ grid"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__, rc=rc)
-
-       CALL Create_ISOMIP_plus_grid(ISM_grid,rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-    CASE DEFAULT
-       msg = "ERROR: FOOL does not recognise ISM_gridLayout"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-    END SELECT
+    CALL ESMF_ConfigGetAttribute(FOOL_config, ISM_gridLayout, label='ISM_gridLayout:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
+    ! We don't need to construct the grid if we're simply using the OM grid
+    IF (ISM_UseOMGrid) THEN
+      msg = "Using OM grid for ISM"
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+           line=__LINE__, file=__FILE__, rc=rc)
+
+    ELSE
+      
+      SELECT CASE(ISM_gridLayout)
+        
+      CASE ('isomip_plus')
+        msg = "Creating ISM ISOMIP+ grid"
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+             line=__LINE__, file=__FILE__, rc=rc)
+        
+        CALL Create_ISOMIP_plus_grid(ISM_grid,rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+      CASE DEFAULT
+        msg = "ERROR: FOOL does not recognise ISM_gridLayout"
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+             line=__LINE__, file=__FILE__, rc=rc)
+        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+      END SELECT
+    
+    END IF
+
     CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -497,16 +512,16 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    lbx = lbnd(1)
-    ubx = ubnd(1)
-
+    lbx = lbnd(2)+1
+    ubx = ubnd(2)+1
+ 
     CALL ESMF_GridGetCoordBounds(FOOLgrid, 2,    &
          totalLBound=lbnd, totalUBound=ubnd,   rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    lby = lbnd(1)
-    uby = ubnd(1)
+    lby = lbnd(1)+1
+    uby = ubnd(1)+1
     nx = ubx - lbx + 1
     ny = uby - lby + 1
 
@@ -526,15 +541,15 @@ CONTAINS
       IF(status /= nf90_NoErr) CALL handle_err(status)
     ELSE
       status = nf90_get_var(ncid, varid, values,      &
-           start = (/ lby, lbx /),                    &
-           count = (/ ny,  nx  /)                      )
+           start = (/ lby,  lbx /),                    &
+           count = (/ ny,   nx  /)                      )
       IF(status /= nf90_NoErr) CALL handle_err(status)
     END IF
 
     status = nf90_close(ncid)
     IF(status /= nf90_NoErr) CALL handle_err(status)
 
-    ptr = TRANSPOSE(values)
+!    ptr = TRANSPOSE(values)
 
     ptr = ptr / scaling ! e.g. to convert from m/yr to m/s
 !    ptr = ptr/31557600.0
@@ -607,7 +622,7 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL   :: rc
 
     CHARACTER(len=ESMF_MAXSTR)     :: fileName, fileNumber, ForcingDir, ForcingBaseName
-    REAL(ESMF_KIND_R8),POINTER     :: xCoords(:), yCoords(:)
+    REAL(ESMF_KIND_R8),POINTER     :: xCoords(:,:), yCoords(:,:)
     INTEGER                        :: lbnd(2), ubnd(2), year, NtileI, NtileJ
     INTEGER                        :: nx, ny, dx, dy, ii, x1, y1, localDEcount
 
@@ -623,7 +638,7 @@ CONTAINS
     ! Note: we are using David G's processed netcdf files with 2km instead of 1km 
     ! resolution, so set the values accordingly here:
     ny = 240; nx = 40; dx = 2000; dy = 2000
-    y1 = 321000; x1 = 1000 ! starting coords (like all) are at cell centres
+    x1 = 321000; y1 = 1000 ! starting coords (like all) are at cell centres
     
     ! get the decomposition from the FOOL config
     CALL ESMF_ConfigGetAttribute(FOOL_config, NtileI, label='NtileI:', rc=rc)
@@ -641,15 +656,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    
-
     ! Make the grid and add coords
     FOOLgrid=ESMF_GridCreateNoPeriDim(  &
-         maxIndex=(/ny,nx/),            & 
-         regDecomp=(/NtileJ,NtileI/),   &
+         regDecomp=(/NtileI,NtileJ/),   &
+         minIndex=(/0,0/),              & 
+         maxIndex=(/nx-1,ny-1/),        & 
          coordSys=ESMF_COORDSYS_CART,   &
-         coordDep1=(/1/), & ! 1st coord is 1D and depends on 1st Grid dim
-         coordDep2=(/2/), & ! 2nd coord is 1D and depends on 2nd Grid dim
          indexflag=ESMF_INDEX_GLOBAL,   &
          rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -664,16 +676,16 @@ CONTAINS
     
     CALL ESMF_GridGetCoord(FOOLgrid, 2, localDE=0, &
          staggerloc=ESMF_STAGGERLOC_CENTER, &
-         farrayPtr=xCoords, &
          computationalLBound=lbnd, &
          computationalUBound=ubnd, &
+         farrayPtr=xCoords, &
          rc=rc)  
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    DO ii=lbnd(1),ubnd(1)
-       xCoords(ii) = x1 - dx + (ii*dx)
+    DO ii=lbnd(2),ubnd(2)
+       xCoords(:,ii) = x1 + (ii*dx)
     END DO
     
     CALL ESMF_GridGetCoord(FOOLgrid, 1, localDE=0, &
@@ -687,7 +699,7 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     DO ii=lbnd(1),ubnd(1)
-       yCoords(ii) = y1 - dy + (ii*dy)
+       yCoords(ii,:) = y1 + (ii*dy)
     END DO
 
     NULLIFY(yCoords)

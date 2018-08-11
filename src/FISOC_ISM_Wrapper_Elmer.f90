@@ -480,7 +480,6 @@ CONTAINS
     
     label = 'ISM_varNames:'
     CALL FISOC_getListFromConfig(FISOC_config, label, ISM_varNames,rc=rc)
-
     IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
        msg = "ISM_varNames not found, using hard coded Elmer defaults"
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &

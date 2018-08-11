@@ -18,7 +18,8 @@ MODULE FISOC_utils_MOD
        FISOC_OneGrid, FISOC_cavityCheckOptions,                & 
        FISOC_getFirstFieldRank, FISOC_makeRHfromFB,            &
        FISOC_getGridOrMeshFromFB, FISOC_regridFB,              &
-       FISOC_GridCompRun, FISOC_FieldListGetField
+       FISOC_GridCompRun, FISOC_FieldListGetField,             &
+       FISOC_State2StateCopyFB
   
 
   INTERFACE Unique1DArray
@@ -227,6 +228,32 @@ CONTAINS
 
   END SUBROUTINE FISOC_cavityCheckOptions
 
+
+  !------------------------------------------------------------------------------
+  ! Copy a field bundle from one state to another state
+  SUBROUTINE FISOC_State2StateCopyFB(srcState,destState,FBname,rc)
+    TYPE(ESMF_state),INTENT(IN)    :: srcState
+    TYPE(ESMF_state),INTENT(INOUT) :: destState
+    CHARACTER(len=*),INTENT(IN)    :: FBname
+    INTEGER,INTENT(OUT),OPTIONAL   :: rc
+
+    TYPE(ESMF_fieldBundle)         :: fb
+
+    rc = ESMF_FAILURE
+
+    CALL ESMF_StateGet(srcState, FBname, fb, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+    CALL ESMF_StateAdd(destState, (/fb/), rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_State2StateCopyFB
 
 
   !------------------------------------------------------------------------------
@@ -557,8 +584,6 @@ CONTAINS
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_setClocks
-
-
 
 
   !--------------------------------------------------------------------------------------
@@ -1081,7 +1106,7 @@ CONTAINS
 
     SELECT CASE(label)
 
-    CASE('profiling')
+    CASE('profiling','profiling:')
        CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='profiling:', rc=rc_local)
        IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
           derivedAttribute = .FALSE.
@@ -1094,12 +1119,38 @@ CONTAINS
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        END IF
        
-    CASE('ISM2OM_init_vars')
+    CASE('ISM2OM_init_vars','ISM2OM_init_vars:')
        CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='ISM2OM_init_vars:', rc=rc_local)
        IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
           derivedAttribute = .TRUE.
           msg = "WARNING: ISM2OM_init_vars not found, setting to .TRUE."
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+
+    CASE('ISM_UseOMGrid','ISM_UseOMGrid:')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='ISM_UseOMGrid:', rc=rc_local)
+       IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+          derivedAttribute = .FALSE.
+          msg = "ISM_UseOMGrid not found, setting to .FALSE."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+
+    CASE('OM_UseISMGrid','OM_UseISMGrid:')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_UseISMGrid:', rc=rc_local)
+       IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+          derivedAttribute = .FALSE.
+          msg = "OM_UseISMGrid not found, setting to .FALSE."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
                line=__LINE__, file=__FILE__)
        ELSE
           IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
@@ -1707,7 +1758,7 @@ print*,"need RH"
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
+    
     ! copy the field data back in, cleaning up as we go
     SELECT CASE(InDims)
     CASE(1)
@@ -1732,7 +1783,7 @@ print*,"need RH"
     END SELECT
     
     rc = ESMF_SUCCESS
-
+    
   END SUBROUTINE FISOC_FieldRegridStore
 
 
