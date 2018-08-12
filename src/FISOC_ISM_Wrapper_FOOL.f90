@@ -550,6 +550,7 @@ CONTAINS
     IF(status /= nf90_NoErr) CALL handle_err(status)
 
 !    ptr = TRANSPOSE(values)
+    ptr = values
 
     ptr = ptr / scaling ! e.g. to convert from m/yr to m/s
 !    ptr = ptr/31557600.0

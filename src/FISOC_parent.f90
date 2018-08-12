@@ -615,17 +615,20 @@ CONTAINS
     msg = "FISOC parent finalise: getting child states"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
          line=__LINE__, file=__FILE__, rc=rc)
-    CALL ESMF_StateGet(importstate, "ISM import state", ISM_ImpSt, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF ( (.NOT.ISM_UseOMGrid) .AND. (.NOT.OM_UseISMGrid) ) THEN
+      CALL ESMF_StateGet(importstate, "ISM import state", ISM_ImpSt, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      CALL ESMF_StateGet(importstate, "OM import state", OM_ImpSt, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
 
     CALL ESMF_StateGet(importstate, "ISM export state", ISM_ExpSt, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL ESMF_StateGet(importstate, "OM import state", OM_ImpSt, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
