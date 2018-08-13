@@ -89,18 +89,14 @@ CONTAINS
     bedrock = -20.0 - ( ROMS_depth_e5 * ROMS_j_over_Mm_e5 )
   END FUNCTION Ex5_bedrock
   
+  !-------------------------------------------------------------------------------
+  REAL(KIND=dp) FUNCTION Ex4_LowerSurface(x_dist) RESULT(LowerSurface)
+    USE DefUtils
+    REAL(KIND=dp),INTENT(IN)  :: x_dist
+    LowerSurface = -450_dp + (400.0_dp * x_dist/100000.)
+  END FUNCTION Ex4_LowerSurface
+  
 END MODULE MOD_ElmerGeom
-
-
-!-------------------------------------------------------------------------------
-REAL(KIND=dp) FUNCTION Ex4_LowerSurface(Model, node, x_dist) RESULT(LowerSurface)
-  USE DefUtils
-  TYPE(Model_t),INTENT(IN)  :: Model
-  INTEGER,INTENT(IN)        :: node
-  REAL(KIND=dp),INTENT(IN)  :: x_dist
-  LowerSurface = -450_dp + (400.0_dp * x_dist/100000.)
-!  print*,x_dist,LowerSurface
-END FUNCTION Ex4_LowerSurface
 
 
 !-------------------------------------------------------------------------------
@@ -149,6 +145,34 @@ END FUNCTION Ex1_UpperSurface_w
 
 
 !-------------------------------------------------------------------------------
+REAL(KIND=dp) FUNCTION Ex4_LowerSurface_w(Model, node, x_dist) RESULT(LowerSurface)
+  USE DefUtils
+  USE MOD_ElmerGeom
+  IMPLICIT NONE
+  TYPE(Model_t),INTENT(IN)  :: Model
+  INTEGER,INTENT(IN)        :: node
+  REAL(KIND=dp),INTENT(IN)  :: x_dist
+
+  LowerSurface =  Ex4_LowerSurface(x_dist)
+    
+END FUNCTION Ex4_LowerSurface_w
+
+
+!-------------------------------------------------------------------------------
+REAL(KIND=dp) FUNCTION Ex4_UpperSurface_w(Model, node, x_dist) RESULT(UpperSurface)
+  USE DefUtils
+  USE MOD_ElmerGeom
+  IMPLICIT NONE
+  TYPE(Model_t),INTENT(IN)  :: Model
+  INTEGER,INTENT(IN)        :: node
+  REAL(KIND=dp),INTENT(IN)  :: x_dist
+  
+  UpperSurface = -Ex4_LowerSurface(x_dist) * ( 1000.0_dp / 910.0_dp - 1.0_dp )
+
+END FUNCTION Ex4_UpperSurface_w
+
+
+!-------------------------------------------------------------------------------
 REAL(KIND=dp) FUNCTION Ex5_bedrock_w(Model, node, x_dist) RESULT(bedrock)
   USE DefUtils
   USE MOD_ElmerGeom
@@ -193,7 +217,5 @@ REAL(KIND=dp) FUNCTION Ex5_UpperSurface_w(Model, node, x_dist) RESULT(UpperSurfa
      UpperSurface = UpperSurface + 0.1*(Ex5_bedrock(x_dist) - Ex5_LowerSurface(x_dist))
   END IF
 
-!print*,x_dist,UpperSurface
-    
 END FUNCTION Ex5_UpperSurface_w
 
