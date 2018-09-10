@@ -796,9 +796,11 @@ print*,"Hang on, need to get temperature exchange going too..."
           EI_fieldVals => EI_field % Values
           EI_fieldPerm => EI_field % Perm
           DO ii = 1,SIZE(ownedNodeIDs)
-             ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
+            ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
+            IF (ptr(ii).GE.0) ptr(ii) = 0
+            IF (ptr(ii).LT.0) ptr(ii) = 1
           END DO
-          
+           
        CASE ('ISM_temperature_l0','ISM_temperature_l1','ISM_velocity_l0','ISM_z_l1','ISM_z_l0_previous','ISM_z_lts_previous')
           msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &

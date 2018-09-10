@@ -1132,6 +1132,19 @@ CONTAINS
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        END IF
 
+    CASE('ISM_maskOMvars','ISM_maskOMvars:')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='ISM_maskOMvars:', rc=rc_local)
+       IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+          derivedAttribute = .FALSE.
+          msg = "WARNING: ISM_maskOMvars not found, setting to .FALSE."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+
     CASE('ISM_UseOMGrid','ISM_UseOMGrid:')
        CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='ISM_UseOMGrid:', rc=rc_local)
        IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN

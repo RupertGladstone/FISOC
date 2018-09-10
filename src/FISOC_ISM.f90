@@ -249,7 +249,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    msg = "ISM initialise phase 2 (allows the ISM access to the OM initial state) "
+    CALL FISOC_ISM_maskOMfields(FISOC_config,ISM_ImpFB,ISM_ExpFB,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    msg = "ISM initialise phase 2 complete (allows the ISM access to the OM initial state) "
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
@@ -305,6 +310,11 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+    CALL FISOC_ISM_maskOMfields(FISOC_config,ISM_ImpFB,ISM_ExpFB,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL FISOC_ISM_Wrapper_Run(FISOC_config,vm,ISM_ImpFB=ISM_ImpFB, &
          ISM_ExpFB=ISM_ExpFB,rc=rc)
@@ -467,6 +477,81 @@ CONTAINS
   
 
 
+  !------------------------------------------------------------------------------
+  SUBROUTINE FISOC_ISM_maskOMfields(FISOC_config,ISM_ImpFB,ISM_ExpFB,rc)
+
+    TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB, ISM_ImpFB
+    INTEGER, INTENT(OUT),OPTIONAL          :: rc
+    
+    LOGICAL                         :: ISM_maskOMvars
+    TYPE(ESMF_field)                :: ISM_gmask
+    REAL(ESMF_KIND_R8),POINTER      :: mask_ptr(:),ptr(:)
+    INTEGER                         :: fieldCount, ii
+    TYPE(ESMF_Field),ALLOCATABLE    :: fieldList(:)
+!    CHARACTER(len=ESMF_MAXSTR)      :: fieldName
+
+    rc = ESMF_FAILURE
+
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_maskOMvars, 'ISM_maskOMvars',rc=rc) 
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    IF (.NOT. ISM_maskOMvars) THEN
+      rc = ESMF_SUCCESS
+      RETURN
+    END IF
+
+    ! Get grounded mask from ISM export fields
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, "ISM_gmask", field=ISM_gmask, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(ISM_gmask, farrayPtr=mask_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    ! Loop through ISM import fields, mask them all
+    CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldCount=fieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(fieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldList=fieldList, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    DO ii = 1,fieldCount
+      CALL ESMF_FieldGet(fieldList(ii), farrayPtr=ptr, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+!       CALL ESMF_FieldGet(fieldList(ii), name=fieldName, rc=rc)
+!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!            line=__LINE__, file=__FILE__)) &
+!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+      ptr = ptr * mask_ptr
+      
+      IF (ASSOCIATED(ptr)) THEN
+        NULLIFY(ptr)
+      END IF
+      
+    END DO
+
+    IF (ASSOCIATED(mask_ptr)) THEN
+      NULLIFY(mask_ptr)
+    END IF
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_ISM_maskOMfields
+
+  
   !------------------------------------------------------------------------------
   SUBROUTINE FISOC_ISM_calcDerivedFields(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
 

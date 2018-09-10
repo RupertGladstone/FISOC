@@ -32,6 +32,7 @@
 #  ISM2OM_vars:        
   ISM2OM_vars:        ISM_dddt ISM_dsdt # ISM_dTdz_l0 # ISM_z_l0_linterp # 
   ISM2OM_init_vars:   .FALSE.
+  ISM_maskOMvars:     .TRUE.
   ISM_stdoutFile:     ./EI_out
   ISM_gridType:       ESMF_mesh
   ISM2OM_regrid:      ESMF_REGRIDMETHOD_NEAREST_STOD
@@ -47,6 +48,7 @@
   FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0 OM_z_l0 OM_bed
 #  FISOC_OM_DerVars:   
   OM_ReqVars_stagger: CENTER CENTER CENTER CENTER
+#  OM2ISM_vars:        
   OM2ISM_vars:        OM_dBdt_l0
 #  OM2ISM_init_vars:   .FALSE.  NYI
   OM_initCavityFromISM: .TRUE.
@@ -64,7 +66,8 @@
 #  end_month:          1
   runLength_ISM_steps: 3
 
-  verbose_coupling:   .FALSE.
-#  verbose_coupling:   .TRUE.
+  profiling:          .TRUE.
+#  verbose_coupling:   .FALSE.
+  verbose_coupling:   .TRUE.
 
 
