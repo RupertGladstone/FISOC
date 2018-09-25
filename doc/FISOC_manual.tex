@@ -1096,7 +1096,11 @@ and the input file is ROMS/External/ocean\_iceshelf2d\_toy\_gl.in.
 \section{Post processing}
 The default expectation is that standard approaches to visualising and 
 processing outputs will be used for OM and ISM components separately. 
-
+The outputs from FISOC includes:
+1. Standard out from the job.  In interactive runs it is written to the screen.
+2. Standard out from the ice model.  This is redirected to a file named in the FISOC_config file.
+3. Standard out from the ocean model.  This is redirected to a file named in the FISOC_config file.
+4. ESMF log files (usually named PET*.log).
 FISOC can output basic netcdf files from the OM generic wrapper 
 on the OM grid. 
 FISOC can do this for both ISM and OM variables.
