@@ -505,6 +505,8 @@ CONTAINS
              EIname_z_lts           = ISM_varNames(ii)
           CASE ('ISM_gmask')
              EIname_gmask           = ISM_varNames(ii)
+          CASE ('ISM_thick')
+             EIname_thick           = ISM_varNames(ii)
           CASE DEFAULT
              msg = "unknown varName "//ISM_ReqVarList(ii)
              CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
