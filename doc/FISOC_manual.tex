@@ -520,6 +520,13 @@ List of variables derived by FISOC from the ISM variables. These are
 calculated from ISM required variables by hard coded routines in 
 FISOC\_ISM or FISOC\_utils. This list is allowed to be empty.              \\
 \vspace{6pt}
+\textbf{ISM\_maskOMvars:} [LOGICAL] [optional]                             \\
+Determines whether the ISM\_maskOMvars should be turned on or not. The generic
+pre-requisite for this is that ISM\_gmask must be present, i.e. it must be a 
+member of either FISOC\_ISM\_ReqVars or FISO\C_ISM\_DerVars.
+The Elmer-specific pre-requisite is that the Elmer variable GroundedMask must
+exist according to the .sif.
+\vspace{6pt}
 \textbf{ISM\_gridType:}        [STRING] [required]                          \\
 Which ESMF object to use.  Valid values are ESMF\_mesh (typically used 
 o describe unstructured meshes) and ESMF\_grid (typically used to 
@@ -696,6 +703,7 @@ Simply m (i.e. full name OM\_m) would probably be better, to avoid confusion wit
                             & base one ISM timestep previously.            &   \\
       ISM\_z\_lts\_previous & Height relative to sea level of the ice      & m \\
                             & top surface one ISM timestep previously.     &   \\
+      ISM\_thick            & Ice thickness                                & m \\
       ISM\_dTdz\_l0         & Vertical temperature gradient in the ice     & K/m \\
                             & at the ice base.                             &   \\
       ISM\_dddt             & Rate of change of the ice draft with respect & m/a \\
@@ -703,6 +711,8 @@ Simply m (i.e. full name OM\_m) would probably be better, to avoid confusion wit
       ISM\_dsdt             & Rate of change of the ice top surface        & m/a \\
                             & height with respect to time.                 &   \\
       ISM\_velocity\_l0     & Ice flow velocity at the ice base            & m/a \\
+      ISM\_maskOMvars       & Mask the fields being passed from OM         &   \\
+                            & to the ISM                                   &   \\
       OM\_dBdt\_l0          & Ice shelf basal melt rate.                   & m/a \\
       OM\_temperature\_l0   & Ocean temperature at the ice ocean           &   \\
                             & interface.                                   &   \\
@@ -1087,7 +1097,11 @@ and the input file is ROMS/External/ocean\_iceshelf2d\_toy\_gl.in.
 \section{Post processing}
 The default expectation is that standard approaches to visualising and 
 processing outputs will be used for OM and ISM components separately. 
-
+The outputs from FISOC includes:
+1. Standard out from the job.  In interactive runs it is written to the screen.
+2. Standard out from the ice model.  This is redirected to a file named in the FISOC_config file.
+3. Standard out from the ocean model.  This is redirected to a file named in the FISOC_config file.
+4. ESMF log files (usually named PET*.log).
 FISOC can output basic netcdf files from the OM generic wrapper 
 on the OM grid. 
 FISOC can do this for both ISM and OM variables.
