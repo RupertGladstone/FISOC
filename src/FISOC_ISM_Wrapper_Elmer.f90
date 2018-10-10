@@ -45,8 +45,6 @@ MODULE FISOC_ISM_Wrapper
   INTEGER, PARAMETER :: ELMER_ELEMENT_HEXAHED_QUADRAT  = 820
   INTEGER, PARAMETER :: ELMER_ELEMENT_HEXAHED_QUADRAT2 = 827
 
-  REAL(ESMF_KIND_R8), PARAMETER :: Elmer_secpyr = 365.25_dp*24.0_dp*60.0_dp*60.0_dp
-
   ! These variable names should be given in the ISM_varNames list in the FISOC 
   ! config file.  If omitted, defaults are given here.  In either case the user 
   ! must ensure these names correspond to Elmer variable names.
@@ -434,7 +432,7 @@ CONTAINS
     TimeStepConsistent = .TRUE.
 
     Elmer_dt = ListGetConstReal( CurrentModel % Simulation, 'Timestep Sizes' )
-    Elmer_dt_sec = INT(Elmer_secpyr * Elmer_dt)
+    Elmer_dt_sec = INT(FISOC_secPerYear * Elmer_dt)
 
     CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt_sec, 'ISM_dt_sec',rc=rc) 
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
