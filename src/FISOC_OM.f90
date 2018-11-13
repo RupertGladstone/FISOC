@@ -64,7 +64,11 @@ CONTAINS
     INTEGER, INTENT(OUT)       :: rc
 
     TYPE(ESMF_config)          :: FISOC_config
+# if defined(FISOC_OM_GRID)
     TYPE(ESMF_grid)            :: OM_grid
+# elif defined(FISOC_OM_MESH)
+    TYPE(ESMF_mesh)            :: OM_mesh
+# endif
     TYPE(ESMF_fieldBundle)     :: OM_ExpFB,OM_ExpFBcum
     TYPE(ESMF_VM)              :: vm
     LOGICAL                    :: ISM_UseOMGrid, OM_UseISMGrid
@@ -111,7 +115,16 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! model-specific initialisation
+# if defined(FISOC_OM_GRID)
     CALL FISOC_OM_Wrapper_Init_Phase1(FISOC_config,vm,OM_ExpFB,OM_grid,rc=rc)
+# elif defined(FISOC_OM_MESH)
+    CALL FISOC_OM_Wrapper_Init_Phase1(FISOC_config,vm,OM_ExpFB,OM_mesh,rc=rc)
+# else
+    msg = "ERROR: FISOC does not recognise OM geom type."
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+         line=__LINE__, file=__FILE__, rc=rc)
+    CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -366,7 +379,6 @@ CONTAINS
        
     END IF OM_cumulate
     
-
     ! turn off alarms relating to data exchange and cumulating
     IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN
        CALL ESMF_AlarmRingerOff(alarm_ISM_exportAvailable, rc=rc)
@@ -397,7 +409,11 @@ CONTAINS
     TYPE(ESMF_fieldbundle)       :: OM_ImpFB, OM_ExpFB
     INTEGER                      :: FieldCount,ii, localPet
     TYPE(ESMF_field),ALLOCATABLE :: FieldList(:)
+# if defined(FISOC_OM_GRID)
     TYPE(ESMF_grid)              :: OM_grid
+# elif defined(FISOC_OM_MESH)
+    TYPE(ESMF_grid)              :: OM_mesh
+# endif
     LOGICAL                      :: ISM_UseOMGrid, OM_UseISMGrid
     
     rc = ESMF_FAILURE
@@ -440,11 +456,19 @@ CONTAINS
            line=__LINE__, file=__FILE__)) &
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
       
+# if defined(FISOC_OM_GRID)
       CALL ESMF_FieldGet(FieldList(1), grid=OM_grid, rc=rc)
       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
            line=__LINE__, file=__FILE__)) &
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
       CALL ESMF_GridDestroy(OM_grid,rc=rc)
+# elif defined(FISOC_OM_MESH)
+      CALL ESMF_FieldGet(FieldList(1), mesh=OM_mesh, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      CALL ESMF_MeshDestroy(OM_mesh,rc=rc)
+# endif
       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
            line=__LINE__, file=__FILE__)) &
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -532,10 +556,12 @@ CONTAINS
     INTEGER                     :: ii,jj,arrShape(2)
     INTEGER                     :: IendR, IstrR, JendR, JstrR
 
-    CHARACTER(len=ESMF_MAXSTR)  :: OM_gridType
     REAL(ESMF_KIND_R8), POINTER :: ptrX(:,:), ptrY(:,:)
+# if defined(FISOC_OM_GRID)
     TYPE(ESMF_grid)             :: OM_grid
+# elif defined(FISOC_OM_MESH)
     TYPE(ESMF_mesh)             :: OM_mesh
+# endif
     INTEGER                     :: exclusiveLBound(2),exclusiveUBound(2),exclusiveCount(2),computationalLBound(2)
     INTEGER                     :: computationalUBound(2),computationalCount(2),totalLBound(2),totalUBound(2)
 
@@ -648,15 +674,21 @@ CONTAINS
         ! TODO: get and check stagger locs
         ! TODO: move grid/mesh choice to cpp
         ! get the grid or mesh from the OM exp bundle.  
-        CALL ESMF_ConfigGetAttribute(FISOC_config, OM_gridType, label='OM_gridType:', rc=rc)
+# if defined(FISOC_OM_GRID)
+        CALL FISOC_getGridFromFB(OM_expFB,OM_grid,rc=rc)
+# elif defined(FISOC_OM_MESH)
+        CALL FISOC_getMeshFromFB(OM_expFB,OM_mesh,rc=rc)
+# else
+        msg="invalid CPP options for OM geom type"
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__, rc=rc)          
+        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
         IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
              line=__LINE__, file=__FILE__)) &
              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-        CALL FISOC_getGridOrMeshFromFB(OM_expFB,OM_gridType,OM_grid,OM_mesh,rc=rc)
-        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-             line=__LINE__, file=__FILE__)) &
-             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-        
+
+# if defined(FISOC_OM_GRID)
         CALL ESMF_GridGetCoord(OM_grid,                 &
              coordDim=1,                                &
              exclusiveLBound=exclusiveLBound,           &
@@ -689,6 +721,12 @@ CONTAINS
         !                   OM_WCmin)-OM_z_l0(ii,jj) ) / ISM_dt
         !            END DO
         !          END DO
+# else
+        msg="invalid OM geom type for correctedRate in handleCavity"
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__, rc=rc)          
+        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
         
         NULLIFY(ISM_z_l0)
         NULLIFY(OM_z_l0)

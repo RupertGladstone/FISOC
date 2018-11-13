@@ -16,11 +16,6 @@ MODULE FISOC_ISM_Wrapper
        FISOC_ISM_Wrapper_Run, FISOC_ISM_Wrapper_Finalize
 
 
-  INTERFACE FISOC_ISM_Wrapper_Init_Phase1
-      MODULE PROCEDURE FISOC_ISM_Wrapper_Init_Phase1_mesh
-      MODULE PROCEDURE FISOC_ISM_Wrapper_Init_Phase1_grid
-   END INTERFACE
-
   ! Note that Elmer's CurrentModel is shared through the Types module (via MainUtils)
 
   ! Elmer element types (not directly available from Elmer, though ideally they should be)
@@ -96,26 +91,10 @@ MODULE FISOC_ISM_Wrapper
 
 CONTAINS
 
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_grid(FISOC_config,vm,ISM_ExpFB,ISM_grid,rc)
-
-    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    TYPE(ESMF_VM),INTENT(INOUT)           :: vm
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
-    TYPE(ESMF_grid),INTENT(OUT)           :: ISM_Grid
-    INTEGER,INTENT(OUT),OPTIONAL          :: rc
-
-    msg = "ERROR: Dummy subroutine called probably due to ISM_gridType error"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-         line=__LINE__, file=__FILE__, rc=rc)
-    CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_grid
-
-
   !--------------------------------------------------------------------------------------
   ! This initialisation wrapper aims to convert the Elmer mesh and required variables 
   ! to the ESMF formats.  It also performs simple sanity/consistency checks.
-  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_mesh(FISOC_config,vm,ISM_ExpFB,ISM_mesh,rc)
+  SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1(FISOC_config,vm,ISM_ExpFB,ISM_mesh,rc)
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_VM),INTENT(INOUT)           :: vm
@@ -274,7 +253,7 @@ CONTAINS
          line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1_mesh
+  END SUBROUTINE FISOC_ISM_Wrapper_Init_Phase1
   
 
   !--------------------------------------------------------------------------------------

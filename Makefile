@@ -26,6 +26,18 @@ ifneq ($(origin FISOC_OM), environment)
  $(error Environment variable FISOC_OM was not set.)
 endif
 
+ifneq ($(origin FISOC_OM_GEOM), environment)
+ CPPFLAGS += -D FISOC_OM_GRID
+else
+ CPPFLAGS += -D $(FISOC_OM_GEOM)
+endif
+
+ifneq ($(origin FISOC_ISM_GEOM), environment)
+ CPPFLAGS += -D FISOC_ISM_MESH
+else
+ CPPFLAGS += -D $(FISOC_ISM_GEOM)
+endif
+
 ifneq ($(origin FISOC_INSTALL_DIR), environment)
  ifneq ($(origin HOME), environment)
   $(error Environment variables neither HOME nor FISOC_INSTALL_DIR was set.)

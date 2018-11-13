@@ -68,7 +68,7 @@ CONTAINS
     TYPE(ESMF_fieldBundle)     :: ISM_ExpFB,OM_ExpFB
     TYPE(ESMF_VM)              :: vm
     TYPE(ESMF_field),ALLOCATABLE :: fieldList(:)
-    CHARACTER(len=ESMF_MAXSTR) :: label, ISM_gridType
+    CHARACTER(len=ESMF_MAXSTR) :: label
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: ISM_DerVarList(:)
     INTEGER                    :: fieldCount
     LOGICAL                    :: ISM_UseOMGrid, OM_UseISMGrid
@@ -107,11 +107,6 @@ CONTAINS
       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
-    CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_gridType, label='ISM_gridType:', rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
     CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_UseOMGrid, 'ISM_UseOMGrid',rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -125,66 +120,58 @@ CONTAINS
     
     ! The model-specific initialisation adds the ISM vars to the field bundle.
     ! This is followed by adding non-model-specific derived variables. 
-    SELECT CASE (ISM_gridType)
-
-    CASE("ESMF_grid","ESMF_Grid")
-
-      IF (ISM_UseOMGrid) THEN
-        ! Get grid from field from field list from field bundle from state.
-        CALL ESMF_StateGet(ISM_ImpSt, ISM_impFBname, OM_ExpFB, rc=rc)
-        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-             line=__LINE__, file=__FILE__)) &
-             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-        CALL ESMF_FieldBundleGet(OM_ExpFB, fieldCount=fieldCount, rc=rc)
-        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-             line=__LINE__, file=__FILE__)) &
-             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-        ALLOCATE(fieldList(fieldCount))
-        CALL ESMF_FieldBundleGet(OM_ExpFB, fieldList=fieldList,rc=rc)
-        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-             line=__LINE__, file=__FILE__)) &
-             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)        
-        CALL ESMF_FieldGet(FieldList(1), grid=OM_grid, rc=rc)
-        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-             line=__LINE__, file=__FILE__)) &
-             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-        ! We assign the ISM_grid to the OM_grid.  This is not taking a copy, 
-        ! but using the same object.
-        ISM_grid = OM_grid
-
-!        ! The OM_ExpFB was only there to give us the grid, so remove it now.
-!        CALL ESMF_StateRemove (ISM_ImpSt, (/"OM export fields"/), rc=rc)
-!        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!             line=__LINE__, file=__FILE__)) &
-!             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-      END IF
-
-      CALL FISOC_ISM_Wrapper_Init_Phase1(FISOC_config,vm,ISM_ExpFB,ISM_grid,rc=rc)
+# if defined(FISOC_ISM_GRID)
+    IF (ISM_UseOMGrid) THEN
+      ! Get grid from field from field list from field bundle from state.
+      CALL ESMF_StateGet(ISM_ImpSt, ISM_impFBname, OM_ExpFB, rc=rc)
       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
            line=__LINE__, file=__FILE__)) &
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-      CALL FISOC_populateFieldBundle(ISM_DerVarList,ISM_ExpFB,ISM_grid,rc=rc)
+      CALL ESMF_FieldBundleGet(OM_ExpFB, fieldCount=fieldCount, rc=rc)
       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
            line=__LINE__, file=__FILE__)) &
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      ALLOCATE(fieldList(fieldCount))
+      CALL ESMF_FieldBundleGet(OM_ExpFB, fieldList=fieldList,rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)        
+      CALL ESMF_FieldGet(FieldList(1), grid=OM_grid, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      ! We assign the ISM_grid to the OM_grid.  This is not taking a copy, 
+      ! but using the same object.
+      ISM_grid = OM_grid
+      
+    END IF
+    
+    CALL FISOC_ISM_Wrapper_Init_Phase1(FISOC_config,vm,ISM_ExpFB,ISM_grid,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL FISOC_populateFieldBundle(ISM_DerVarList,ISM_ExpFB,ISM_grid,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+# elif defined(FISOC_ISM_MESH)
+    CALL FISOC_ISM_Wrapper_Init_Phase1(FISOC_config,vm,ISM_ExpFB,ISM_mesh,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL FISOC_populateFieldBundle(ISM_DerVarList,ISM_ExpFB,ISM_mesh,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CASE("ESMF_mesh","ESMF_Mesh")
-       CALL FISOC_ISM_Wrapper_Init_Phase1(FISOC_config,vm,ISM_ExpFB,ISM_mesh,rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       CALL FISOC_populateFieldBundle(ISM_DerVarList,ISM_ExpFB,ISM_mesh,rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CASE DEFAULT
-       msg = "ERROR: FISOC does not recognise ISM_gridType: "//ISM_gridType
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END SELECT
+# else
+    msg = "ERROR: FISOC does not recognise ISM geom type."
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+         line=__LINE__, file=__FILE__, rc=rc)
+    CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
 
 
     ! Calculate values for derived variables from the model-specific ISM vars.
