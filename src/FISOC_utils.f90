@@ -19,7 +19,8 @@ MODULE FISOC_utils_MOD
        FISOC_getFirstFieldRank, FISOC_makeRHfromFB,            &
        FISOC_State2StateCopyFB, FISOC_regridFB,                &
        FISOC_GridCompRun, FISOC_FieldListGetField,             &
-       FISOC_getGridFromFB, FISOC_getMeshFromFB                
+       FISOC_getGridFromFB, FISOC_getMeshFromFB,               &                
+       FISOC_ConfigStringListContains
 !         FISOC_getGridOrMeshFromFB, 
 
   INTERFACE Unique1DArray
@@ -337,8 +338,37 @@ CONTAINS
     RETURN
 
   END FUNCTION  FISOC_OM2ISM
+  
+  
+  !------------------------------------------------------------------------------
+  LOGICAL FUNCTION FISOC_ConfigStringListContains(FISOC_config,itemName,listName,rc)
+    
+    CHARACTER(*),INTENT(IN)               :: itemName, listName
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: stringList(:)
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+    
+    rc = ESMF_FAILURE
 
+    CALL FISOC_getStringListFromConfig(FISOC_config, listName, stringList, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    FISOC_ConfigStringListContains = FISOC_listContains(itemName,stringList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    IF (ALLOCATED(stringList)) DEALLOCATE(stringList)
+
+    rc = ESMF_SUCCESS
+
+    RETURN
+
+  END FUNCTION FISOC_ConfigStringListContains
+  
 
   !------------------------------------------------------------------------------
   LOGICAL FUNCTION FISOC_listContains(itemName,list,rc)
@@ -1402,10 +1432,8 @@ print*,'catch error and set default if missing att'
        END IF
 
        IF ( (ii.EQ.1) .AND. (PRESENT(RouteHandle)) ) THEN
-print*,"need RH"
-print*,"need RH"
-print*,"need RH"
-print*,"need RH"
+         print*,"*** need RH ***"
+         print*,"*** need RH ***"
        END IF
 
        CALL ESMF_FieldGet(field=field, localDe=0, farrayPtr=field_ptr, rc=rc)

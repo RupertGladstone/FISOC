@@ -613,46 +613,60 @@ CONTAINS
        ptr = FISOC_missingData
        
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
-          
+         
        CASE ('OM_dBdt_l0')
-          DO jj = JstrR, JendR
-             DO ii = IstrR, IendR
-                ptr(ii,jj) = ICESHELFVAR(1) % m(ii,jj)
-             END DO
-          END DO
-          CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
-          
+         DO jj = JstrR, JendR
+           DO ii = IstrR, IendR
+             ptr(ii,jj) = ICESHELFVAR(1) % m(ii,jj)
+           END DO
+         END DO
+         CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
+         
        CASE ('OM_temperature_l0')
-          DO jj = JstrR, JendR
-             DO ii = IstrR, IendR
-                ptr(ii,jj) = ICESHELFVAR(1) % Tb(ii,jj)
-             END DO
-          END DO
-
+         DO jj = JstrR, JendR
+           DO ii = IstrR, IendR
+             ptr(ii,jj) = ICESHELFVAR(1) % Tb(ii,jj)
+           END DO
+         END DO
+         
        CASE ('OM_z_l0')
-          DO jj = JstrR, JendR
-             DO ii = IstrR, IendR
-                ptr(ii,jj) = ICESHELFVAR(1) % iceshelf_draft(ii,jj,nnew(1))
-             END DO
-          END DO
-
+         DO jj = JstrR, JendR
+           DO ii = IstrR, IendR
+             ptr(ii,jj) = ICESHELFVAR(1) % iceshelf_draft(ii,jj,nnew(1))
+           END DO
+         END DO
+         
+       CASE ('OM_z_lts')
+# if defined ROMS_DSDT
+         DO jj = JstrR, JendR
+           DO ii = IstrR, IendR
+             ptr(ii,jj) = GRID(1) % sice(ii,jj)
+           END DO
+         END DO
+# else
+         msg = "ERROR: cpp ROMS_DSDT must be set in order to access OM_z_lts"
+         CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+              line=__LINE__, file=__FILE__, rc=rc)
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
+         
        CASE ('OM_bed')
-          DO jj = JstrR, JendR
-             DO ii = IstrR, IendR
-                ptr(ii,jj) = -GRID(1) % h(ii,jj)
-             END DO
-          END DO
-
+         DO jj = JstrR, JendR
+           DO ii = IstrR, IendR
+             ptr(ii,jj) = -GRID(1) % h(ii,jj)
+           END DO
+         END DO
+         
        CASE DEFAULT
-          msg = "ERROR: unknown variable"
-          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-               line=__LINE__, file=__FILE__, rc=rc)
-          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
+         msg = "ERROR: unknown variable"
+         CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+              line=__LINE__, file=__FILE__, rc=rc)
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+         
        END SELECT
        
        IF (ASSOCIATED(ptr)) THEN
-          NULLIFY(ptr)
+         NULLIFY(ptr)
        END IF
        
     END DO fieldLoop

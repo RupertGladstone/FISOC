@@ -127,6 +127,7 @@ else
  endif
 endif
 	$(info )
+	$(info )
 
 ################################################################################
 
@@ -146,6 +147,8 @@ $(SRCDIR)/FISOC_utils.o:                    $(SRCDIR)/FISOC_utils.f90
 ################################################################################
 
 install: info $(FISOC_EXE) 
+	$(info )
+	$(info Building FISOC complete)
 	cp $(FISOC_EXE) $(INSTALL_DIR)/$(FISOC_EXE) 
 
 .PHONY: clean

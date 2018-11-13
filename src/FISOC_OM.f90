@@ -550,9 +550,11 @@ CONTAINS
     TYPE(ESMF_field)            :: ISM_z_l0_previous, ISM_z_l0_linterp 
     TYPE(ESMF_field)            :: ISM_z_l0_field, OM_z_l0_field, dddt_field
     TYPE(ESMF_field)            :: OM_bed_field
+    TYPE(ESMF_field)            :: OM_z_lts_field,ISM_z_lts_field,ISM_dsdt_field
     REAL(ESMF_KIND_R8),POINTER  :: ptr_curr(:,:),ptr_prev(:,:),ptr_linterp(:,:)
     REAL(ESMF_KIND_R8),POINTER  :: ISM_z_l0(:,:), OM_z_l0(:,:), dddt(:,:)
     REAL(ESMF_KIND_R8),POINTER  :: OM_bed(:,:)
+    REAL(ESMF_KIND_R8),POINTER  :: OM_z_lts(:,:),ISM_z_lts(:,:),ISM_dsdt(:,:)
     INTEGER                     :: ii,jj,arrShape(2)
     INTEGER                     :: IendR, IstrR, JendR, JstrR
 
@@ -564,6 +566,8 @@ CONTAINS
 # endif
     INTEGER                     :: exclusiveLBound(2),exclusiveUBound(2),exclusiveCount(2),computationalLBound(2)
     INTEGER                     :: computationalUBound(2),computationalCount(2),totalLBound(2),totalUBound(2)
+
+    LOGICAL                     :: CalculateUpperSurface
 
     rc = ESMF_FAILURE
 
@@ -591,16 +595,24 @@ CONTAINS
       !            line=__LINE__, file=__FILE__, rc=rc)
       !       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        
+
       ! ISM var dddt will be used.  If an ISM export is available, which means 
-       ! dddt has just been calculated, we modify dddt here to impose a 
+      ! dddt has just been calculated, we modify dddt here to impose a 
       ! correcting drift. The drift is designed to reduce the ISM-OM 
-       ! discrepancy over one ISM timestep.
+      ! discrepancy over one ISM timestep.
       CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_ISM_exportAvailable", alarm_ISM_exportAvailable, rc=rc)
       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
            line=__LINE__, file=__FILE__)) &
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
       
       IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN 
+        
+        ! check whether we need to take into consideration the upper ice surface.
+        ! By default only the lower surface will be used.
+        CalculateUpperSurface = FISOC_ConfigStringListContains(FISOC_config,"ISM_dsdt","ISM2OM_vars",rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
         
         ! We need the OM cavity geom... 
         CALL ESMF_FieldBundleGet(OM_ExpFB, fieldName="OM_z_l0", field=OM_z_l0_field, rc=rc)
@@ -642,6 +654,37 @@ CONTAINS
         IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
              line=__LINE__, file=__FILE__)) &
              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+        ! If we're considering the upper ice surface we also need:
+        ! OM upper ice surface
+        ! ISM upper ice surface
+        ! ISM change rate of upper surface, dsdt
+        UpperSurf: IF (CalculateUpperSurface) THEN          
+          CALL ESMF_FieldBundleGet(OM_ExpFB, fieldName="OM_z_lts", field=OM_z_lts_field, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldGet(field=OM_z_lts_field, farrayPtr=OM_z_lts, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_z_lts", field=ISM_z_lts_field, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldGet(field=ISM_z_lts_field, farrayPtr=ISM_z_lts, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_dsdt", field=ISM_dsdt_field, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldGet(field=ISM_dsdt_field, farrayPtr=ISM_dsdt, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)          
+        END IF UpperSurf
         
         ! ISM time step in seconds is used (we are modifying dddt here in 
         ! metres per second)
@@ -651,6 +694,7 @@ CONTAINS
              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
         ISM_dt = REAL(ISM_dt_int,ESMF_KIND_R8)
         
+        ! TODO: access this from the OM instead of FISOC config?  For ROMS it would be DCRIT.
         CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_WCmin, 'OM_WCmin',rc)
         IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
              line=__LINE__, file=__FILE__)) &
@@ -711,6 +755,10 @@ CONTAINS
             dddt(ii,jj) = dddt(ii,jj) +                          &
                  CavCorr*( MAX(ISM_z_l0(ii,jj),OM_bed(ii,jj)+    &
                  OM_WCmin)-OM_z_l0(ii,jj) ) / ISM_dt
+            IF (CalculateUpperSurface) THEN          
+              ISM_dsdt(ii,jj) = ISM_dsdt(ii,jj) +  CavCorr *     & 
+                   (ISM_z_lts(ii,jj)-OM_z_lts(ii,jj)) / ISM_dt
+            END IF
           END DO
         END DO
         
@@ -728,12 +776,10 @@ CONTAINS
         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 # endif
         
-        NULLIFY(ISM_z_l0)
-        NULLIFY(OM_z_l0)
-        NULLIFY(OM_bed)
-        NULLIFY(dddt)
-        NULLIFY(ptrX)
-        
+        NULLIFY(ISM_z_l0,OM_z_l0,OM_bed,dddt,ptrX)
+        IF (CalculateUpperSurface) THEN          
+          NULLIFY(ISM_dsdt,ISM_z_lts,OM_z_lts)
+        END IF
       END IF
       
       
