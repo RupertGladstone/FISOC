@@ -197,7 +197,7 @@ CONTAINS
          OM_mesh,init_value=REAL(0.0,ESMF_KIND_R8),rc=rc)
 # else
     msg="invalid CPP options for OM geom type"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)          
     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 # endif
@@ -368,12 +368,12 @@ CONTAINS
 # if defined(FISOC_ISM_GRID)
     CALL FISOC_populateFieldBundle(fieldNameList,ISM_impFB,   &
          ISM_grid,init_value=REAL(0.0,ESMF_KIND_R8),rc=rc)
-# elif defined(FISOC_OM_MESH)
+# elif defined(FISOC_ISM_MESH)
     CALL FISOC_populateFieldBundle(fieldNameList,ISM_impFB,    &
          ISM_mesh,init_value=REAL(0.0,ESMF_KIND_R8),rc=rc)
 # else
     msg="invalid CPP options for ISM geom type"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
          line=__LINE__, file=__FILE__, rc=rc)          
     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 # endif
