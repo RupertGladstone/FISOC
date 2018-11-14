@@ -541,7 +541,7 @@ CONTAINS
     INTEGER,INTENT(IN)                       :: localPet
     INTEGER,INTENT(OUT),OPTIONAL             :: rc
 
-    CHARACTER(len=ESMF_MAXSTR)               :: OM_cavityUpdate
+    CHARACTER(len=ESMF_MAXSTR)               :: OM_cavityUpdate, label, listLabel
     TYPE(ESMF_Alarm)                         :: alarm_ISM_exportAvailable
     INTEGER, SAVE                            :: linterpCounter=0
     INTEGER                                  :: dt_ratio, ISM_dt_int
@@ -609,7 +609,9 @@ CONTAINS
         
         ! check whether we need to take into consideration the upper ice surface.
         ! By default only the lower surface will be used.
-        CalculateUpperSurface = FISOC_ConfigStringListContains(FISOC_config,"ISM_dsdt","ISM2OM_vars",rc=rc)
+        label = "ISM_dsdt"
+        listLabel = "ISM2OM_vars"
+        CalculateUpperSurface = FISOC_ConfigStringListContains(FISOC_config,label,listLabel,rc=rc)
         IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
              line=__LINE__, file=__FILE__)) &
              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)

@@ -343,7 +343,7 @@ CONTAINS
   !------------------------------------------------------------------------------
   LOGICAL FUNCTION FISOC_ConfigStringListContains(FISOC_config,itemName,listName,rc)
     
-    CHARACTER(*),INTENT(IN)               :: itemName, listName
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: itemName, listName
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: stringList(:)
