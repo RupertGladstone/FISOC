@@ -183,7 +183,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
+    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,ignoreAveragesOpt=.TRUE.,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -260,7 +260,7 @@ CONTAINS
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
-    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
+    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,ignoreAveragesOpt=.TRUE.,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) & 
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -545,12 +545,13 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! update the fields in the ocean export field bundle from the OM
   !--------------------------------------------------------------------------------------
-  SUBROUTINE getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc)
+  SUBROUTINE getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,ignoreAveragesOpt,rc)
 
     USE mod_iceshelfvar, ONLY : ICESHELFVAR
     USE mod_param, ONLY       : BOUNDS, Ngrids
     USE mod_stepping, ONLY    : nnew
     USE mod_grid , ONLY       : GRID
+    USE mod_average, ONLY     : AVERAGE
 
     IMPLICIT NONE
 
@@ -558,7 +559,9 @@ CONTAINS
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
     TYPE(ESMF_VM),INTENT(IN)              :: vm
+    LOGICAL,INTENT(IN),OPTIONAL           :: ignoreAveragesOpt
 
+    LOGICAL                               :: ignoreAverages
     INTEGER                               :: fieldCount, localPet, petCount
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
     CHARACTER(len=ESMF_MAXSTR)            :: fieldName
@@ -568,6 +571,12 @@ CONTAINS
 !    INTEGER                               :: LBi, UBi, LBj, UBj ! tile start and end coords including halo
 
     rc = ESMF_FAILURE
+
+    IF (PRESENT(ignoreAveragesOpt)) THEN
+      ignoreAverages = ignoreAveragesOpt
+    ELSE
+      ignoreAverages = .FALSE.
+    END IF
 
     IF (Ngrids .ne. 1) THEN
        msg = "ERROR: not expecting multiple ROMS grids"
@@ -617,15 +626,31 @@ CONTAINS
        CASE ('OM_dBdt_l0')
          DO jj = JstrR, JendR
            DO ii = IstrR, IendR
+# if defined(ROMS_AVERAGES)
+             IF (ignoreAverages) THEN
+               ptr(ii,jj) = ICESHELFVAR(1) % m(ii,jj)
+             ELSE
+               ptr(ii,jj) = AVERAGE(1) % avgismr(ii,jj)
+             END IF
+# else
              ptr(ii,jj) = ICESHELFVAR(1) % m(ii,jj)
+# endif
            END DO
          END DO
-         CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
+!         CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
          
        CASE ('OM_temperature_l0')
          DO jj = JstrR, JendR
            DO ii = IstrR, IendR
+# if defined(ROMS_AVERAGES)
+             IF (ignoreAverages) THEN
+               ptr(ii,jj) = ICESHELFVAR(1) % Tb(ii,jj)
+             ELSE
+               ptr(ii,jj) = AVERAGE(1) % avgisTb(ii,jj)
+             END IF
+# else
              ptr(ii,jj) = ICESHELFVAR(1) % Tb(ii,jj)
+# endif
            END DO
          END DO
          

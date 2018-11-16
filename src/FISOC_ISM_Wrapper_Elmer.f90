@@ -375,9 +375,35 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL       :: rc
     TYPE(ESMF_VM),INTENT(IN)           :: vm
 
+    INTEGER                            :: localPet
+    LOGICAL                            :: verbose_coupling
+
     rc = ESMF_FAILURE
 
-    CALL ElmerSolver_finalize(PreserveParEnvOpt=.TRUE.)
+
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       PRINT*,""
+       PRINT*,"******************************************************************************"
+       PRINT*,"************      ISM wrapper.  Finalise method.        **********************"
+       PRINT*,"******************************************************************************"
+       PRINT*,""
+       PRINT*,"FISOC has taken care of clearing up ESMF types.  Here we just need to call the "
+       PRINT*,"ISM finalise method."
+    END IF
+
+! TODO: fix Elmer finalise call, not working for some reason...
+!    CALL ElmerSolver_finalize()
+!    CALL ElmerSolver_finalize(PreserveParEnvOpt=.TRUE.)
 
     CLOSE(unit=ISM_outputUnit, ERR=102)
 
