@@ -1,0 +1,56 @@
+### ROMS-FOOL FISOC_config.rc file. Uncommented lines are required entries. ###
+
+
+### ISM options ###
+  ISM_configFile:         FOOL_config.rc
+#  ISM_stdoutFile:         ISM.out
+  FISOC_ISM_ReqVars:      ISM_z_l0 ISM_z_l0_previous
+  ISM_varNames:           zice zice_prev 
+  FISOC_ISM_DerVars:      ISM_dddt
+  ISM_gridType:           ESMF_grid
+  ISM2OM_vars:            ISM_dddt
+  ISM2OM_init_vars:       .TRUE.
+  ISM2OM_regrid:          ESMF_REGRIDMETHOD_NEAREST_STOD
+  ISM_UseOMGrid:          .TRUE.
+
+
+### OM options ###
+  OM_configFile:          /home1/slmack/ROMSIceShelf_devel/ROMS/External/ocean_isomip_plus_sm.in
+  OM_stdoutFile:          run074.out
+  FISOC_OM_ReqVars:       OM_temperature_l0 OM_bed
+  OM_ReqVars_stagger:     CENTER CENTER
+  FISOC_OM_DerVars:       OM_dBdt_l0
+  OM_gridType:            ESMF_grid
+  OM2ISM_vars:            
+#  OM2ISM_init_vars:
+  OM2ISM_regrid:          ESMF_REGRIDMETHOD_BILINEAR
+  OM_initCavityFromISM:   .FALSE.
+  OM_cavityUpdate:        Rate
+  OM_WCmin:               15.0
+#  OM_cavCorr:             0.2
+  OM_outputInterval:      157680
+
+
+### NETCDF output options ###
+  OM_writeNetcdf:         .FALSE.
+  output_dir:             /nobackupp2/slmack/FISOC/ROMSFOOL
+  OM_NCfreq:              all
+
+
+### Timestepping options ###
+  OM_dt_sec:              200
+#  dt_ratio:               43200
+  dt_ratio:               157680
+  start_year:             1
+  start_month:            1
+  end_year:               100
+  end_month:              1
+#  runLength_ISM_steps:    10000
+
+
+### General options ###
+  verbose_coupling:       .FALSE.
+
+### Variable definitions and possible values ###
+### To be completed later ###
+
