@@ -25,7 +25,7 @@
 
   ISM_configFile:     FISOC_Ex5b.sif
   FISOC_ISM_ReqVars:  ISM_z_l0 ISM_thick ISM_gmask 
-  FISOC_ISM_varNames: 'Coordinate 3' Depth groundedmask 
+#  ISM_varNames: 'Coordinate 3' Depth groundedmask 
   FISOC_ISM_DerVars:  ISM_z_lts ISM_z_l0_previous ISM_z_lts_previous ISM_dddt ISM_dsdt 
 
 # ISM_z_l0_linterp # ISM_dTdz_l0

@@ -20,8 +20,9 @@ MODULE FISOC_ISM_Wrapper
   INTEGER,PARAMETER                     :: NOYEAR = -999
   
   TYPE(ESMF_config)                     :: FOOL_config 
-  REAL(ESMF_KIND_R8),PARAMETER          :: secperyear = 365.0*24.*60.*60. 
-  INTEGER                               :: year = NOYEAR
+!  REAL(ESMF_KIND_R8),PARAMETER          :: secperyear = 365.0*24.*60.*60. 
+  INTEGER,PARAMETER                     :: secperyear = 365.0*24.*60.*60. 
+  INTEGER                               :: year = NOYEAR, ISM_stepCounter = 1
 
 ! TODO: resolve some code duplication between init 1 and run.  Setting up file names etc. for getting the var from netcdf.
 ! TODO: hard code timestep check instead of hard coding timestep itself.  Put expected timestep in config file.
@@ -54,14 +55,14 @@ CONTAINS
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_VM),INTENT(INOUT)           :: vm
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
-    TYPE(ESMF_grid),INTENT(OUT)           :: ISM_Grid
+    TYPE(ESMF_grid),INTENT(INOUT)         :: ISM_Grid
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM_ReqVarList(:)
     CHARACTER(len=ESMF_MAXSTR)            :: label
     CHARACTER(len=ESMF_MAXSTR)            :: FOOL_configName, ISM_gridLayout
     INTEGER                               :: localPet, ISM_dt_sec
-    LOGICAL                               :: verbose_coupling
+    LOGICAL                               :: verbose_coupling, ISM_UseOMGrid
 
     CHARACTER(len=ESMF_MAXSTR)   :: fileName
     TYPE(ESMF_grid)              :: FOOLgrid
@@ -106,31 +107,46 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_ConfigGetAttribute(FOOL_config, ISM_gridLayout, label='ISM_gridLayout:', rc=rc)
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_UseOMGrid, 'ISM_UseOMGrid',rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    SELECT CASE(ISM_gridLayout)
-
-    CASE ('isomip_plus')
-       msg = "Creating ISM ISOMIP+ grid"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__, rc=rc)
-
-       CALL Create_ISOMIP_plus_grid(ISM_grid,rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-    CASE DEFAULT
-       msg = "ERROR: FOOL does not recognise ISM_gridLayout"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-    END SELECT
+    CALL ESMF_ConfigGetAttribute(FOOL_config, ISM_gridLayout, label='ISM_gridLayout:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
+    ! We don't need to construct the grid if we're simply using the OM grid
+    IF (ISM_UseOMGrid) THEN
+      msg = "Using OM grid for ISM"
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+           line=__LINE__, file=__FILE__, rc=rc)
+
+    ELSE
+      
+      SELECT CASE(ISM_gridLayout)
+        
+      CASE ('isomip_plus')
+        msg = "Creating ISM ISOMIP+ grid"
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+             line=__LINE__, file=__FILE__, rc=rc)
+        
+        CALL Create_ISOMIP_plus_grid(ISM_grid,rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+      CASE DEFAULT
+        msg = "ERROR: FOOL does not recognise ISM_gridLayout"
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+             line=__LINE__, file=__FILE__, rc=rc)
+        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+      END SELECT
+    
+    END IF
+
     CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -218,6 +234,8 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
+    ISM_stepCounter = ISM_stepCounter + 1
+
     CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -278,9 +296,11 @@ CONTAINS
     TYPE(ESMF_grid)                :: FOOLgrid
     INTEGER                        :: nn, ISM_dt_sec
     REAL(ESMF_KIND_R8),POINTER     :: ptr(:,:)
-    INTEGER                        :: fieldCount, rc
+    INTEGER                        :: fieldCount, rc, numForcingFiles
     TYPE(ESMF_Field),ALLOCATABLE   :: fieldList(:)
-    CHARACTER(len=ESMF_MAXSTR)     :: fieldName, fileName
+    TYPE(ESMF_Field)               :: field
+    CHARACTER(len=ESMF_MAXSTR)     :: fieldName, fileName, label
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM_varNames(:), ISM_reqVars(:)
 
     CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt_sec, 'ISM_dt_sec',rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -288,6 +308,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     CALL makeFileName(FOOL_config,fileName)
+
+    CALL ESMF_ConfigGetAttribute(FOOL_config, NumForcingFiles, label='NumForcingFiles:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! get a list of fields and their names from the ISM export field bundle
     fieldCount = 0
@@ -307,27 +332,34 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-
-    fieldLoop: DO nn = 1,fieldCount
-       
-       ! access the FISOC version of the current field
-       CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-       ! access the netcdf file for the current field
-       SELECT CASE (TRIM(ADJUSTL(fieldName)))
-
-       CASE ('ISM_z_l0')
+    ! if var names are defined we don't need to use hard coded values
+    label = 'ISM_varNames:'
+    CALL FISOC_getListFromConfig(FISOC_config, label, ISM_varNames,rc=rc)
+    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+      msg = "ISM_varNames not found, using hard coded defaults"
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      
+      fieldLoop: DO nn = 1,fieldCount
+        
+        ! access the FISOC version of the current field
+        CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+        CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+         
+        ! access the netcdf file for the current field
+        SELECT CASE (TRIM(ADJUSTL(fieldName)))
+          
+        CASE ('ISM_z_l0')
           CALL readFromNC(FileName,'zice',FOOLgrid,ptr,1)
           
-       CASE ('ISM_z_lts')
+        CASE ('ISM_z_lts')
           CALL readFromNC(FileName,'sice',FOOLgrid,ptr,1)
           
        CASE ('ISM_dddt')
@@ -343,17 +375,50 @@ CONTAINS
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
                line=__LINE__, file=__FILE__, rc=rc)
           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          
+        END SELECT
+        
+      END DO fieldLoop
+      
+    ELSE IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) THEN
+      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-       END SELECT
-
-    END DO fieldLoop
-
+    ! If var names are defined we don't need to use hard coded values.
+    ! Here we just loop over required vars.
+    ELSE
+      label = 'FISOC_ISM_ReqVars:'
+      CALL FISOC_getListFromConfig(FISOC_config, label, ISM_reqVars,rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) THEN
+        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      END IF
+      DO nn = 1,SIZE(ISM_ReqVars)
+        field = FISOC_FieldListGetField(FieldList,ISM_reqVars(nn),rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        CALL ESMF_FieldGet(field, farrayPtr=ptr, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)        
+        IF (numForcingFiles.EQ.1) THEN
+          CALL readFromNC(FileName,ISM_varNames(nn),FOOLgrid,ptr,1,ISM_stepCounter)
+        ELSE
+          CALL readFromNC(FileName,ISM_varNames(nn),FOOLgrid,ptr,1)
+        END IF
+      END DO
+    END IF
+    
+    IF (ALLOCATED(ISM_ReqVars)) DEALLOCATE(ISM_ReqVars)
+    IF (ALLOCATED(ISM_varNames)) DEALLOCATE(ISM_varNames)
+         
     NULLIFY(ptr)
-
+    
     rc = ESMF_SUCCESS
-
+    
   END SUBROUTINE getFieldDataFromISM
-
+  
 
 !    CALL ESMF_ClockGet(clock, startTime, currTime
 !    advanceCount, rc=rc)
@@ -411,7 +476,12 @@ CONTAINS
     END IF
 
     WRITE (fileNumber, "(I0)") year
-    fileName = TRIM(ADJUSTL(ForcingDir))//TRIM(ADJUSTL(ForcingBaseName))//TRIM(ADJUSTL(fileNumber))//".nc"
+
+    IF (NumForcingFiles.GT.1) THEN
+      fileName = TRIM(ADJUSTL(ForcingDir))//TRIM(ADJUSTL(ForcingBaseName))//TRIM(ADJUSTL(fileNumber))//".nc"
+    ELSE
+      fileName = TRIM(ADJUSTL(ForcingDir))//TRIM(ADJUSTL(ForcingBaseName))//".nc"
+    END IF
 
     ! Increment year for next time (we assume here the ISM timestep is 1 year)
     year = year + 1
@@ -420,13 +490,14 @@ CONTAINS
 
 
 
-  SUBROUTINE readFromNC(FileName,VarName,FOOLgrid,ptr,scaling)
+  SUBROUTINE readFromNC(FileName,VarName,FOOLgrid,ptr,scaling,timeStep)
 
     REAL(ESMF_KIND_R8),POINTER,INTENT(INOUT) :: ptr(:,:)
     CHARACTER(len=ESMF_MAXSTR),INTENT(IN)    :: FileName
     CHARACTER(len=*),INTENT(IN)              :: VarName
     TYPE(ESMF_grid),INTENT(INOUT)            :: FOOLgrid
     INTEGER,INTENT(IN)                       :: scaling
+    INTEGER,INTENT(IN),OPTIONAL              :: timeStep
 
     REAL(ESMF_KIND_R8),ALLOCATABLE :: values(:,:)
     INTEGER                        :: lbnd(2), ubnd(2), NtileI, NtileJ
@@ -443,16 +514,16 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    lbx = lbnd(1)
-    ubx = ubnd(1)
-
+    lbx = lbnd(2)+1
+    ubx = ubnd(2)+1
+ 
     CALL ESMF_GridGetCoordBounds(FOOLgrid, 2,    &
          totalLBound=lbnd, totalUBound=ubnd,   rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    lby = lbnd(1)
-    uby = ubnd(1)
+    lby = lbnd(1)+1
+    uby = ubnd(1)+1
     nx = ubx - lbx + 1
     ny = uby - lby + 1
 
@@ -464,16 +535,24 @@ CONTAINS
     
     status = nf90_inq_varid(ncid, VarName, varid)
     IF(status /= nf90_NoErr) CALL handle_err(status)
-
-    status = nf90_get_var(ncid, varid, values,  &
-         start = (/ lby, lbx /),                      &
-         count = (/ ny,  nx  /)                        )
-    IF(status /= nf90_NoErr) CALL handle_err(status)
+    
+    IF (PRESENT(TimeStep)) THEN
+      status = nf90_get_var(ncid, varid, values,      &
+           start = (/ lby, lbx, TimeStep /),          &
+           count = (/ ny,  nx,  1        /)            )
+      IF(status /= nf90_NoErr) CALL handle_err(status)
+    ELSE
+      status = nf90_get_var(ncid, varid, values,      &
+           start = (/ lby,  lbx /),                    &
+           count = (/ ny,   nx  /)                      )
+      IF(status /= nf90_NoErr) CALL handle_err(status)
+    END IF
 
     status = nf90_close(ncid)
     IF(status /= nf90_NoErr) CALL handle_err(status)
 
-    ptr = TRANSPOSE(values)
+!    ptr = TRANSPOSE(values)
+    ptr = values
 
     ptr = ptr / scaling ! e.g. to convert from m/yr to m/s
 !    ptr = ptr/31557600.0
@@ -546,7 +625,7 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL   :: rc
 
     CHARACTER(len=ESMF_MAXSTR)     :: fileName, fileNumber, ForcingDir, ForcingBaseName
-    REAL(ESMF_KIND_R8),POINTER     :: xCoords(:), yCoords(:)
+    REAL(ESMF_KIND_R8),POINTER     :: xCoords(:,:), yCoords(:,:)
     INTEGER                        :: lbnd(2), ubnd(2), year, NtileI, NtileJ
     INTEGER                        :: nx, ny, dx, dy, ii, x1, y1, localDEcount
 
@@ -562,7 +641,7 @@ CONTAINS
     ! Note: we are using David G's processed netcdf files with 2km instead of 1km 
     ! resolution, so set the values accordingly here:
     ny = 240; nx = 40; dx = 2000; dy = 2000
-    y1 = 321000; x1 = 1000 ! starting coords (like all) are at cell centres
+    x1 = 321000; y1 = 1000 ! starting coords (like all) are at cell centres
     
     ! get the decomposition from the FOOL config
     CALL ESMF_ConfigGetAttribute(FOOL_config, NtileI, label='NtileI:', rc=rc)
@@ -580,15 +659,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    
-
     ! Make the grid and add coords
     FOOLgrid=ESMF_GridCreateNoPeriDim(  &
-         maxIndex=(/ny,nx/),            & 
-         regDecomp=(/NtileJ,NtileI/),   &
+         regDecomp=(/NtileI,NtileJ/),   &
+         minIndex=(/0,0/),              & 
+         maxIndex=(/nx-1,ny-1/),        & 
          coordSys=ESMF_COORDSYS_CART,   &
-         coordDep1=(/1/), & ! 1st coord is 1D and depends on 1st Grid dim
-         coordDep2=(/2/), & ! 2nd coord is 1D and depends on 2nd Grid dim
          indexflag=ESMF_INDEX_GLOBAL,   &
          rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -603,16 +679,16 @@ CONTAINS
     
     CALL ESMF_GridGetCoord(FOOLgrid, 2, localDE=0, &
          staggerloc=ESMF_STAGGERLOC_CENTER, &
-         farrayPtr=xCoords, &
          computationalLBound=lbnd, &
          computationalUBound=ubnd, &
+         farrayPtr=xCoords, &
          rc=rc)  
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    DO ii=lbnd(1),ubnd(1)
-       xCoords(ii) = x1 - dx + (ii*dx)
+    DO ii=lbnd(2),ubnd(2)
+       xCoords(:,ii) = x1 + (ii*dx)
     END DO
     
     CALL ESMF_GridGetCoord(FOOLgrid, 1, localDE=0, &
@@ -626,7 +702,7 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     DO ii=lbnd(1),ubnd(1)
-       yCoords(ii) = y1 - dy + (ii*dy)
+       yCoords(ii,:) = y1 + (ii*dy)
     END DO
 
     NULLIFY(yCoords)

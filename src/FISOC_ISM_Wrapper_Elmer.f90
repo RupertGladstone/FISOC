@@ -48,23 +48,22 @@ MODULE FISOC_ISM_Wrapper
   REAL(ESMF_KIND_R8), PARAMETER :: Elmer_secpyr = 365.25_dp*24.0_dp*60.0_dp*60.0_dp
 
   ! These variable names should be given in the ISM_varNames list in the FISOC 
-  ! inpupt file.  If omitted, defaults are given here.
-  ! The user must ensure the names correspond to Elmer variable names.
+  ! config file.  If omitted, defaults are given here.  In either case the user 
+  ! must ensure these names correspond to Elmer variable names.
   ! TODO: is this information in the manual?
-  CHARACTER(len=ESMF_MAXSTR) :: EIname_gmask          = 'groundedmask'
-  CHARACTER(len=ESMF_MAXSTR) :: EIname_dBdt_l0        = 'meltRate'
-  CHARACTER(len=ESMF_MAXSTR) :: EIname_temperature_l0 = 'oceanTemperature'
-  CHARACTER(len=ESMF_MAXSTR) :: EIname_temperature_l1 = 'oceanTemperature'
-  CHARACTER(len=ESMF_MAXSTR) :: EIname_velocity_l0    = 'Velocity'
-  CHARACTER(len=ESMF_MAXSTR) :: EIname_thick          = 'Depth'
-  CHARACTER(len=ESMF_MAXSTR) :: EIname_z_l0           = 'Coordinate 3'
-  CHARACTER(len=ESMF_MAXSTR) :: EIname_z_l1           = 'Coordinate 3'
-  CHARACTER(len=ESMF_MAXSTR) :: EIname_z_lts          = 'Coordinate 3'
-  ! for SSA, config should contain something like this
-  !   ISM_varNames:       'Zb' 'Zs' 'SSAVelocity'
-
-
-
+  ! For Elmer SSA runs, FISOC config should contain something like this:
+  !  FISOC_ISM_ReqVars:  ISM_z_l0 ISM_z_lts 
+  !  ISM_varNames:       'Zb' 'Zs'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_gmask          = 'groundedmask'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_dBdt_l0        = 'meltRate'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_temperature_l0 = 'oceanTemperature'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_temperature_l1 = 'oceanTemperature'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_velocity_l0    = 'Velocity'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_thick          = 'Depth'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_z_l0           = 'Coordinate 3'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_z_l1           = 'Coordinate 3'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_z_lts          = 'Coordinate 3'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_H_l0           = 'depth'
 
   ! The following mesh related properties are calculated during mesh conversion 
   ! during initialisation, and are needed during variable transfer while 
@@ -72,30 +71,30 @@ MODULE FISOC_ISM_Wrapper
 
   ! EI_NodeIDs contains unique node ids used in transferring ocean field 
   ! data from esmf fields to Elmer variables
-  INTEGER, ALLOCATABLE :: EI_NodeIDs(:)
+  INTEGER, ALLOCATABLE,SAVE :: EI_NodeIDs(:)
 
 ! TODO: some of these vars below might not need to be module scope, need revising
-  INTEGER, ALLOCATABLE :: EI_ElementIDs(:)
-  INTEGER, ALLOCATABLE :: nodeOwners(:)
+  INTEGER, ALLOCATABLE,SAVE :: EI_ElementIDs(:)
+  INTEGER, ALLOCATABLE,SAVE :: nodeOwners(:)
 
   ! This is an array of Elmer node IDs for the current partition that are owned by 
   ! the local pet.  This is needed for mapping Elmer data on to the ESMF mesh.
-  INTEGER, ALLOCATABLE :: ownedNodeIDs(:)
+  INTEGER, ALLOCATABLE,SAVE :: ownedNodeIDs(:)
   
   ! Global node numbering reference (Elmer uses local node numbering).  We 
   ! must add this number to the node id whenever converting from Elmer node 
   ! ids to ESMF node ids.  Same for element id.
   ! Edit: probably no longer needed now that full ID lists are kept in memory.
-  INTEGER  :: EI_firstNodeThisPET, EI_firstElemThisPET
+  INTEGER,SAVE  :: EI_firstNodeThisPET, EI_firstElemThisPET
 
   ! Route handles for switching between Elmer arrays (which include duplicated nodes 
   ! along partition boundaries) and corresponding ESMF arrays (which don't)
-  TYPE(ESMF_RouteHandle) :: RH_ESMF2Elmer
+  TYPE(ESMF_RouteHandle),SAVE :: RH_ESMF2Elmer
 !  TYPE(ESMF_RouteHandle) :: RH_Elmer2ESMF ! not needed because the redist operation in this direction is not well defined
 
   ! nodal distgrid, an ESMF object holding information about the distribution of 
   ! Elmer nodes across partitions, needed for the redist related operations.
-  TYPE(ESMF_distgrid):: distgridElmer
+  TYPE(ESMF_distgrid),SAVE :: distgridElmer
 
 CONTAINS
 
@@ -401,7 +400,7 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
-    CALL ElmerSolver_finalize()
+    CALL ElmerSolver_finalize(PreserveParEnvOpt=.TRUE.)
 
     CLOSE(unit=ISM_outputUnit, ERR=102)
 
@@ -481,7 +480,6 @@ CONTAINS
     
     label = 'ISM_varNames:'
     CALL FISOC_getListFromConfig(FISOC_config, label, ISM_varNames,rc=rc)
-
     IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
        msg = "ISM_varNames not found, using hard coded Elmer defaults"
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
@@ -557,7 +555,9 @@ CONTAINS
     ParEnv % MyPE = localPet
     OutputPE = ParEnv % MyPe
     ParEnv % PEs  = petCount
-    ParEnv % ActiveComm = MPI_COMM_WORLD ! or mpic_dup
+    ELMER_COMM_WORLD = mpic_dup
+    ParEnv % ActiveComm = ELMER_COMM_WORLD
+!    ParEnv % ActiveComm = MPI_COMM_WORLD ! or mpic_dup
     Parenv % NumOfNeighbours = 0
     ParEnv % Initialized = .TRUE.
 
@@ -848,7 +848,7 @@ print*,"Hang on, need to get temperature exchange going too..."
     INTEGER                          :: localPet, petCount
     INTEGER                          :: ii, nodeIndex
     INTEGER                          :: EI_numNodes 
-
+    LOGICAL                          :: verbose_coupling
     INTEGER,ALLOCATABLE              :: ESMF_elemTypes(:)
     INTEGER,ALLOCATABLE              :: elemConn(:), ElementIDs_global(:)
     INTEGER,ALLOCATABLE              :: nodeIds(:), nodeIds_global(:)
@@ -856,16 +856,21 @@ print*,"Hang on, need to get temperature exchange going too..."
     INTEGER                          :: numQuadElems, numTriElems, numElems
 
 
-    ! We can access the main Elmer derived types from here.  We assume there is
-    ! one mesh in this Elmer simulation.
-    ElmerMesh = CurrentModel % Mesh
-    CALL ElmerMeshSanityChecks(ElmerMesh)
+    CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Obtain basic parallel information (pet = persistent execution thread)
     CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! We can access the main Elmer derived types from here.  We assume there is
+    ! one mesh in this Elmer simulation.
+    ElmerMesh = CurrentModel % Mesh
+    CALL ElmerMeshSanityChecks(ElmerMesh)
 
     ! If a projection vector is not specified, the default is downwards.
     label = "ISM_ProjVector:"
@@ -919,8 +924,6 @@ print*,"Hang on, need to get temperature exchange going too..."
     ALLOCATE(NodeIDs(EI_numNodes))
     ALLOCATE(NodeIDs_global(EI_numNodes))
 
-print*,"change comments about EI vars at top when resolved..."
-
     ! Calculate some properties dependent on other PETs, and 
     ! which will be needed for variable exchange.
     EI_firstNodeThisPET = firstItemThisPET(EI_numNodes,vm)
@@ -934,10 +937,25 @@ print*,"change comments about EI vars at top when resolved..."
 
     ALLOCATE(nodeCoords(EI_numNodes*2))
 
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       msg = "Elmer mesh: getting node coords"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
     CALL getNodeCoords(nodeCoords,ElmerMesh,ISM_ProjVector,EI_numNodes)
 
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       msg = "Elmer mesh: making node ids unique"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
     CALL uniquifyGlobalNodeIDs(nodeIDs_global,nodeCoords,vm)
 
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       msg = "Elmer mesh: identifing local nodes"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
     CALL locallyOwnedNodes(localPet)
 
     ! TODO (probably not urgent, maybe not needed at all)
@@ -945,9 +963,20 @@ print*,"change comments about EI vars at top when resolved..."
     ! (not just for the boundary of interest but for the whole mesh). It might make sense to 
     ! use these rather than construct the uniqueIDs here. 
     
+
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       msg = "Elmer mesh: building element connectivity"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
     CALL buildElementConnectivity(elemConn, nodeIDs_global, BodyID, ESMF_elemTypes, ISM_ProjVector,ELmerMesh)
 
     ! Create Mesh structure in 1 step
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       msg = "Elmer mesh: creating ESMF mesh structure"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
     ESMF_ElmerMesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
          nodeIds=nodeIds_global, nodeCoords=nodeCoords,            &
          nodeOwners=nodeOwners, elementIds=ElementIDs_global,      &
@@ -958,6 +987,11 @@ print*,"change comments about EI vars at top when resolved..."
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       msg = "Elmer mesh: creating routehandles"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
     CALL CreateArrayMappingRouteHandles(ESMF_ElmerMesh,nodeIDs_global,vm)
 
     IF (ALLOCATED(elemConn)) DEALLOCATE(elemConn)
@@ -1012,6 +1046,11 @@ print*,"change comments about EI vars at top when resolved..."
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    IF (localPet.EQ.0) THEN
+       msg = "Elmer routehandles: creating distrgrid"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
     ! Create a distgrid containing sequence indices for the Elmer array, i.e. 
     ! containing the duplicate node IDs.  This can be used to create an array 
     ! including duplicates, like the Elmer fields.
@@ -1053,6 +1092,11 @@ print*,"change comments about EI vars at top when resolved..."
     IF (ASSOCIATED(ptr_ESMF)) NULLIFY(ptr_ESMF)
     
     ! Create the route handles for later use 
+    IF (localPet.EQ.0) THEN
+       msg = "Elmer routehandles: store routehandle"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
     CALL ESMF_ArrayRedistStore(DummyArr_ESMF, DummyArr_Elmer, &
          RH_ESMF2Elmer, ignoreUnmatchedIndices=.TRUE., rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -1068,6 +1112,11 @@ print*,"change comments about EI vars at top when resolved..."
 !         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Tidy up 
+    IF (localPet.EQ.0) THEN
+       msg = "Elmer routehandles: tidy up"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
     CALL ESMF_ArrayDestroy(DummyArr_Elmer, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &

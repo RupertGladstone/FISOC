@@ -18,6 +18,7 @@ MODULE  FISOC_parent_MOD
   TYPE(ESMF_CplComp),  SAVE :: FISOC_coupler
   TYPE(ESMF_State),    SAVE :: ISM_ImpSt, ISM_ExpSt, OM_ImpSt, OM_ExpSt
   REAL,                SAVE :: OM_time=0.0, ISM_time=0.0, AM_time=0.0
+  LOGICAL,             SAVE :: ISM_UseOMGrid, OM_UseISMGrid
 
 CONTAINS
   
@@ -165,17 +166,46 @@ CONTAINS
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
 
-    ISM_ImpSt = ESMF_StateCreate(name='ISM import state', stateintent=ESMF_STATEINTENT_IMPORT, rc=rc) 
+    ! Check whether regridding is needed... not needed if components are on the same grid.
+    CALL FISOC_ConfigDerivedAttribute(config, ISM_UseOMGrid, 'ISM_UseOMGrid',rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL FISOC_ConfigDerivedAttribute(config, OM_UseISMGrid, 'OM_UseISMGrid',rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF (OM_UseISMGrid) THEN
+      msg = "OM_UseISMGrid set to true but this option is NYI"
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+           line=__LINE__, file=__FILE__)
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    IF (OM_UseISMGrid.AND.ISM_UseOMGrid) THEN
+      msg = "OM_UseISMGrid and ISM_UseOMGrid are both set to true."
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+           line=__LINE__, file=__FILE__)
+      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    ! If ISM and OM are on the same grid, the export states will be imported directly into the 
+    ! opposite component.  So we don't need to create separate import states.
+    IF ( (.NOT.OM_UseISMGrid) .AND. (.NOT.ISM_UseOMGrid) ) THEN
+      ISM_ImpSt = ESMF_StateCreate(name='ISM import state', stateintent=ESMF_STATEINTENT_IMPORT, rc=rc) 
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      OM_ImpSt = ESMF_StateCreate(name='OM import state', stateintent=ESMF_STATEINTENT_IMPORT, rc=rc) 
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
 
     ISM_ExpSt = ESMF_StateCreate(name='ISM export state', stateintent=ESMF_STATEINTENT_EXPORT, rc=rc) 
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    OM_ImpSt = ESMF_StateCreate(name='OM import state', stateintent=ESMF_STATEINTENT_IMPORT, rc=rc) 
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -192,9 +222,15 @@ CONTAINS
     msg = "FISOC parent calling OM init phase 1"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
-    CALL ESMF_GridCompInitialize(FISOC_OM, &
-         importState=OM_ImpSt, exportState=OM_ExpSt, &
-         clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+    IF ( (OM_UseISMGrid) .OR. (ISM_UseOMGrid) ) THEN
+      CALL ESMF_GridCompInitialize(FISOC_OM, &
+           importState=ISM_ExpSt, exportState=OM_ExpSt, &
+           clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+    ELSE
+      CALL ESMF_GridCompInitialize(FISOC_OM, &
+           importState=OM_ImpSt, exportState=OM_ExpSt, &
+           clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+    END IF
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -202,12 +238,27 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+!    IF (ISM_UseOMGrid) THEN
+!      ! Copy OM fields to ISM state so that ISM can access OM grid.
+!      ! The ISM will remove the fields after accessing the grid.
+!      CALL FISOC_State2StateCopyFB(OM_ExpSt,ISM_ImpSt,'OM export fields',rc=rc)
+!      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!           line=__LINE__, file=__FILE__)) &
+!           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    END IF
+
     msg = "FISOC parent calling ISM init phase 1"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
-    CALL ESMF_GridCompInitialize(FISOC_ISM, &
-         importState=ISM_ImpSt, exportState=ISM_ExpSt, &
-         clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+    IF ( (OM_UseISMGrid) .OR. (ISM_UseOMGrid) ) THEN
+      CALL ESMF_GridCompInitialize(FISOC_ISM, &
+           importState=OM_ExpSt, exportState=ISM_ExpSt, &
+           clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+    ELSE 
+      CALL ESMF_GridCompInitialize(FISOC_ISM, &
+           importState=ISM_ImpSt, exportState=ISM_ExpSt, &
+           clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+    END IF
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -220,25 +271,33 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
     
-    msg = "FISOC parent calling coupler init phase 1"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-       line=__LINE__, file=__FILE__, rc=rc)
-    CALL ESMF_cplCompInitialize(FISOC_coupler, &
-         importState=ISM_ExpSt, exportState=OM_ImpSt, &
-         clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF ( (.NOT.ISM_UseOMGrid) .AND. (.NOT.OM_UseISMGrid) ) THEN
+      msg = "FISOC parent calling coupler init phase 1"
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      CALL ESMF_cplCompInitialize(FISOC_coupler, &
+           importState=ISM_ExpSt, exportState=OM_ImpSt, &
+           clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
 
     msg = "FISOC parent calling OM init phase 2"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
-    CALL ESMF_GridCompInitialize(FISOC_OM, &
-         importState=OM_ImpSt, exportState=OM_ExpSt, &
-         clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
+    IF ( (OM_UseISMGrid) .OR. (ISM_UseOMGrid) ) THEN
+      CALL ESMF_GridCompInitialize(FISOC_OM, &
+           importState=ISM_ExpSt, exportState=OM_ExpSt, &
+           clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
+    ELSE
+      CALL ESMF_GridCompInitialize(FISOC_OM, &
+           importState=OM_ImpSt, exportState=OM_ExpSt, &
+           clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
+    END IF
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -251,26 +310,34 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
-    msg = "FISOC parent calling coupler init phase 2"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-       line=__LINE__, file=__FILE__, rc=rc)
-    CALL ESMF_cplCompInitialize(FISOC_coupler, &
-         importState=OM_ExpSt, exportState=ISM_ImpSt, &
-         clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF ( (.NOT.ISM_UseOMGrid) .AND. (.NOT.OM_UseISMGrid) ) THEN
+      msg = "FISOC parent calling coupler init phase 2"
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      CALL ESMF_cplCompInitialize(FISOC_coupler, &
+           importState=OM_ExpSt, exportState=ISM_ImpSt, &
+           clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
 
     msg = "FISOC parent calling ISM init phase 2"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
-    CALL ESMF_GridCompInitialize(FISOC_ISM, &
-         importState=ISM_ImpSt, exportState=ISM_ExpSt, &
-         clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+    IF ( (OM_UseISMGrid) .OR. (ISM_UseOMGrid) ) THEN
+      CALL ESMF_GridCompInitialize(FISOC_ISM, &
+           importState=OM_ExpSt, exportState=ISM_ExpSt, &
+           clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
+    ELSE
+      CALL ESMF_GridCompInitialize(FISOC_ISM, &
+           importState=ISM_ImpSt, exportState=ISM_ExpSt, &
+           clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
+    END IF
+    IF(ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -282,7 +349,11 @@ CONTAINS
        line=__LINE__, file=__FILE__, rc=rc)
 
     ! put child states into the parent import state just so we can make them available during run phases
-    CALL ESMF_StateAdd(importstate, (/OM_ImpSt, OM_ExpSt, ISM_ImpSt, ISM_ExpSt/), rc=rc)
+    IF ( (OM_UseISMGrid) .OR. (ISM_UseOMGrid) ) THEN
+      CALL ESMF_StateAdd(importstate, (/OM_ExpSt, ISM_ExpSt/), rc=rc)
+    ELSE
+      CALL ESMF_StateAdd(importstate, (/OM_ImpSt, OM_ExpSt, ISM_ImpSt, ISM_ExpSt/), rc=rc)
+    END IF
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -344,17 +415,19 @@ CONTAINS
        PRINT*,""
     END IF
 
-    CALL ESMF_StateGet(importstate, "ISM import state", ISM_ImpSt, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF ( (.NOT.ISM_UseOMGrid).AND.(.NOT.OM_UseISMGrid) ) THEN
+      CALL ESMF_StateGet(importstate, "ISM import state", ISM_ImpSt, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      CALL ESMF_StateGet(importstate, "OM import state", OM_ImpSt, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
 
     CALL ESMF_StateGet(importstate, "ISM export state", ISM_ExpSt, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL ESMF_StateGet(importstate, "OM import state", OM_ImpSt, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -388,6 +461,9 @@ CONTAINS
        IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
           PRINT*,""
           CALL ESMF_ClockPrint(FISOC_clock, options="advanceCount string isofrac", rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
           CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_OM_output", alarm_OM_output, rc=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
@@ -404,53 +480,63 @@ CONTAINS
        END IF
        
        IF (ESMF_AlarmIsRinging(alarm_OM, rc=rc)) THEN
-          IF (verbose_coupling) THEN
-             msg = "FISOC parent run: calling OM"
-             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-                  line=__LINE__, file=__FILE__, rc=rc)
-          END IF
-          CALL FISOC_GridCompRun(FISOC_OM, OM_ImpSt, OM_ExpSt, profiling, &
-               vm, FISOC_clock=FISOC_clock, phase=1, cumulatedCPUtime=OM_time)
-          CALL ESMF_cplCompRun(FISOC_coupler, &
-               importState=OM_ExpSt, exportState=ISM_ImpSt, &
-               clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-          IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-          CALL ESMF_AlarmRingerOff(alarm_OM, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
+         IF (verbose_coupling) THEN
+           msg = "FISOC parent run: calling OM"
+           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+                line=__LINE__, file=__FILE__, rc=rc)
+         END IF
+         IF ( ISM_UseOMGrid .OR. OM_UseISMGrid ) THEN
+           CALL FISOC_GridCompRun(FISOC_OM, ISM_ExpSt, OM_ExpSt, profiling, &
+                vm, FISOC_clock=FISOC_clock, phase=1, cumulatedCPUtime=OM_time)
+         ELSE
+           CALL FISOC_GridCompRun(FISOC_OM, OM_ImpSt, OM_ExpSt, profiling, &
+                vm, FISOC_clock=FISOC_clock, phase=1, cumulatedCPUtime=OM_time)
+           CALL ESMF_cplCompRun(FISOC_coupler, &
+                importState=OM_ExpSt, exportState=ISM_ImpSt, &
+                clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+                line=__LINE__, file=__FILE__)) &
+                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+           IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+                line=__LINE__, file=__FILE__)) &
+                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+         END IF
+         
+         CALL ESMF_AlarmRingerOff(alarm_OM, rc=rc)
+         IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+              line=__LINE__, file=__FILE__)) &
+              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
        END IF
        
        IF (ESMF_AlarmIsRinging(alarm_ISM, rc=rc)) THEN
-          IF (verbose_coupling) THEN
-             msg = "FISOC parent run: calling ISM"
-             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-                  line=__LINE__, file=__FILE__, rc=rc)
-          END IF
-          CALL FISOC_GridCompRun(FISOC_ISM, ISM_ImpSt, ISM_ExpSt, profiling, &
-               vm, FISOC_clock=FISOC_clock, phase=1, cumulatedCPUtime=ISM_time)
-          CALL ESMF_cplCompRun(FISOC_coupler, &
-               importState=ISM_ExpSt, exportState=OM_ImpSt, &
-               clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-          IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-          CALL ESMF_AlarmRingerOff(alarm_ISM, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
+         IF (verbose_coupling) THEN
+           msg = "FISOC parent run: calling ISM"
+           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+                line=__LINE__, file=__FILE__, rc=rc)
+         END IF
+         IF ( ISM_UseOMGrid .OR. OM_UseISMGrid ) THEN
+           CALL FISOC_GridCompRun(FISOC_ISM, OM_ExpSt, ISM_ExpSt, profiling, &
+                vm, FISOC_clock=FISOC_clock, phase=1, cumulatedCPUtime=ISM_time)
+         ELSE
+           CALL FISOC_GridCompRun(FISOC_ISM, ISM_ImpSt, ISM_ExpSt, profiling, &
+                vm, FISOC_clock=FISOC_clock, phase=1, cumulatedCPUtime=ISM_time)
+           CALL ESMF_cplCompRun(FISOC_coupler, &
+                importState=ISM_ExpSt, exportState=OM_ImpSt, &
+                clock=FISOC_clock, phase=2, rc=rc, userRc=urc)
+           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+                line=__LINE__, file=__FILE__)) &
+                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+           IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+                line=__LINE__, file=__FILE__)) &
+                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+         END IF
+         
+         CALL ESMF_AlarmRingerOff(alarm_ISM, rc=rc)
+         IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+              line=__LINE__, file=__FILE__)) &
+              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
        END IF
-
+       
        CALL ESMF_ClockAdvance(FISOC_clock, rc=rc)   
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
@@ -529,17 +615,20 @@ CONTAINS
     msg = "FISOC parent finalise: getting child states"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
          line=__LINE__, file=__FILE__, rc=rc)
-    CALL ESMF_StateGet(importstate, "ISM import state", ISM_ImpSt, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF ( (.NOT.ISM_UseOMGrid) .AND. (.NOT.OM_UseISMGrid) ) THEN
+      CALL ESMF_StateGet(importstate, "ISM import state", ISM_ImpSt, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      CALL ESMF_StateGet(importstate, "OM import state", OM_ImpSt, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
 
     CALL ESMF_StateGet(importstate, "ISM export state", ISM_ExpSt, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    CALL ESMF_StateGet(importstate, "OM import state", OM_ImpSt, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -553,53 +642,78 @@ CONTAINS
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
          line=__LINE__, file=__FILE__, rc=rc)
 
-    CALL ESMF_GridCompFinalize(FISOC_OM, &
-         importState=OM_ImpSt, exportState=OM_ExpSt, &
-         clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+    IF ( ISM_UseOMGrid .OR. OM_UseISMGrid ) THEN
+      CALL ESMF_GridCompFinalize(FISOC_OM, &
+           importState=ISM_ExpSt, exportState=OM_ExpSt, &
+           clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+    ELSE
+      CALL ESMF_GridCompFinalize(FISOC_OM, &
+           importState=OM_ImpSt, exportState=OM_ExpSt, &
+           clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+    END IF
+    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_GridCompFinalize(FISOC_ISM, &
-         importState=ISM_ImpSt, exportState=ISM_ExpSt, &
-         clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+    IF ( ISM_UseOMGrid .OR. OM_UseISMGrid ) THEN
+      CALL ESMF_GridCompFinalize(FISOC_ISM, &
+           importState=OM_ExpSt, exportState=ISM_ExpSt, &
+           clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+    ELSE
+      CALL ESMF_GridCompFinalize(FISOC_ISM, &
+           importState=ISM_ImpSt, exportState=ISM_ExpSt, &
+           clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+    END IF
+    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    CALL ESMF_cplCompFinalize(FISOC_coupler, &
-         importState=OM_ExpSt, exportState=ISM_ImpSt, &
-         clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
+    IF ( (.NOT.ISM_UseOMGrid) .AND. (.NOT.OM_UseISMGrid) ) THEN
+      CALL ESMF_cplCompFinalize(FISOC_coupler, &
+           importState=OM_ExpSt, exportState=ISM_ImpSt, &
+           clock=FISOC_clock, phase=1, rc=rc, userRc=urc)
+      IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+   
     msg = "FISOC parent finalise: destroying states"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
          line=__LINE__, file=__FILE__, rc=rc)
 
-    CALL ESMF_StateDestroy(ISM_ImpSt, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF ( (.NOT.ISM_UseOMGrid) .AND. (.NOT.OM_UseISMGrid) ) THEN
+      CALL ESMF_StateDestroy(ISM_ImpSt, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      CALL ESMF_StateDestroy(OM_ImpSt, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
     CALL ESMF_StateDestroy(ISM_ExpSt, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_StateDestroy(OM_ImpSt, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_StateDestroy(OM_ExpSt, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_StateDestroy(exportstate, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     CALL ESMF_StateDestroy(importstate, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=urc, msg=ESMF_LOGERR_PASSTHRU, &
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     

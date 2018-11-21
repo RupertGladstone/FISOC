@@ -10,6 +10,9 @@ MODULE FISOC_ISM_MOD
   
   PUBLIC FISOC_ISM_register
   
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: ISM_impFBname = "ISM import fields"
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: ISM_expFBname = "ISM export fields"
+
 CONTAINS
   
   !------------------------------------------------------------------------------
@@ -61,13 +64,15 @@ CONTAINS
 
     TYPE(ESMF_config)          :: FISOC_config
     TYPE(ESMF_mesh)            :: ISM_mesh
-    TYPE(ESMF_grid)            :: ISM_grid
-    TYPE(ESMF_fieldBundle)     :: ISM_ExpFB
+    TYPE(ESMF_grid)            :: ISM_grid, OM_grid
+    TYPE(ESMF_fieldBundle)     :: ISM_ExpFB,OM_ExpFB
     TYPE(ESMF_VM)              :: vm
-
+    TYPE(ESMF_field),ALLOCATABLE :: fieldList(:)
     CHARACTER(len=ESMF_MAXSTR) :: label, ISM_gridType
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: ISM_DerVarList(:)
- 
+    INTEGER                    :: fieldCount
+    LOGICAL                    :: ISM_UseOMGrid, OM_UseISMGrid
+
     rc = ESMF_FAILURE
 
     msg = "ISM initialise started"
@@ -79,19 +84,41 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    label = 'FISOC_ISM_DerVars:' 
-    CALL FISOC_getListFromConfig(FISOC_config, label, ISM_DerVarList,rc=rc)
+    ! if the ISM and OM are on the same grid then the ISM export field bundle is 
+    ! used as the OM import field bundle
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_UseOMGrid, 'ISM_UseOMGrid',rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_UseISMGrid, 'OM_UseISMGrid',rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (ISM_UseOMGrid.OR.OM_UseISMGrid) THEN
+      ISM_impFBname = "OM export fields"
+    END IF
+
+    label = 'FISOC_ISM_DerVars:' 
+    CALL FISOC_getListFromConfig(FISOC_config, label, ISM_DerVarList,rc=rc)
+    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+      ALLOCATE(ISM_DerVarList(0))
+    ELSE IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) THEN
+      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, ISM_gridType, label='ISM_gridType:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_UseOMGrid, 'ISM_UseOMGrid',rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     ! create empty field bundle
-    ISM_ExpFB = ESMF_FieldBundleCreate(name='ISM export fields', rc=rc)
+    ISM_ExpFB = ESMF_FieldBundleCreate(name=ISM_expFBname, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -101,14 +128,46 @@ CONTAINS
     SELECT CASE (ISM_gridType)
 
     CASE("ESMF_grid","ESMF_Grid")
-       CALL FISOC_ISM_Wrapper_Init_Phase1(FISOC_config,vm,ISM_ExpFB,ISM_grid,rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       CALL FISOC_populateFieldBundle(ISM_DerVarList,ISM_ExpFB,ISM_grid,rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+      IF (ISM_UseOMGrid) THEN
+        ! Get grid from field from field list from field bundle from state.
+        CALL ESMF_StateGet(ISM_ImpSt, ISM_impFBname, OM_ExpFB, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        CALL ESMF_FieldBundleGet(OM_ExpFB, fieldCount=fieldCount, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        ALLOCATE(fieldList(fieldCount))
+        CALL ESMF_FieldBundleGet(OM_ExpFB, fieldList=fieldList,rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)        
+        CALL ESMF_FieldGet(FieldList(1), grid=OM_grid, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+        ! We assign the ISM_grid to the OM_grid.  This is not taking a copy, 
+        ! but using the same object.
+        ISM_grid = OM_grid
+
+!        ! The OM_ExpFB was only there to give us the grid, so remove it now.
+!        CALL ESMF_StateRemove (ISM_ImpSt, (/"OM export fields"/), rc=rc)
+!        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!             line=__LINE__, file=__FILE__)) &
+!             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      END IF
+
+      CALL FISOC_ISM_Wrapper_Init_Phase1(FISOC_config,vm,ISM_ExpFB,ISM_grid,rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      CALL FISOC_populateFieldBundle(ISM_DerVarList,ISM_ExpFB,ISM_grid,rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CASE("ESMF_mesh","ESMF_Mesh")
        CALL FISOC_ISM_Wrapper_Init_Phase1(FISOC_config,vm,ISM_ExpFB,ISM_mesh,rc=rc)
@@ -175,12 +234,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_StateGet(ISM_ImpSt, "ISM import fields", ISM_ImpFB, rc=rc)
+    CALL ESMF_StateGet(ISM_ImpSt, ISM_impFBname, ISM_ImpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
-    CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
+    CALL ESMF_StateGet(ISM_ExpSt, ISM_expFBname, ISM_ExpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
@@ -232,12 +291,12 @@ CONTAINS
 
     ! extract field bundles from import and export states to send to model-specific wrapper
 
-    CALL ESMF_StateGet(ISM_ImpSt, "ISM import fields", ISM_ImpFB, rc=rc)
+    CALL ESMF_StateGet(ISM_ImpSt, ISM_impFBname, ISM_ImpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
-    CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
+    CALL ESMF_StateGet(ISM_ExpSt, ISM_expFBname, ISM_ExpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
@@ -282,6 +341,7 @@ CONTAINS
     TYPE(ESMF_field),ALLOCATABLE :: ImpFieldList(:)
     TYPE(ESMF_field),ALLOCATABLE :: ExpFieldList(:)
     TYPE(ESMF_mesh)              :: ISM_mesh
+    LOGICAL                      :: ISM_UseOMGrid, OM_UseISMGrid
 
     CHARACTER(len=ESMF_MAXSTR) :: name
     
@@ -292,6 +352,15 @@ CONTAINS
        line=__LINE__, file=__FILE__, rc=rc)
 
     CALL ESMF_GridCompGet(FISOC_ISM, config=FISOC_config, vm=vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_UseOMGrid, 'ISM_UseOMGrid',rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_UseISMGrid, 'OM_UseISMGrid',rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -308,8 +377,7 @@ CONTAINS
 
 
     ! destroy ISM export fields
-
-    CALL ESMF_StateGet(ISM_ExpSt, "ISM export fields", ISM_ExpFB, rc=rc)
+    CALL ESMF_StateGet(ISM_ExpSt, ISM_expFBname, ISM_ExpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
@@ -334,11 +402,6 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        
-!       CALL ESMF_VMBarrier(vm, rc=rc)
-!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!            line=__LINE__, file=__FILE__)) &
-!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
        CALL ESMF_FieldDestroy(ExpFieldList(ii), rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
@@ -353,50 +416,51 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     
-    ! destroy ISM import fields
-    
-    CALL ESMF_StateGet(ISM_ImpSt, "ISM import fields", ISM_ImpFB, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-
-    ! ...how many fields?...
-    CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldCount=FieldCount, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
-    ! ... get list of fields from bundle.
-    ALLOCATE(ImpFieldList(FieldCount))
-    CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldList=ImpFieldList,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF ( (.NOT.ISM_UseOMGrid).AND.(.NOT.OM_UseISMGrid) ) THEN
+      ! destroy ISM import fields    
+      CALL ESMF_StateGet(ISM_ImpSt, ISM_impFBname, ISM_ImpFB, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+      
+      ! ...how many fields?...
+      CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldCount=FieldCount, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      ! ... get list of fields from bundle.
+      ALLOCATE(ImpFieldList(FieldCount))
+      CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldList=ImpFieldList,rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
 !    CALL ESMF_FieldGet(ImpFieldList(1), mesh=ISM_mesh, rc=rc)
 !    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
 !         line=__LINE__, file=__FILE__)) &
 !         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    DO ii = 1,FieldCount
-       CALL ESMF_FieldDestroy(ImpFieldList(ii), rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
+      DO ii = 1,FieldCount
+        CALL ESMF_FieldDestroy(ImpFieldList(ii), rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END DO
-    
+      END DO
+      
 !    CALL ESMF_MeshDestroy(ISM_mesh,rc=rc)
 !    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
 !         line=__LINE__, file=__FILE__)) &
 !         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    DEALLOCATE(ImpFieldList)
+      DEALLOCATE(ImpFieldList)
     
-    CALL ESMF_FieldBundleDestroy(ISM_ImpFB, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
+      CALL ESMF_FieldBundleDestroy(ISM_ImpFB, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-    
+    END IF
+      
     rc = ESMF_SUCCESS
     
   END SUBROUTINE FISOC_ISM_finalise
@@ -454,13 +518,15 @@ CONTAINS
        SELECT CASE(FISOC_ISM_DerVarList(ii))
 
        CASE ("ISM_z_l0_previous")
-          CALL ISM_derive_z_l0_previous(ISM_ExpFB,rc)
+!          CALL ISM_derive_z_l0_previous(ISM_ExpFB,rc)
+          CALL ISM_derive_previous("ISM_z_l0", "ISM_z_l0_previous",ISM_ExpFB,rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        CASE ("ISM_z_lts_previous")
-          CALL ISM_derive_z_lts_previous(ISM_ExpFB,rc)
+!          CALL ISM_derive_z_lts_previous(ISM_ExpFB,rc)
+          CALL ISM_derive_previous("ISM_z_lts", "ISM_z_lts_previous",ISM_ExpFB,rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -519,6 +585,7 @@ CONTAINS
 
        SELECT CASE(FISOC_ISM_DerVarList(ii))
 
+          ! These are handled elsewhere, hence the empty case
        CASE ("ISM_z_l0_previous","ISM_z_lts_previous","ISM_z_l0_linterp")
           ! ignore vars that should have been derived before the ISM run call
 
@@ -528,7 +595,17 @@ CONTAINS
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+!       CASE ("ISM_z_lts")
+          ! Needed if we have only ice thikness and lower surface height 
+          ! from the ice sheet model.
+!          CALL ISM_derive_z_lts(ISM_ExpFB,FISOC_config,rc)
+!          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!               line=__LINE__, file=__FILE__)) &
+!               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
        CASE ("ISM_dddt")
+!          CALL ISM_derive_rate("ISM_z_l0","ISM_z_l0_previous",  &
+!               "ISM_dddt",ISM_ExpFB,FISOC_config,FISOC_clock,rc)
           CALL ISM_derive_dddt(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
@@ -618,7 +695,39 @@ CONTAINS
 
   !------------------------------------------------------------------------------
   ! Copy current data.  At next timestep this copy will contain "previous" data.
-  ! TODO: make this generic; should only need one "previous" subroutine
+  !
+  SUBROUTINE ISM_derive_previous(varName,varName_previous,ISM_ExpFB,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
+    INTEGER, INTENT(OUT),OPTIONAL         :: rc
+    CHARACTER(len=*),INTENT(IN)           :: varName,varName_previous
+
+    TYPE(ESMF_field)           :: var, var_previous
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName=TRIM(varName), field=var, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName=TRIM(varName_previous), field=var_previous, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_FieldCopy(var_previous, var, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    RC = ESMF_SUCCESS
+
+  END SUBROUTINE ISM_derive_previous
+
+
+  !------------------------------------------------------------------------------
+  ! Copy current data.  At next timestep this copy will contain "previous" data.
+  !
+  ! TODO: remove this once the generic routine derive_previous is tested
   SUBROUTINE ISM_derive_z_l0_previous(ISM_ExpFB,rc)
 
     TYPE(ESMF_fieldBundle),INTENT(INOUT)            :: ISM_ExpFB
@@ -626,36 +735,21 @@ CONTAINS
 
     TYPE(ESMF_field)           :: ISM_z_l0
     TYPE(ESMF_field)           :: ISM_z_l0_previous
-    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_ptr(:) 
-    REAL(ESMF_KIND_R8),POINTER :: ISM_z_l0_previous_ptr(:) 
 
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0", field=ISM_z_l0, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!    CALL ESMF_FieldGet(field=ISM_z_l0, farrayPtr=ISM_z_l0_ptr, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_z_l0_previous", field=ISM_z_l0_previous, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!    CALL ESMF_FieldGet(field=ISM_z_l0_previous, localDe=0, farrayPtr=ISM_z_l0_previous_ptr, rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     CALL ESMF_FieldCopy(ISM_z_l0_previous, ISM_z_l0, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-!    ISM_z_l0_previous_ptr = ISM_z_l0_ptr
-
-!    NULLIFY(ISM_z_l0_previous_ptr)
-!    NULLIFY(ISM_z_l0_ptr)
 
     RC = ESMF_SUCCESS
 
@@ -889,6 +983,56 @@ CONTAINS
 
 
   !------------------------------------------------------------------------------
+  !
+  SUBROUTINE ISM_derive_rate(varName,varName_previous,varName_rate, &
+       ISM_ExpFB,FISOC_config,FISOC_clock,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: ISM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    CHARACTER(len=*),INTENT(IN)           :: varName,varName_previous,varName_rate
+    TYPE(ESMF_clock),INTENT(IN)           :: FISOC_clock
+    INTEGER, INTENT(OUT),OPTIONAL         :: rc
+
+    INTEGER                :: rank
+    
+    rc = ESMF_FAILURE
+    rank = 0
+
+    CALL FISOC_getFirstFieldRank(ISM_ExpFB,rank,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+
+    SELECT CASE (rank)
+
+    CASE(1)
+       CALL  ISM_derive_rate_1D(varName,varName_previous,varName_rate, &
+            ISM_ExpFB,FISOC_config,FISOC_clock,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,  &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+    CASE(2)
+       CALL  ISM_derive_rate_2D(varName,varName_previous,varName_rate, &
+            ISM_ExpFB,FISOC_config,FISOC_clock,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,  &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+    CASE DEFAULT
+       msg = "ERROR: dimension of array ptr NYI"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END SELECT
+    
+    RC = ESMF_SUCCESS
+
+  END SUBROUTINE ISM_derive_rate
+
+
+  !------------------------------------------------------------------------------
   ! dddt, short for dd/dt, is the rate of change of depth (or draft) with time, 
   ! for use by ocean model.
   !
@@ -936,6 +1080,154 @@ CONTAINS
   END SUBROUTINE ISM_derive_dddt
 
   
+  !------------------------------------------------------------------------------
+  SUBROUTINE ISM_derive_rate_1D(varName,varName_previous,varName_rate, &
+       ISM_ExpFB,FISOC_config,FISOC_clock,rc)
+    
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
+    TYPE(ESMF_clock),INTENT(IN)            :: FISOC_clock
+    CHARACTER(len=*),INTENT(IN)            :: varName,varName_previous
+    CHARACTER(len=*),INTENT(IN)            :: varName_rate
+    INTEGER, INTENT(OUT),OPTIONAL          :: rc
+    
+    TYPE(ESMF_field)           :: field
+    TYPE(ESMF_field)           :: field_previous
+    TYPE(ESMF_field)           :: rate
+    REAL(ESMF_KIND_R8),POINTER :: field_ptr(:) 
+    REAL(ESMF_KIND_R8),POINTER :: field_previous_ptr(:) 
+    REAL(ESMF_KIND_R8),POINTER :: rate_ptr(:) 
+    REAL(ESMF_KIND_R8)         :: ISM_dt
+    INTEGER                    :: ISM_dt_int
+    INTEGER(ESMF_KIND_I8)      :: advancecount
+
+    RC = ESMF_FAILURE
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName=varName, field=field, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=field, localDe=0, farrayPtr=field_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName=varName_previous, field=field_previous, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=field_previous, localDe=0, farrayPtr=field_previous_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName=varName_rate, field=rate, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=rate, localDe=0, farrayPtr=rate_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt_int, 'ISM_dt_sec',rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ISM_dt = REAL(ISM_dt_int,ESMF_KIND_R8)
+    rate_ptr = (field_ptr - field_previous_ptr) / ISM_dt
+
+    ! first time we set it to zero
+    CALL ESMF_ClockGet(FISOC_clock, advanceCount=advanceCount, rc=rc)
+    IF (advanceCount.LE.1) THEN
+       rate_ptr = 0.0
+    END IF
+
+    NULLIFY(field_previous_ptr)
+    NULLIFY(field_ptr)
+    NULLIFY(rate_ptr)
+
+    RC = ESMF_SUCCESS
+
+  END SUBROUTINE ISM_derive_rate_1D
+
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE ISM_derive_rate_2D(varName,varName_previous,varName_rate, &
+       ISM_ExpFB,FISOC_config,FISOC_clock,rc)
+    
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)   :: ISM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
+    TYPE(ESMF_clock),INTENT(IN)            :: FISOC_clock
+    CHARACTER(len=*),INTENT(IN)            :: varName,varName_previous
+    CHARACTER(len=*),INTENT(IN)            :: varName_rate
+    INTEGER, INTENT(OUT),OPTIONAL          :: rc
+    
+    TYPE(ESMF_field)           :: field
+    TYPE(ESMF_field)           :: field_previous
+    TYPE(ESMF_field)           :: rate
+    REAL(ESMF_KIND_R8),POINTER :: field_ptr(:,:) 
+    REAL(ESMF_KIND_R8),POINTER :: field_previous_ptr(:,:) 
+    REAL(ESMF_KIND_R8),POINTER :: rate_ptr(:,:) 
+    REAL(ESMF_KIND_R8)         :: ISM_dt
+    INTEGER                    :: ISM_dt_int
+    INTEGER(ESMF_KIND_I8)      :: advancecount
+
+    RC = ESMF_FAILURE
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName=varName, field=field, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=field, localDe=0, farrayPtr=field_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName=varName_previous, field=field_previous, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=field_previous, localDe=0, farrayPtr=field_previous_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName=varName_rate, field=rate, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=rate, localDe=0, farrayPtr=rate_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt_int, 'ISM_dt_sec',rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ISM_dt = REAL(ISM_dt_int,ESMF_KIND_R8)
+    rate_ptr = (field_ptr - field_previous_ptr) / ISM_dt
+
+    ! first time we set it to zero
+    CALL ESMF_ClockGet(FISOC_clock, advanceCount=advanceCount, rc=rc)
+    IF (advanceCount.LE.1) THEN
+       rate_ptr = 0.0
+    END IF
+
+    NULLIFY(field_previous_ptr)
+    NULLIFY(field_ptr)
+    NULLIFY(rate_ptr)
+
+    RC = ESMF_SUCCESS
+
+  END SUBROUTINE ISM_derive_rate_2D
+
+
   !------------------------------------------------------------------------------
   SUBROUTINE ISM_derive_dddt_1D(ISM_ExpFB,FISOC_config,FISOC_clock,rc)
     
