@@ -311,20 +311,20 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     OM_dt_sec_float = REAL(OM_dt_sec,ESMF_KIND_R8)
 
-    IF (localPet.EQ.0) THEN
-      WRITE (OM_outputUnit,*) 'FISOC is about to call ROMS run method, period (sec): ',OM_dt_sec_float
-      IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-        msg = "Calling ROMS run method now."
-        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-             line=__LINE__, file=__FILE__, rc=rc)
-      END IF
-    END IF
+!    IF (localPet.EQ.0) THEN
+!      WRITE (OM_outputUnit,*) 'FISOC is about to call ROMS run method, period (sec): ',OM_dt_sec_float
+!      IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+!        msg = "Calling ROMS run method now."
+!        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+!             line=__LINE__, file=__FILE__, rc=rc)
+!      END IF
+!    END IF
     CALL ESMF_VMBarrier(vm, rc=rc)
     CALL ROMS_run(OM_dt_sec_float)
     CALL ESMF_VMBarrier(vm, rc=rc)
-    IF (localPet.EQ.0) THEN
-       WRITE (OM_outputUnit,*) 'FISOC has just called ROMS run method.'
-    END IF
+!    IF (localPet.EQ.0) THEN
+!       WRITE (OM_outputUnit,*) 'FISOC has just called ROMS run method.'
+!    END IF
 
     IF (exit_flag.NE.NoError) THEN
        WRITE (msg, "(A,I0,A)") "ERROR: ROMS has returned non-safe exit_flag=", &
