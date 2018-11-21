@@ -15,8 +15,8 @@
 
 
 ### OM options ###
-  OM_configFile:          /home1/slmack/ROMSIceShelf_devel/ROMS/External/ocean_isomip_plus_sm.in
-  OM_stdoutFile:          run074.out
+  OM_configFile:          /ROMSIceShelf_devel/Apps/FOOLexample/ocean_isomip_plus_sm.in
+  OM_stdoutFile:          ocean.out
   FISOC_OM_ReqVars:       OM_temperature_l0 OM_bed
   OM_ReqVars_stagger:     CENTER CENTER
   FISOC_OM_DerVars:       OM_dBdt_l0
@@ -33,7 +33,7 @@
 
 ### NETCDF output options ###
   OM_writeNetcdf:         .FALSE.
-  output_dir:             /nobackupp2/slmack/FISOC/ROMSFOOL
+  output_dir:             /FISOC/Apps/FOOLexample
   OM_NCfreq:              all
 
 

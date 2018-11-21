@@ -2,6 +2,7 @@
                                                                                                             
 export CPPFLAGS="$CPPFLAGS -D FISOC_MPI"
 export FISOC_MPI="yes"
+export FISOC_DIR="/FISOC"
 
 ## optionally over-write the default executable name:
 #export FISOC_EXE="FISOC_caller"
@@ -36,19 +37,19 @@ export FISOC_AM_INCLUDE="$HOME"
 #export FISOC_OM_INCLUDE="$HOME"
 #export FISOC_OM_LIBPATH="$HOME"
 
-export MY_ROMS_DIR="$HOME/ROMSIceShelf_devel"
+export MY_ROMS_DIR="$/ROMSIceShelf_devel"
 export FISOC_OM="ROMS"
 export FISOC_OM_LIBS="-loceanM"
 export FISOC_OM_INCLUDE="${MY_ROMS_DIR}/Build"
 export FISOC_OM_LIBPATH="${MY_ROMS_DIR}/Lib/FISOC"
-export FISOC_INSTALL_DIR="/nobackupp2/slmack/FISOC/ROMSFOOL"
+export FISOC_INSTALL_DIR="FISOC/Apps/FOOLexample"
 
 # These ROMS_ preprocessor keywords correspond to a relevant subset of 
 # the preprocessor keywords in the ROMS .in file.
 #export CPPFLAGS="$CPPFLAGS -D ROMS_SPHERICAL"
 export CPPFLAGS="$CPPFLAGS -D ROMS_MASKING"
-#export CPPFLAGS="$CPPFLAGS -D ROMS_DDDT"
-export CPPFLAGS="$CPPFLAGS -D ROMS_DRAFT"
+export CPPFLAGS="$CPPFLAGS -D ROMS_DDDT"
+#export CPPFLAGS="$CPPFLAGS -D ROMS_DRAFT"
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$FISOC_OM_LIBPATH
 

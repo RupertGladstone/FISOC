@@ -11,7 +11,7 @@
 # 
 # forcingDataFormat NYI, assume netcdf
 # 
-  ForcingDir:          /nobackupp2/slmack/FISOC/ROMSFOOL/
+  ForcingDir:          /FISOC/Apps/FOOLexample/
 #  ForcingDir:          /home/elmeruser/Work/MISOMIP_prep/ISOMIP/
   ForcingDataFormat:   netcdf
   ForcingBaseName:     ocean3.grd.v03
