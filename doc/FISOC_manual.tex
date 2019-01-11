@@ -405,7 +405,7 @@ For example (see also the example FISOC build script):
 export CPPFLAGS="$CPPFLAGS -D ROMS_DRAFT"
 \end{lstlisting}
 At the time of writing, the relevant values are ROMS\_MASKING, ROMS\_SPHERICAL, 
-ROMS\_DDDT, ROMS\_DSDT and ROMS\_DRAFT.  The general rule is that any of these directives that 
+ROMS\_DDDT, ROMS\_DSDT, ROMS\_DRAFT and ROMS\_AVERAGES. Use of the averaged melt rate from ROMS is activated in FISOC by the ROMS\_AVERAGES cpp. The general rule is that any of these directives that 
 are defined for the ROMS compilation need to be defined also for the FISOC 
 compilation. 
 
