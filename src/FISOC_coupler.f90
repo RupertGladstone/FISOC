@@ -442,31 +442,8 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! Get routehandle name (this is a bit tedious - need to work out how to define a name for a 
-    ! route handle when adding it to a state)
-    CALL ESMF_StateGet(OM_ExpSt, itemNameList=OM_ExpSt_NameList, itemTypeList=OM_ExpSt_TypeList, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    NumRouteHandleItems = 0
-    DO ii = 1,ListLen
-       IF (OM_ExpSt_TypeList(ii).EQ.ESMF_STATEITEM_ROUTEHANDLE) THEN
-          NumRouteHandleItems = NumRouteHandleItems + 1
-          RouteHandleIndex = ii
-       END IF
-    END DO
-    IF (NumRouteHandleItems.EQ.1) THEN
-       OM2ISM_HandleName = OM_ExpSt_NameList(RouteHandleIndex)
-    ELSE
-       WRITE (msg, "(A,I0)") &
-            "Cannot get route handle from OM export state.  Wrong number of route handle items: ", NumRouteHandleItems
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
-
     ! Extract OM2ISM regrid routehandle for regridding...
-    CALL ESMF_StateGet(OM_ExpSt, OM2ISM_HandleName, OM2ISM_regridRouteHandle, rc=rc)
+    CALL ESMF_StateGet(OM_ExpSt, "OM2ISM_regridRouteHandle", OM2ISM_regridRouteHandle, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -529,20 +506,6 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!CALL ESMF_FieldGet(OM_ExpFieldList(ii), farrayPtr=optr, rc=rc)
-!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!     line=__LINE__, file=__FILE__)) &
-!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!optr = 20.0
-!DO nn = 1,SIZE(optr(1,:))
-!print*,""
-!print*,fieldName,SIZE(optr(:,1))
-!print*,optr(:,2)
-!print*,optr(:,99)
-
-!END DO
-!nullify(optr)
-
        CALL ESMF_FieldRegrid(OM_ExpFieldList(ii),ISM_ImpFieldList(ii), &
             routehandle=OM2ISM_regridRouteHandle, zeroregion= ESMF_REGION_TOTAL, &
             checkflag=.TRUE.,rc=rc)
@@ -550,14 +513,6 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        
-!CALL ESMF_FieldGet(ISM_ImpFieldList(ii), farrayPtr=iptr, rc=rc)
-!IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!     line=__LINE__, file=__FILE__)) &
-!     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!print*,fieldName
-!print*,iptr
-!nullify(iptr)
-
        IF (verbose_coupling) THEN
           msg = "Regridded field "//fieldName
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
@@ -611,31 +566,8 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! Get routehandle name (this is a bit tedious - need to work out how to define a name for a 
-    ! route handle when adding it to a state)
-    CALL ESMF_StateGet(ISM_ExpSt, itemNameList=ISM_ExpSt_NameList, itemTypeList=ISM_ExpSt_TypeList, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    NumRouteHandleItems = 0
-    DO ii = 1,ListLen
-       IF (ISM_ExpSt_TypeList(ii).EQ.ESMF_STATEITEM_ROUTEHANDLE) THEN
-          NumRouteHandleItems = NumRouteHandleItems + 1
-          RouteHandleIndex = ii
-       END IF
-    END DO
-    IF (NumRouteHandleItems.EQ.1) THEN
-       ISM2OM_HandleName = ISM_ExpSt_NameList(RouteHandleIndex)
-    ELSE
-       WRITE (msg, "(A,I0)") &
-            "Cannot get route handle from ISM export state.  Wrong number of route handle items: ", NumRouteHandleItems
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
-
     ! Extract ISM2OM regrid routehandle for regridding...
-    CALL ESMF_StateGet(ISM_ExpSt, ISM2OM_HandleName, ISM2OM_regridRouteHandle, rc=rc)
+    CALL ESMF_StateGet(ISM_ExpSt, "ISM2OM_regridRouteHandle", ISM2OM_regridRouteHandle, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
