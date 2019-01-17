@@ -2,7 +2,7 @@
                                                                                                             
 export CPPFLAGS="$CPPFLAGS -D FISOC_MPI"
 export FISOC_MPI="yes"
-export FISOC_INSTALL_DIR=$HOME/FISOC/bin
+export FISOC_INSTALL_DIR=/FISOC/bin
 
 export FFLAGS="$FFLAGS -fbacktrace -g -O0 -fbounds-check -Wall"
 #export FFLAGS=" -O0 -g -fbacktrace -fcheck=all" # -Wall -debug -DD  -O0" # -inline-debug-info"
@@ -60,7 +60,7 @@ export FISOC_OM_LIBPATH="$HOME"
 make clean
 make install
 
-rm PET*Log
+#rm PET*Log
 
 # to run, for example:
 # mpirun -np 4 FISOC_caller
