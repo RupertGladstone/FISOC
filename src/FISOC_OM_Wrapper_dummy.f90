@@ -9,7 +9,7 @@ MODULE FISOC_OM_Wrapper
   PRIVATE
 
   PUBLIC :: FISOC_OM_Wrapper_Init_Phase1,  FISOC_OM_Wrapper_Init_Phase2,  &
-       FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize, OM_HandleCavity
+       FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize
 
 CONTAINS
 
@@ -314,16 +314,5 @@ CONTAINS
     NULLIFY(coordY)
 
   END SUBROUTINE dummyCreateGrid
-
-  SUBROUTINE OM_HandleCavity(FISOC_config, FISOC_clock, OM_ImpFB, OM_ExpFB, localPet, rc)
-
-
-    TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: OM_ImpFB, OM_ExpFB
-    TYPE(ESMF_Clock),INTENT(IN)              :: FISOC_clock
-    INTEGER,INTENT(IN)                       :: localPet
-    INTEGER,INTENT(OUT),OPTIONAL             :: rc
-
-  END SUBROUTINE OM_HandleCavity
 
 END MODULE FISOC_OM_Wrapper
