@@ -26,6 +26,18 @@ ifneq ($(origin FISOC_OM), environment)
  $(error Environment variable FISOC_OM was not set.)
 endif
 
+ifneq ($(origin FISOC_OM_GEOM), environment)
+ CPPFLAGS += -D FISOC_OM_GRID
+else
+ CPPFLAGS += -D $(FISOC_OM_GEOM)
+endif
+
+ifneq ($(origin FISOC_ISM_GEOM), environment)
+ CPPFLAGS += -D FISOC_ISM_MESH
+else
+ CPPFLAGS += -D $(FISOC_ISM_GEOM)
+endif
+
 ifneq ($(origin FISOC_INSTALL_DIR), environment)
  ifneq ($(origin HOME), environment)
   $(error Environment variables neither HOME nor FISOC_INSTALL_DIR was set.)
@@ -38,6 +50,7 @@ endif
 
 include $(ESMFMKFILE)
 
+
 ################################################################################
 
 .SUFFIXES: .f90
@@ -46,14 +59,14 @@ include $(ESMFMKFILE)
 
 info:
 	$(info )
-	$(info ********************************************************************)
-	$(info *** Building FISOC, Framework for Ice Sheet Ocean model Coupling ***)
-	$(info *** Relevant variables for the build are now listed              ***)
-	$(info ********************************************************************)
+	$(info ******************************************************************)
+	$(info *** FISOC, Framework for Ice Sheet Ocean model Coupling        ***)
+	$(info *** Relevant variables for the build are now listed            ***)
+	$(info ******************************************************************)
 	$(info )
-	$(info FISOC will be installed in [${INSTALL_DIR}])
-	$(info FISOC executable will be called [${FISOC_EXE}])
 	$(info )
+	$(info ******************************************************************)
+	$(info Generic FISOC build information)
 	$(info ESMFMKFILE        [${ESMFMKFILE}])
 	$(info CPPFLAGS          [${CPPFLAGS}])
 	$(info FFLAGS            [${FFLAGS}])
@@ -61,21 +74,59 @@ info:
 	$(info ...               [${ESMF_F90COMPILEOPTS}])
 	$(info Additional ESMF Fortran link flags)
 	$(info ...               [${ESMF_F90LINKOPTS}])
+	$(info FISOC will be installed in)
+	$(info ...               [${INSTALL_DIR}])
+	$(info FISOC executable will be named )
+	$(info ...               [${FISOC_EXE}])
 	$(info )
+	$(info )
+ifeq ($(FISOC_ISM), dummy)
+	$(info ******************************************************************)
+	$(info Ice Sheet Model (ISM) is dummy, skipping ISM component)
+else
+	$(info ******************************************************************)
+	$(info Ice Sheet Model (ISM) build information)
 	$(info FISOC_ISM         [${FISOC_ISM}])
 	$(info FISOC_ISM_LIBS    [${FISOC_ISM_LIBS}])
 	$(info FISOC_ISM_LIBPATH [${FISOC_ISM_LIBPATH}])
 	$(info FISOC_ISM_INCLUDE [${FISOC_ISM_INCLUDE}])
+ ifeq ($(origin FISOC_ISM_GEOM), environment)
+	$(info FISOC_ISM_GEOM    [${FISOC_ISM_GEOM}])
+ endif
+endif
 	$(info )
+	$(info )
+ifeq ($(FISOC_OM), dummy)
+	$(info ******************************************************************)
+	$(info Ocean Model (OM) is dummy, skipping OM component)
+else
+	$(info ******************************************************************)
+	$(info Ocean Model (OM) build information)
 	$(info FISOC_OM          [${FISOC_OM}])
 	$(info FISOC_OM_LIBS     [${FISOC_OM_LIBS}])
 	$(info FISOC_OM_LIBPATH  [${FISOC_OM_LIBPATH}])
 	$(info FISOC_OM_INCLUDE  [${FISOC_OM_INCLUDE}])
+ ifeq ($(origin FISOC_OM_GEOM), environment)
+	$(info FISOC_OM_GEOM     [${FISOC_OM_GEOM}])
+ endif
+endif
 	$(info )
+	$(info )
+ifeq ($(FISOC_AM), dummy)
+	$(info ******************************************************************)
+	$(info Atmosphere Model (AM) is dummy, skipping AM component)
+else
+	$(info ******************************************************************)
+	$(info Atmosphere Model (AM) build information)
 	$(info FISOC_AM          [${FISOC_AM}])
 	$(info FISOC_AM_LIBS     [${FISOC_AM_LIBS}])
 	$(info FISOC_AM_LIBPATH  [${FISOC_AM_LIBPATH}])
 	$(info FISOC_AM_INCLUDE  [${FISOC_AM_INCLUDE}])
+ ifeq ($(origin FISOC_AM_GEOM), environment)
+	$(info FISOC_AM_GEOM     [${FISOC_AM_GEOM}])
+ endif
+endif
+	$(info )
 	$(info )
 
 ################################################################################
@@ -96,6 +147,8 @@ $(SRCDIR)/FISOC_utils.o:                    $(SRCDIR)/FISOC_utils.f90
 ################################################################################
 
 install: info $(FISOC_EXE) 
+	$(info )
+	$(info Building FISOC complete)
 	cp $(FISOC_EXE) $(INSTALL_DIR)/$(FISOC_EXE) 
 
 .PHONY: clean

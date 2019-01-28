@@ -1,6 +1,7 @@
 !--------------------------------------------------------
 !--------------------------------------------------------
-$yearinsec = 365.25*24*60*60
+$yearinsec = 360*24*60*60
+!$yearinsec = 365.25*24*60*60
 $rhoi = 910.0/(1.0e6*yearinsec^2)
 $rhow = 1000.0/(1.0e6*yearinsec^2)
 $rhor = 2000.0/(1.0e6*yearinsec^2)
@@ -10,7 +11,7 @@ $gravity = -9.81*yearinsec^2
 $GLTolerance = 1.0e-4
 $name = "BensBoxISM_5b"
 $m = 1.0/3.0
-$dt = 3.0/365.25 ! /864.0 !/86400
+$dt = 3.0/360.0 ! /864.0 !/86400
 
 
 !--------------------------------------------------------
@@ -58,8 +59,8 @@ Simulation
   Output File = "$name".result" !"
   max output level = 9
   Extruded Mesh Levels = Integer 10
-!  Restart File = "BensBoxISM_5a.result"
-!  Restart Position = 0  
+  Restart File = "BensBoxISM_5a.result"
+  Restart Position = 0  
 End
 
 !--------------------------------------------------------
@@ -89,7 +90,7 @@ End
 
 !--------------------------------------------------------
 Initial Condition 1
-  depth = Real 0.0
+!  depth = Real 0.0
   height = Real 0.0
   Pressure = Real 0.0
   Velocity 1 = Real 0.0
