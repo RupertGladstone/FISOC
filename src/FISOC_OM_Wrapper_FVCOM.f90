@@ -15,7 +15,8 @@ MODULE FISOC_OM_Wrapper
   USE Mod_driver
   USE NestingFVCOMMod, only : NestingFVCOM_register
 
-***use something that gives access to the fvcom grid info and the variables we need 
+  ! TODO figure out which modules we need to get the FVCOM variables, assuming that we 
+  ! can't get what we want through the nesting state.
 
   IMPLICIT NONE
 
@@ -28,8 +29,6 @@ MODULE FISOC_OM_Wrapper
   type(ESMF_GridComp) :: nestingFVCOMComp  ! the nesting FVCOM Component
   type(ESMF_State)    :: nestingFVCOMState ! the nesting FVCOM State
   
-
-***need to check on timing stuff, how we modify this...  
 
   ! Clock, TimeInterval, and Times
   type(ESMF_Clock)        :: clock
@@ -183,8 +182,10 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
 
-TODO: sort out clocks.  Allow nesting code its own clocks, but check for clashes with FISOC clocks.
-Overwrite end time according to FISOC_OM_DT
+    !TODO: sort out clocks.  Allow nesting code its own clocks, but check for clashes with FISOC clocks.
+    !Overwrite end time according to FISOC_OM_DT
+
+    !TODO: pass config/onput/namelist filename from FISOC_config or just leave it hard coded?
 
     IF (localPet.EQ.0) THEN
        WRITE (OM_outputUnit,*) 'FISOC is about to call FVCOM init method.'
@@ -196,11 +197,15 @@ Overwrite end time according to FISOC_OM_DT
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ***    CALL ROMS_initialize(first,mpic,OM_configFile)
+    CALL ESMF_GridCompInitialize(nestingFVCOMComp, &
+      importState=nestingFVCOMState, exportState=nestingFVCOMState, &
+      clock=clock, userRc=urc, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     msg = "Completed FVCOM initialisation"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-         line=__LINE__, file=__FILE__, rc=rc)
-    
+         line=__LINE__, file=__FILE__, rc=rc)    
     IF (localPet.EQ.0) THEN
       WRITE (OM_outputUnit,*) 'FISOC has just called FVCOM init method.'
     END IF
@@ -218,11 +223,12 @@ Overwrite end time according to FISOC_OM_DT
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
-    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,ignoreAveragesOpt=.TRUE.,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+ 
+! TODO: rewrite this subroutine for FVCOM   
+!    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,ignoreAveragesOpt=.TRUE.,rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     RETURN
     
@@ -282,24 +288,33 @@ Overwrite end time according to FISOC_OM_DT
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    IF (ISM2OM_init_vars) THEN
-       CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
+! TODO: write send vars subroutine
+!    IF (ISM2OM_init_vars) THEN
+!       CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
+!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!            line=__LINE__, file=__FILE__)) &
+!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    END IF
 
     IF (OM_initCavityFromISM) THEN
-       CALL CavityReset(OM_ImpFB,FISOC_config,localPet,rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) & 
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      msg = "Cavity reset NYI for FVCOM"
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
-    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,ignoreAveragesOpt=.TRUE.,rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) & 
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+! TODO: allow cavity reset
+!       CALL CavityReset(OM_ImpFB,FISOC_config,localPet,rc=rc)
+!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!            line=__LINE__, file=__FILE__)) & 
+!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    END IF
+
+! TODO: write this subroutine
+!    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,ignoreAveragesOpt=.TRUE.,rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) & 
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   END SUBROUTINE FISOC_OM_Wrapper_Init_Phase2
   
@@ -356,26 +371,35 @@ Overwrite end time according to FISOC_OM_DT
       END IF
     END IF
     CALL ESMF_VMBarrier(vm, rc=rc)
-    CALL FVCOM_run(OM_dt_sec_float)
+    CALL ESMF_GridCompRun(nestingFVCOMComp, &
+         importState=nestingFVCOMState, exportState=nestingFVCOMState, &
+         clock=clock, userRc=urc, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ! TODO: implement time limit for run method
+    !    CALL FVCOM_run(OM_dt_sec_float)
     CALL ESMF_VMBarrier(vm, rc=rc)
     IF (localPet.EQ.0) THEN
-       WRITE (OM_outputUnit,*) 'FISOC has just called FVCOM run method.'
-    END IF
-
-    IF (exit_flag.NE.NoError) THEN
-       WRITE (msg, "(A,I0,A)") "ERROR: FVCOM has returned non-safe exit_flag=", &
-            exit_flag,", see FVCOM mod_scalars.f90 for exit flag meanings."
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       RETURN
+      WRITE (OM_outputUnit,*) 'FISOC has just called FVCOM run method.'
     END IF
     
-    IF (PRESENT(OM_ExpFB)) THEN
-       CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
+! TODO: is there an accessible exit flag or similar for FVCOM?
+!    IF (exit_flag.NE.NoError) THEN
+!      WRITE (msg, "(A,I0,A)") "ERROR: FVCOM has returned non-safe exit_flag=", &
+!           exit_flag,", see FVCOM mod_scalars.f90 for exit flag meanings."
+!      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+!           line=__LINE__, file=__FILE__, rc=rc)
+!      RETURN
+!    END IF
+    
+! TODO: wirte this subroutine
+!    IF (PRESENT(OM_ExpFB)) THEN
+!       CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
+!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!            line=__LINE__, file=__FILE__)) &
+!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    END IF
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
@@ -456,17 +480,39 @@ Overwrite end time according to FISOC_OM_DT
 
 !    CLOSE(unit=OM_outputUnit, ERR=102)
 
-    rc = ESMF_SUCCESS
+    CALL ESMF_GridCompFinalize(nestingFVCOMComp, &
+         importState=nestingFVCOMState, exportState=nestingFVCOMState, &
+         clock=clock, userRc=urc, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_StateDestroy(nestingFVCOMState, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CALL ESMF_GridCompDestroy(nestingFVCOMComp, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__,file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    CALL ESMF_ClockDestroy(clock, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    rc = ESMF_SUCCESS
+    
     RETURN
     
 102 msg = "OM failed to close stdoutFile"
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
          line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
+    
   END SUBROUTINE FISOC_OM_Wrapper_Finalize
-
+  
 
   !--------------------------------------------------------------------------------------
   ! Use the cavity from the ISM first stage initialisation to set the OM cavity
@@ -539,7 +585,6 @@ Overwrite end time according to FISOC_OM_DT
     Jstr =BOUNDS(Ngrids)%Jstr (localPet) 
     Jend =BOUNDS(Ngrids)%Jend (localPet)
 
-!    CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
     DO jj = JstrR, JendR
        DO ii = IstrR, IendR
 # ifdef FVCOM_DSDT
@@ -673,7 +718,6 @@ Overwrite end time according to FISOC_OM_DT
 # endif
            END DO
          END DO
-!         CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
          
        CASE ('OM_temperature_l0')
          DO jj = JstrR, JendR
@@ -736,43 +780,6 @@ Overwrite end time according to FISOC_OM_DT
     
   END SUBROUTINE GetFieldDataFromOM
   
-
-  !--------------------------------------------------------------------------------------
-  ! Copy values to boundary cells from neihgbouring interior cells.
-  SUBROUTINE cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
-
-    USE mod_param, ONLY : Lm, Mm, Ngrids
-
-    REAL(ESMF_KIND_R8),POINTER,INTENT(IN) :: ptr(:,:)
-    INTEGER,INTENT(IN)                    :: IstrR, IendR, JstrR, JendR
-
-    INTEGER                               :: ii, jj, rc
-
-    IF (Ngrids .ne. 1) THEN
-       msg = "ERROR: not expecting multiple FVCOM grids"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
-
-    DO jj = JstrR, JendR
-       IF (jj .EQ. 0) THEN
-          ptr(:,jj) = ptr(:,jj+1)
-       ELSE IF (jj .EQ. Mm(1)+1) THEN
-          ptr(:,jj) = ptr(:,jj-1)
-       END IF
-    END DO
-    
-    DO ii = IstrR, IendR
-       IF (ii .EQ. 0) THEN
-          ptr(ii,:) = ptr(ii+1,:)
-       ELSE IF (ii .EQ. Lm(1)+1) THEN
-          ptr(ii,:) = ptr(ii-1,:)
-       END IF
-    END DO
-
-  END SUBROUTINE cp2bdry
-
 
   !--------------------------------------------------------------------------------------
   SUBROUTINE sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc)
@@ -875,11 +882,9 @@ Overwrite end time according to FISOC_OM_DT
              ! iceshelf_draft(:,:,nstp) is the previous draft and iceshelf_draft(:,:,nnew) is 
              ! the current draft.  We only update the new draft from the ISM.
              ! The OM var zice will be set internally by the OM based on the iceshelf_draft.
-             CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
              DO jj = JstrR, JendR
                 DO ii = IstrR, IendR
                    ICESHELFVAR(1) % iceshelf_draft(ii,jj,nnew) = ptr(ii,jj)
-!                   GRID(1) % zice (ii, jj) = ptr (ii, jj)
                 END DO
              END DO
 # else
