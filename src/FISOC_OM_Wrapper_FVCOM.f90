@@ -379,8 +379,21 @@ CONTAINS
   
 
   ! Extract the FVCOM mesh information and use it to create an ESMF_mesh object
-  SUBROUTINE FVCOM2ESMF_mesh(FISOC_config,OM_mesh,vm,rc=rc)
+  SUBROUTINE FVCOM2ESMF_mesh(FISOC_config,ESMF_FVCOMmesh,vm,rc=rc)
+  
+    TYPE(ESMF_mesh),INTENT(INOUT)    :: ESMF_FVCOMMesh
+    TYPE(ESMF_VM),INTENT(IN)         :: vm
+    INTEGER,INTENT(OUT),OPTIONAL     :: rc
 
+    INTEGER                          :: ii, nodeIndex
+    CHARACTER(len=ESMF_MAXSTR)       :: subroutineName = "FVCOM2ESMF_mesh"
+    INTEGER,ALLOCATABLE              :: elemTypes(:), elemIds(:),elemConn(:)
+    INTEGER,ALLOCATABLE              :: nodeIds(:),nodeOwners(:)
+    REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
+    INTEGER                          :: localPet, petCount 
+    INTEGER                          :: FVCOM_numNodes, FVCOM_numElems 
+
+	
     print*,"Tore and Qin to write this"
 
     ! Create Mesh structure in 1 step
@@ -389,15 +402,51 @@ CONTAINS
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
     END IF
-    ESMF_ElmerMesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
-         nodeIds=nodeIds_global, nodeCoords=nodeCoords,            &
-         nodeOwners=nodeOwners, elementIds=ElementIDs_global,      &
-         elementTypes=ESMF_elemTypes, elementConn=elemConn,        &
+  
+    !-------------------------------------------------------------------!
+	! Use fvcom grid variables directly, may need to use MODULE ALL_VARS
+	! and MODULE LIMS from FVCOM library, see mod_main.F for details
+	FVCOM_numNodes        = MGL                            
+    FVCOM_numElems        = NGL
+	
+	
+	ALLOCATE(nodesIds(FVCOM_numNodes))
+	ALLOCATE(nodeCoords(FVCOM_numNodes*2))
+	ALLOCATE(nodeOwners(FVCOM_numNodes))
+	
+    ALLOCATE(elemIds(FVCOM_numElems))
+	ALLOCATE(elemConn(FVCOM_numElems*3))
+	ALLOCATE(elemTypes(FVCOM_numElems))
+   
+	nodeIds           = (/(ii, ii=1, FVCOM_numNodes, 1)/)
+	nodeCoords(:,1)   =  XG                                 
+	nodeCoords(:,2)   =  YG
+	nodeOwners        =  partition
+	
+	elemIds           = (/(ii, ii=1, FVCOM_numElems, 1)/)
+	elemConn          =  NV
+	elemTypes         =  ESMF_MESHELEMTYPE_TRI
+	
+    !----------------------------------------------------------------!   
+  
+    ESMF_FVCOMMesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
+         nodeIds=nodeIds, nodeCoords=nodeCoords,            &
+         nodeOwners=nodeOwners, elementIds=elemIds,      &
+         elementTypes=elemTypes, elementConn=elemConn,        &
          coordSys=ESMF_COORDSYS_CART,                              &
          rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+	
+    DEALLOCATE(nodesIds)
+	DEALLOCATE(nodeCoords)
+	DEALLOCATE(nodeOwners)
+	
+    DEALLOCATE(elemIds)
+	DEALLOCATE(elemConn)
+	DEALLOCATE(elemTypes)	
+		 
 
   END SUBROUTINE FVCOM2ESMF_mesh
 
