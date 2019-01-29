@@ -378,12 +378,28 @@ CONTAINS
   END SUBROUTINE FISOC_OM_Wrapper_Finalize
   
 
+  ! Extract the FVCOM mesh information and use it to create an ESMF_mesh object
+  SUBROUTINE FVCOM2ESMF_mesh(FISOC_config,OM_mesh,vm,rc=rc)
 
-!  ! Extract the FVCOM mesh information and use it to create an ESMF_mesh object
-!  SUBROUTINE FVCOM2ESMF_mesh(FISOC_config,OM_mesh,vm,rc=rc)
+    print*,"Tore and Qin to write this"
 
-!    print*,"Tore and Qin to write this"
+    ! Create Mesh structure in 1 step
+    IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
+       msg = "FVCOM mesh: creating ESMF mesh structure"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
+    ESMF_ElmerMesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
+         nodeIds=nodeIds_global, nodeCoords=nodeCoords,            &
+         nodeOwners=nodeOwners, elementIds=ElementIDs_global,      &
+         elementTypes=ESMF_elemTypes, elementConn=elemConn,        &
+         coordSys=ESMF_COORDSYS_CART,                              &
+         rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!  END SUBROUTINE FVCOM2ESMF_mesh
+  END SUBROUTINE FVCOM2ESMF_mesh
+
 
 END MODULE FISOC_OM_Wrapper
