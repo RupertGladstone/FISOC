@@ -414,7 +414,7 @@ CONTAINS
     TYPE(ESMF_VM),INTENT(IN)         :: vm
     INTEGER,INTENT(OUT),OPTIONAL     :: rc
 
-    INTEGER                          :: ii, nodeIndex
+    INTEGER                          :: ii, nn
     CHARACTER(len=ESMF_MAXSTR)       :: subroutineName = "FVCOM2ESMF_mesh"
     INTEGER,ALLOCATABLE              :: elemTypes(:), elemIds(:),elemConn(:)
     INTEGER,ALLOCATABLE              :: nodeIds(:),nodeOwners(:)
@@ -449,13 +449,26 @@ CONTAINS
     ALLOCATE(elemTypes(FVCOM_numElems))
  
     nodeIds           = (/(ii, ii=1, FVCOM_numNodes, 1)/)
-    nodeCoords(:,1)   =  XG                                 
-    nodeCoords(:,2)   =  YG
     nodeOwners        =  partition
     
     elemIds           = (/(ii, ii=1, FVCOM_numElems, 1)/)
-    elemConn          =  NV
     elemTypes         =  ESMF_MESHELEMTYPE_TRI
+	
+	! loop over to get nodeCoords
+	DO ii = 1, FVCOM_numNodes
+	   nn = (ii-1)*2
+	   nodeCoords(nn+1) = XG(ii)
+	   nodeCoords(nn+2) = YG(ii)
+	END DO
+	
+	
+	! loop over to get elemConn
+	DO ii = 1, FVCOM_numElems
+	   nn = (ii-1)*3
+	   elemConn(nn+1) = NV(ii,1)
+	   elemConn(nn+2) = NV(ii,2)
+	   elemConn(nn+3) = NV(ii,3)
+	END DO
     
     !----------------------------------------------------------------!       
     ! Create Mesh structure in 1 step
