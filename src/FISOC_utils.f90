@@ -182,29 +182,29 @@ CONTAINS
 
     count = 0
     DO ii=1,SIZE(ISM2OM_Vars)
-
-          IF (TRIM('ISM_z_l0').EQ.TRIM(ISM2OM_Vars(ii))) THEN
-             IF (OM_cavityUpdate.NE.'RecentIce') cavityUpdateMismatch = .TRUE.
-             count = count + 1
+       
+       IF (TRIM('ISM_z_l0').EQ.TRIM(ISM2OM_Vars(ii))) THEN
+          IF (OM_cavityUpdate.NE.'RecentIce') cavityUpdateMismatch = .TRUE.
+          count = count + 1
+       END IF
+       
+       IF (TRIM('ISM_z_l0_linterp').EQ.TRIM(ISM2OM_Vars(ii))) THEN
+          IF (OM_cavityUpdate.NE.'Linterp') cavityUpdateMismatch = .TRUE.
+          count = count + 1
+       END IF
+       
+       IF (TRIM('ISM_dddt').EQ.TRIM(ISM2OM_Vars(ii))) THEN
+          IF ( (OM_cavityUpdate.NE.'Rate')          &
+               .AND.                                &
+               (OM_cavityUpdate.NE.'CorrectedRate') &
+               ) THEN
+             cavityUpdateMismatch = .TRUE.
           END IF
-          
-          IF (TRIM('ISM_z_l0_linterp').EQ.TRIM(ISM2OM_Vars(ii))) THEN
-             IF (OM_cavityUpdate.NE.'Linterp') cavityUpdateMismatch = .TRUE.
-             count = count + 1
-          END IF
-
-          IF (TRIM('ISM_dddt').EQ.TRIM(ISM2OM_Vars(ii))) THEN
-             IF ( (OM_cavityUpdate.NE.'Rate')          &
-                  .AND.                                &
-                  (OM_cavityUpdate.NE.'CorrectedRate') &
-                  ) THEN
-                cavityUpdateMismatch = .TRUE.
-                count = count + 1
-             END IF
-          END IF
-          
+          count = count + 1
+       END IF
+       
     END DO
-
+    
     IF (count.eq.0) THEN
        msg = 'no ISM cavity variable will be passed to the OM'
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &

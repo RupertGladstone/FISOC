@@ -171,12 +171,12 @@ CONTAINS
     TUW(1)=BOUNDS(NGrids)%UBi(localPet)-BOUNDS(NGrids)%Iend(localPet)
     TUW(2)=BOUNDS(NGrids)%UBj(localPet)-BOUNDS(NGrids)%Jend(localPet)
 
-!         fieldStagger=OM_ReqVars_stagger,                          &
-!         RouteHandle=OM_haloRouteHandle,                           &
+    !         fieldStagger=OM_ReqVars_stagger,                          &
+    !         RouteHandle=OM_haloRouteHandle,                           &
 !        TLW=TLW,TUW=TUW,                                          &
-!TODO: fix roms stagger and halo... may affect some types of regridding...
-
-     CALL FISOC_populateFieldBundle(OM_ReqVarList,OM_ExpFB,OM_grid, &
+    !TODO: fix roms stagger and halo... may affect some types of regridding...
+    
+    CALL FISOC_populateFieldBundle(OM_ReqVarList,OM_ExpFB,OM_grid, &
          init_value=FISOC_missingData,                             &
          rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -187,7 +187,7 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
+    
     RETURN
     
 101 msg = "OM failed to open stdoutFile"

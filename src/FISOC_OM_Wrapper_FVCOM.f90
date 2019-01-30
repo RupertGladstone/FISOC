@@ -43,13 +43,11 @@ CONTAINS
     INTEGER                               :: localPet, petCount
     INTEGER                               :: mpic
     CHARACTER(len=ESMF_MAXSTR)            :: label
-    TYPE(ESMF_staggerLoc),ALLOCATABLE     :: OM_ReqVars_stagger(:)
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: OM_ReqVarList(:)
     CHARACTER(len=ESMF_MAXSTR)            :: OM_configFile, OM_stdoutFile
     LOGICAL                               :: verbose_coupling, first
 
     first = .TRUE.
-
 
     CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -88,22 +86,30 @@ CONTAINS
        PRINT*,""
     END IF
 
+    ! We will pass an MPI communicator to FVCOM
+    CALL FISOC_VM_MPI_Comm_dup(vm,mpic,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF (localPet.EQ.0) THEN
        WRITE (OM_outputUnit,*) 'FISOC is about to call FVCOM init method.'
     END IF
-    msg = "Calling FVCOM initialisation"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-         line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_VMBarrier(vm, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL FVCOM_initialize()
+    CALL FVCOM_initialize(casename_opt=OM_configFile, MPI_COMM_opt=mpic)
     IF (localPet.EQ.0) THEN
       WRITE (OM_outputUnit,*) 'FISOC has just called FVCOM init method.'
     END IF
     
+    CALL FVCOM2ESMF_mesh(FISOC_config,OM_mesh,vm,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+
     ! extract a list of required ocean variables from the configuration object
     label = 'FISOC_OM_ReqVars:' ! the FISOC names for the vars
     CALL FISOC_getListFromConfig(FISOC_config, label, OM_ReqVarList,rc=rc)
@@ -406,6 +412,7 @@ CONTAINS
   END SUBROUTINE FISOC_OM_Wrapper_Finalize
   
 
+  !--------------------------------------------------------------------------------
   ! Extract the FVCOM mesh information and use it to create an ESMF_mesh object
   SUBROUTINE FVCOM2ESMF_mesh(FISOC_config,ESMF_FVCOMmesh,vm,rc)
   
@@ -439,7 +446,7 @@ CONTAINS
     ! and MODULE LIMS from FVCOM library, see mod_main.F for details
     FVCOM_numNodes        = MGL                            
     FVCOM_numElems        = NGL	
-	
+
     ALLOCATE(nodeIds(FVCOM_numNodes))
     ALLOCATE(nodeCoords(FVCOM_numNodes*2))
     ALLOCATE(nodeOwners(FVCOM_numNodes))
@@ -453,22 +460,24 @@ CONTAINS
     
     elemIds           = (/(ii, ii=1, FVCOM_numElems, 1)/)
     elemTypes         =  ESMF_MESHELEMTYPE_TRI
-	
-	! loop over to get nodeCoords
-	DO ii = 1, FVCOM_numNodes
-	   nn = (ii-1)*2
-	   nodeCoords(nn+1) = XG(ii)
-	   nodeCoords(nn+2) = YG(ii)
-	END DO
-	
-	
-	! loop over to get elemConn
-	DO ii = 1, FVCOM_numElems
-	   nn = (ii-1)*3
-	   elemConn(nn+1) = NV(ii,1)
-	   elemConn(nn+2) = NV(ii,2)
-	   elemConn(nn+3) = NV(ii,3)
-	END DO
+    
+print*,"Diagnosing... ",SIZE(XG),SIZE(YG),FVCOM_numNodes
+print*,ALLOCATED(XG),ALLOCATED(YG)
+
+    ! loop over to get nodeCoords
+    DO ii = 1, FVCOM_numNodes
+       nn = (ii-1)*2
+       nodeCoords(nn+1) = XG(ii)
+       nodeCoords(nn+2) = YG(ii)
+    END DO
+    
+    ! loop over to get elemConn
+    DO ii = 1, FVCOM_numElems
+       nn = (ii-1)*3
+       elemConn(nn+1) = NV(ii,1)
+       elemConn(nn+2) = NV(ii,2)
+       elemConn(nn+3) = NV(ii,3)
+    END DO
     
     !----------------------------------------------------------------!       
     ! Create Mesh structure in 1 step
@@ -489,8 +498,9 @@ CONTAINS
     DEALLOCATE(elemIds)
     DEALLOCATE(elemConn)
     DEALLOCATE(elemTypes)	
-    
 
+print*,"FINISHED FVCOM MESH CREATION"
+    
   END SUBROUTINE FVCOM2ESMF_mesh
 
 
