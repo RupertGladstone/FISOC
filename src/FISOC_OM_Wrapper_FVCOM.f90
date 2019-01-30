@@ -251,12 +251,38 @@ CONTAINS
 !            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 !    END IF
 
+
+    ! FVCOM needs date strings that look like this:
+    ! START_DATE      = '2000-01-01 00:00:00',
+    ! END_DATE        = '2000-01-01 00:01:00',
+
+    ! Get OM time interval (how long to run OM for) in seconds...
     CALL ESMF_ConfigGetAttribute(FISOC_config, OM_dt_sec, label='OM_dt_sec:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     OM_dt_sec_float = REAL(OM_dt_sec,ESMF_KIND_R8)
 
+    ! ...convert to ESMF type...
+    CALL ESMF_TimeIntervalSet(OM_dt, s=OM_dt_sec, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! ... use to create start and end times...
+    interval_startTime = FISOC_time
+    interval_endTime   = FISOC_time + OM_dt
+
+    ! ... and convert these to character strings.
+    CALL ESMF_TimeGet(startTime, timeStringISOFrac=interval_startTime_char, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_TimeGet(endTime, timeStringISOFrac=interval_endTime_char, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
     IF (localPet.EQ.0) THEN
       WRITE (OM_outputUnit,*) 'FISOC is about to call FVCOM run method, period (sec): ',OM_dt_sec_float
       IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
@@ -266,7 +292,7 @@ CONTAINS
       END IF
     END IF
     CALL ESMF_VMBarrier(vm, rc=rc)
-    ! TODO: implement run method with time limit in seconds
+    CALL FVCOM_run(START_DATE_opt=interval_startTime_char,END_DATE_opt=interval_endTime_char)
     CALL ESMF_VMBarrier(vm, rc=rc)
     IF (localPet.EQ.0) THEN
       WRITE (OM_outputUnit,*) 'FISOC has just called FVCOM run method.'

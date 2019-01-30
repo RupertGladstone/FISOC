@@ -607,6 +607,11 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
+    CALL ESMF_ClockGet(FISOC_clock, currTime=FISOC_time, startTime=FISOC_startTime, stopTime=FISOC_endTime, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
     msg = "created and initialised clocks and alarms"  
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
          line=__LINE__, file=__FILE__, rc=rc)
