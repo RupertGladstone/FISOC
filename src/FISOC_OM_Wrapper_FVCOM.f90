@@ -444,8 +444,9 @@ CONTAINS
     !-------------------------------------------------------------------!
     ! Use fvcom grid variables directly, may need to use MODULE ALL_VARS
     ! and MODULE LIMS from FVCOM library, see mod_main.F for details
-    FVCOM_numNodes        = MGL                            
-    FVCOM_numElems        = NGL	
+    ! and module par for retreating  EGID NGID
+    FVCOM_numNodes        = M                           
+    FVCOM_numElems        = N
 
     ALLOCATE(nodeIds(FVCOM_numNodes))
     ALLOCATE(nodeCoords(FVCOM_numNodes*2))
@@ -455,28 +456,28 @@ CONTAINS
     ALLOCATE(elemConn(FVCOM_numElems*3))
     ALLOCATE(elemTypes(FVCOM_numElems))
  
-    nodeIds           = (/(ii, ii=1, FVCOM_numNodes, 1)/)
-    nodeOwners        =  partition
-    
-    elemIds           = (/(ii, ii=1, FVCOM_numElems, 1)/)
+ 
+    nodeOwners        =  localPet
     elemTypes         =  ESMF_MESHELEMTYPE_TRI
     
 print*,"Diagnosing... ",SIZE(XG),SIZE(YG),FVCOM_numNodes
 print*,ALLOCATED(XG),ALLOCATED(YG)
 
-    ! loop over to get nodeCoords
+    ! loop over to get nodeIds nodeCoords
     DO ii = 1, FVCOM_numNodes
        nn = (ii-1)*2
-       nodeCoords(nn+1) = XG(ii)
-       nodeCoords(nn+2) = YG(ii)
+       nodeIds(ii)      = NGID(ii)
+       nodeCoords(nn+1) = XG(NGID(ii))
+       nodeCoords(nn+2) = YG(NGID(ii))
     END DO
     
     ! loop over to get elemConn
     DO ii = 1, FVCOM_numElems
        nn = (ii-1)*3
-       elemConn(nn+1) = NV(ii,1)
-       elemConn(nn+2) = NV(ii,2)
-       elemConn(nn+3) = NV(ii,3)
+       elemIds(ii)    = EGDI(ii)
+       elemConn(nn+1) = NVG(EGID(ii),4)
+       elemConn(nn+2) = NVG(EGID(ii),3)
+       elemConn(nn+3) = NVG(EGID(ii),2)
     END DO
     
     !----------------------------------------------------------------!       
