@@ -99,9 +99,7 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL FVCOM_initialize
-!    CALL FVCOM_run
-! TODO: call FVCOM init
+    CALL FVCOM_initialize()
     IF (localPet.EQ.0) THEN
       WRITE (OM_outputUnit,*) 'FISOC has just called FVCOM init method.'
     END IF
@@ -229,7 +227,9 @@ CONTAINS
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)
     INTEGER                    :: OM_dt_sec
     REAL(ESMF_KIND_R8)         :: OM_dt_sec_float
-
+    TYPE(ESMF_TimeInterval)    :: OM_dt
+    TYPE(ESMF_time)            :: interval_startTime, interval_endTime
+    CHARACTER(len=ESMF_MAXSTR) :: interval_startTime_char, interval_endTime_char
 
     rc_local = ESMF_FAILURE
     
@@ -274,11 +274,11 @@ CONTAINS
     interval_endTime   = FISOC_time + OM_dt
 
     ! ... and convert these to character strings.
-    CALL ESMF_TimeGet(startTime, timeStringISOFrac=interval_startTime_char, rc=rc)
+    CALL ESMF_TimeGet(interval_startTime, timeStringISOFrac=interval_startTime_char, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_TimeGet(endTime, timeStringISOFrac=interval_endTime_char, rc=rc)
+    CALL ESMF_TimeGet(interval_endTime, timeStringISOFrac=interval_endTime_char, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -421,7 +421,7 @@ CONTAINS
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
     INTEGER                          :: localPet, petCount 
     INTEGER                          :: FVCOM_numNodes, FVCOM_numElems 
-
+    LOGICAL                          :: verbose_coupling
 	
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &

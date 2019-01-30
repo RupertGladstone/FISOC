@@ -7,6 +7,7 @@ MODULE  FISOC_parent_MOD
   USE FISOC_coupler_MOD, ONLY : FISOC_coupler_register
   USE FISOC_OM_MOD, ONLY : FISOC_OM_register
   USE FISOC_utils_MOD
+  USE FISOC_types_MOD
   
   IMPLICIT NONE
   
