@@ -16,6 +16,7 @@ MODULE FISOC_OM_Wrapper
   USE ALL_VARS
   USE LIMS
   USE mod_par
+  USE mod_main
 
   ! TODO figure out which modules we need to get the FVCOM variables, assuming that we 
   ! can't get what we want through the nesting state.
@@ -28,6 +29,8 @@ MODULE FISOC_OM_Wrapper
        FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize
 
   
+  INTEGER                               :: mpic
+
 CONTAINS
   
   !--------------------------------------------------------------------------------------
@@ -42,7 +45,6 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
     INTEGER                               :: localPet, petCount
-    INTEGER                               :: mpic
     CHARACTER(len=ESMF_MAXSTR)            :: label
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: OM_ReqVarList(:)
     CHARACTER(len=ESMF_MAXSTR)            :: OM_configFile, OM_stdoutFile
@@ -413,6 +415,93 @@ CONTAINS
   END SUBROUTINE FISOC_OM_Wrapper_Finalize
   
 
+  !--------------------------------------------------------------------------------------
+  ! update the fields in the ocean export field bundle from the OM
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc)
+
+    USE mod_iceshelfvar, ONLY : ICESHELFVAR
+    USE mod_param, ONLY       : BOUNDS, Ngrids
+    USE mod_stepping, ONLY    : nnew
+    USE mod_grid , ONLY       : GRID
+    USE mod_average, ONLY     : AVERAGE
+
+    IMPLICIT NONE
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ExpFB
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+    TYPE(ESMF_VM),INTENT(IN)              :: vm
+
+    INTEGER                               :: fieldCount, localPet, petCount
+    TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
+    CHARACTER(len=ESMF_MAXSTR)            :: fieldName
+    REAL(ESMF_KIND_R8),POINTER            :: ptr(:)
+    INTEGER                               :: IstrR, IendR, JstrR, JendR ! tile start and end coords
+    INTEGER                               :: ii, jj, nn
+!    INTEGER                               :: LBi, UBi, LBj, UBj ! tile start and end coords including halo
+
+    rc = ESMF_FAILURE
+
+    CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+    ! get a list of fields and their names from the OM export field bundle
+    fieldCount = 0
+    CALL ESMF_FieldBundleGet(OM_ExpFB, fieldCount=fieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(fieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(OM_ExpFB, fieldList=fieldList, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    fieldLoop: DO nn = 1,fieldCount
+       
+       CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       ptr = FISOC_missingData
+       
+       SELECT CASE (TRIM(ADJUSTL(fieldName)))
+       
+       CASE ('OM_dBdt_l0')
+         ptr = melt_avg
+         !         DO ii = M ! loop over all local nodes including boundary and halo nodes
+         !           ptr(ii) = melt_avg(ii)
+         !         END IF
+       END DO
+       
+       CASE DEFAULT
+         msg = "ERROR: unknown variable"
+         CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+              line=__LINE__, file=__FILE__, rc=rc)
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+         
+       END SELECT
+       
+       IF (ASSOCIATED(ptr)) THEN
+         NULLIFY(ptr)
+       END IF
+       
+    END DO fieldLoop
+    
+    rc = ESMF_SUCCESS
+    
+  END SUBROUTINE GetFieldDataFromOM
+  
+
+
   !--------------------------------------------------------------------------------
   ! Extract the FVCOM mesh information and use it to create an ESMF_mesh object
   SUBROUTINE FVCOM2ESMF_mesh(FISOC_config,ESMF_FVCOMmesh,vm,rc)
@@ -422,15 +511,20 @@ CONTAINS
     TYPE(ESMF_VM),INTENT(IN)         :: vm
     INTEGER,INTENT(OUT),OPTIONAL     :: rc
 
-    INTEGER                          :: ii, nn
+    INTEGER                          :: ii, nn, IERR
     CHARACTER(len=ESMF_MAXSTR)       :: subroutineName = "FVCOM2ESMF_mesh"
     INTEGER,ALLOCATABLE              :: elemTypes(:), elemIds(:),elemConn(:)
-    INTEGER,ALLOCATABLE              :: nodeIds(:),nodeOwners(:)
+    INTEGER,ALLOCATABLE              :: nodeIds(:),nodeOwners(:),nodeOwnersGL(:)
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
     INTEGER                          :: localPet, petCount 
     INTEGER                          :: FVCOM_numNodes, FVCOM_numElems 
     LOGICAL                          :: verbose_coupling
 	
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -446,8 +540,8 @@ CONTAINS
     ! Use fvcom grid variables directly, may need to use MODULE ALL_VARS
     ! and MODULE LIMS from FVCOM library, see mod_main.F for details
     ! and module par for retreating  EGID NGID
-    FVCOM_numNodes        = M                           
-    FVCOM_numElems        = N
+    FVCOM_numNodes        = MT
+    FVCOM_numElems        = NT
 
     ALLOCATE(nodeIds(FVCOM_numNodes))
     ALLOCATE(nodeCoords(FVCOM_numNodes*2))
@@ -456,31 +550,49 @@ CONTAINS
     ALLOCATE(elemIds(FVCOM_numElems))
     ALLOCATE(elemConn(FVCOM_numElems*3))
     ALLOCATE(elemTypes(FVCOM_numElems))
- 
- 
-    nodeOwners        =  localPet
+
+    ALLOCATE(nodeOwnersGL(MGL)) 
+
+    ! Construct a global array of node owners in which an arbitrary decision is 
+    ! taken about which partition boundary nodes should belong to.
+    nodeOwnersGL = -1
+    DO nn=1,M
+      nodeOwnersGL(NGID(nn))=localPET
+    END DO
+    CALL MPI_Allreduce(nodeOwnersGL,nodeOwnersGL,MGL,MPI_INT,MPI_MAX,mpic,IERR)
+
+    ! sanity check (we initialised owners to -1, but PET count starts at 0, so if it 
+    ! works then all nodes should have been assigned an owner .GE. 0)
+    IF (MINVAL(nodeOwnersGL).LT.0) THEN
+      msg = "ERROR: Some nodes not assigned owners"
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    
+    !populate nodeOwners from nodeOwnersGL
+    DO ii = 1, FVCOM_numNodes
+      nodeOwners(ii) = nodeOwnersGL(NGID_X(ii))
+    END DO
     elemTypes         =  ESMF_MESHELEMTYPE_TRI
     
-print*,"Diagnosing... ",SIZE(XG),SIZE(YG),FVCOM_numNodes
-print*,ALLOCATED(XG),ALLOCATED(YG)
-
     ! loop over to get nodeIds nodeCoords
     DO ii = 1, FVCOM_numNodes
        nn = (ii-1)*2
-       nodeIds(ii)      = NGID(ii)
-       nodeCoords(nn+1) = XG(NGID(ii))
-       nodeCoords(nn+2) = YG(NGID(ii))
+       nodeIds(ii)      = NGID_X(ii)
+       nodeCoords(nn+1) = XM(ii)
+       nodeCoords(nn+2) = YM(ii)
     END DO
     
     ! loop over to get elemConn
     DO ii = 1, FVCOM_numElems
        nn = (ii-1)*3
-       elemIds(ii)    = EGID(ii)
-       elemConn(nn+1) = NVG(EGID(ii),4)
-       elemConn(nn+2) = NVG(EGID(ii),3)
-       elemConn(nn+3) = NVG(EGID(ii),2)
+       elemIds(ii)    = EGID_X(ii)
+       elemConn(nn+1) = NVG(EGID_X(ii),4)
+       elemConn(nn+2) = NVG(EGID_X(ii),3)
+       elemConn(nn+3) = NVG(EGID_X(ii),2)
     END DO
-    
+
     !----------------------------------------------------------------!       
     ! Create Mesh structure in 1 step
     ESMF_FVCOMMesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &

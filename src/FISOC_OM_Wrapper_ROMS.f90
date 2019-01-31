@@ -702,7 +702,7 @@ CONTAINS
   
 
   !--------------------------------------------------------------------------------------
-  ! Copy values to boundary cells from neihgbouring interior cells.
+  ! Copy values to boundary cells from neighbouring interior cells.
   SUBROUTINE cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
 
     USE mod_param, ONLY : Lm, Mm, Ngrids
