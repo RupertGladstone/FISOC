@@ -15,6 +15,7 @@ MODULE FISOC_OM_Wrapper
   USE mod_ocean_control
   USE ALL_VARS
   USE LIMS
+  USE mod_par
 
   ! TODO figure out which modules we need to get the FVCOM variables, assuming that we 
   ! can't get what we want through the nesting state.
@@ -474,7 +475,7 @@ print*,ALLOCATED(XG),ALLOCATED(YG)
     ! loop over to get elemConn
     DO ii = 1, FVCOM_numElems
        nn = (ii-1)*3
-       elemIds(ii)    = EGDI(ii)
+       elemIds(ii)    = EGID(ii)
        elemConn(nn+1) = NVG(EGID(ii),4)
        elemConn(nn+2) = NVG(EGID(ii),3)
        elemConn(nn+3) = NVG(EGID(ii),2)
