@@ -18,9 +18,6 @@ MODULE FISOC_OM_Wrapper
   USE mod_par
 !  USE mod_main
 
-  ! TODO figure out which modules we need to get the FVCOM variables, assuming that we 
-  ! can't get what we want through the nesting state.
-
   IMPLICIT NONE
 
   PRIVATE
@@ -127,11 +124,10 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
  
-! TODO: rewrite this subroutine for FVCOM   
-!    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,ignoreAveragesOpt=.TRUE.,rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) &
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     RETURN
     
@@ -191,13 +187,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-! TODO: write send vars subroutine
-!    IF (ISM2OM_init_vars) THEN
-!       CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
-!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!            line=__LINE__, file=__FILE__)) &
-!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!    END IF
+    IF (ISM2OM_init_vars) THEN
+       CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
 
     IF (OM_initCavityFromISM) THEN
       msg = "Cavity reset NYI for FVCOM"
@@ -213,11 +208,10 @@ CONTAINS
 !            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 !    END IF
 
-! TODO: write this subroutine
-!    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,ignoreAveragesOpt=.TRUE.,rc=rc)
-!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!         line=__LINE__, file=__FILE__)) & 
-!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) & 
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   END SUBROUTINE FISOC_OM_Wrapper_Init_Phase2
   
@@ -252,18 +246,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!TODO: write this
-!    IF (PRESENT(OM_ImpFB)) THEN       
-!       CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
-!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!            line=__LINE__, file=__FILE__)) &
-!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!    END IF
-
-
-    ! FVCOM needs date strings that look like this:
-    ! START_DATE      = '2000-01-01 00:00:00',
-    ! END_DATE        = '2000-01-01 00:01:00',
+    IF (PRESENT(OM_ImpFB)) THEN       
+       CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
 
     ! Get OM time interval (how long to run OM for) in seconds...
     CALL ESMF_ConfigGetAttribute(FISOC_config, OM_dt_sec, label='OM_dt_sec:', rc=rc)
@@ -300,6 +288,7 @@ CONTAINS
              line=__LINE__, file=__FILE__, rc=rc)
       END IF
     END IF
+
     CALL ESMF_VMBarrier(vm, rc=rc)
     CALL FVCOM_run(START_DATE_opt=interval_startTime_char,END_DATE_opt=interval_endTime_char)
     CALL ESMF_VMBarrier(vm, rc=rc)
@@ -316,14 +305,13 @@ CONTAINS
 !      RETURN
 !    END IF
     
-! TODO: wirte this subroutine
-!    IF (PRESENT(OM_ExpFB)) THEN
-!       CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
-!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!            line=__LINE__, file=__FILE__)) &
-!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!    END IF
-
+    IF (PRESENT(OM_ExpFB)) THEN
+      CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        PRINT*,""
        PRINT*,"******************************************************************************"
@@ -494,6 +482,78 @@ CONTAINS
   
 
 
+  !--------------------------------------------------------------------------------------
+  ! update the fields in the OM from the ocean import field bundle
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+    TYPE(ESMF_VM),INTENT(IN)              :: vm
+
+    INTEGER                               :: fieldCount, localPet, petCount
+    TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
+    CHARACTER(len=ESMF_MAXSTR)            :: fieldName
+    REAL(ESMF_KIND_R8),POINTER            :: ptr(:)
+    INTEGER                               :: IstrR, IendR, JstrR, JendR ! tile start and end coords
+    INTEGER                               :: ii, jj, nn
+!    INTEGER                               :: LBi, UBi, LBj, UBj ! tile start and end coords including halo
+
+    rc = ESMF_FAILURE
+
+    CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+    ! get a list of fields and their names from the OM export field bundle
+    fieldCount = 0
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldCount=fieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(fieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldList=fieldList, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    fieldLoop: DO nn = 1,fieldCount
+       
+       CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       SELECT CASE (TRIM(ADJUSTL(fieldName)))
+         
+       CASE ('OM_dDdt_l0')
+         ISF_DDDT = ptr
+         
+       CASE DEFAULT
+         msg = "ERROR: unknown variable"
+         CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+              line=__LINE__, file=__FILE__, rc=rc)
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+         
+       END SELECT
+       
+       IF (ASSOCIATED(ptr)) THEN
+         NULLIFY(ptr)
+       END IF
+       
+    END DO fieldLoop
+    
+    rc = ESMF_SUCCESS
+    
+  END SUBROUTINE SendFieldDataToOM
+  
+
   !--------------------------------------------------------------------------------
   ! Extract the FVCOM mesh information and use it to create an ESMF_mesh object
   SUBROUTINE FVCOM2ESMF_mesh(FISOC_config,ESMF_FVCOMmesh,vm,rc)
@@ -506,7 +566,7 @@ CONTAINS
     INTEGER                          :: ii, nn, IERR
     CHARACTER(len=ESMF_MAXSTR)       :: subroutineName = "FVCOM2ESMF_mesh"
     INTEGER,ALLOCATABLE              :: elemTypes(:), elemIds(:),elemConn(:)
-    INTEGER,ALLOCATABLE              :: nodeIds(:),nodeOwners(:),nodeOwnersGL(:)
+    INTEGER,ALLOCATABLE              :: nodeIds(:),nodeOwners(:),nodeOwnersGL(:),nodeOwnersGL_recv(:)
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
     INTEGER                          :: localPet, petCount 
     INTEGER                          :: FVCOM_numNodes, FVCOM_numElems 
@@ -544,6 +604,7 @@ CONTAINS
     ALLOCATE(elemTypes(FVCOM_numElems))
 
     ALLOCATE(nodeOwnersGL(MGL)) 
+    ALLOCATE(nodeOwnersGL_recv(MGL)) 
 
     ! Construct a global array of node owners in which an arbitrary decision is 
     ! taken about which partition boundary nodes should belong to.
@@ -551,11 +612,11 @@ CONTAINS
     DO nn=1,M
       nodeOwnersGL(NGID(nn))=localPET
     END DO
-    CALL MPI_Allreduce(nodeOwnersGL,nodeOwnersGL,MGL,MPI_INT,MPI_MAX,mpic,IERR)
+    CALL MPI_Allreduce(nodeOwnersGL,nodeOwnersGL_recv,MGL,MPI_INT,MPI_MAX,mpic,IERR)
 
     ! sanity check (we initialised owners to -1, but PET count starts at 0, so if it 
     ! works then all nodes should have been assigned an owner .GE. 0)
-    IF (MINVAL(nodeOwnersGL).LT.0) THEN
+    IF (MINVAL(nodeOwnersGL_recv).LT.0) THEN
       msg = "ERROR: Some nodes not assigned owners"
       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
            line=__LINE__, file=__FILE__, rc=rc)
@@ -564,7 +625,7 @@ CONTAINS
     
     !populate nodeOwners from nodeOwnersGL
     DO ii = 1, FVCOM_numNodes
-      nodeOwners(ii) = nodeOwnersGL(NGID_X(ii))
+      nodeOwners(ii) = nodeOwnersGL_recv(NGID_X(ii))
     END DO
     elemTypes         =  ESMF_MESHELEMTYPE_TRI
     

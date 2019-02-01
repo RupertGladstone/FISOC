@@ -629,7 +629,11 @@ CONTAINS
     INTEGER,OPTIONAL,INTENT(OUT)          :: rc
 
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
+# if defined(FISOC_OM_GRID)
     REAL(ESMF_KIND_R8),POINTER            :: field_ptr(:,:)
+# elif defined(FISOC_OM_MESH)
+    REAL(ESMF_KIND_R8),POINTER            :: field_ptr(:)
+# endif
     INTEGER                               :: fieldCount, ii
 
     rc = ESMF_FAILURE
@@ -649,15 +653,15 @@ CONTAINS
 
     ! loop over fields, setting all values to zero
     DO ii=1,fieldCount
-       CALL ESMF_FieldGet(field=fieldList(ii), farrayPtr=field_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-       field_ptr(:,:) = 0.0
-
+      CALL ESMF_FieldGet(field=fieldList(ii), farrayPtr=field_ptr, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      field_ptr = 0.0
+      
     END DO
-
+    
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_zeroBundle
@@ -676,7 +680,11 @@ CONTAINS
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:),fieldListCum(:)
     TYPE(ESMF_TypeKind_Flag)              :: fieldTypeKind
     CHARACTER(len=ESMF_MAXSTR)            :: fieldName, fieldNameCum
+# if defined(FISOC_OM_GRID)
     REAL(ESMF_KIND_R8),POINTER            :: fieldCum_ptr(:,:), field_ptr(:,:) 
+# elif defined(FISOC_OM_MESH)
+    REAL(ESMF_KIND_R8),POINTER            :: fieldCum_ptr(:), field_ptr(:) 
+# endif
     TYPE(ESMF_GRID)                       :: grid
 
     rc = ESMF_FAILURE
@@ -750,7 +758,7 @@ CONTAINS
           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        END IF
     
-       fieldCum_ptr(:,:) = fieldCum_ptr(:,:) + field_ptr(:,:)
+       fieldCum_ptr = fieldCum_ptr + field_ptr
 
     END DO
 
@@ -776,7 +784,11 @@ CONTAINS
     CHARACTER(len=ESMF_MAXSTR)            :: fieldName, fieldNameCum
     INTEGER                               :: OM_cum_steps, ii, fieldCount, fieldCountCum 
     TYPE(ESMF_field)                      :: fieldCum, field
+# if defined(FISOC_OM_GRID)
     REAL(ESMF_KIND_R8),POINTER            :: fieldCum_ptr(:,:), field_ptr(:,:) 
+# elif defined(FISOC_OM_MESH)
+    REAL(ESMF_KIND_R8),POINTER            :: fieldCum_ptr(:), field_ptr(:) 
+# endif
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:),fieldListCum(:)
     TYPE(ESMF_TypeKind_Flag)              :: fieldTypeKind
 
@@ -857,7 +869,7 @@ CONTAINS
           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        END IF
     
-       field_ptr(:,:) = fieldCum_ptr(:,:) / OM_cum_steps
+       field_ptr = fieldCum_ptr / OM_cum_steps
 
     END DO
 
@@ -885,7 +897,11 @@ CONTAINS
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:),fieldListCum(:)
     TYPE(ESMF_TypeKind_Flag)              :: fieldTypeKind
     CHARACTER(len=ESMF_MAXSTR)            :: fieldName, fieldNameCum
+# if defined(FISOC_OM_GRID)
     TYPE(ESMF_GRID)                       :: grid
+# elif defined(FISOC_OM_MESH)
+    TYPE(ESMF_MESH)                       :: mesh
+# endif
 
     rc = ESMF_FAILURE
 
@@ -916,6 +932,7 @@ CONTAINS
 
        fieldNameCum = TRIM(fieldName)//"_cum"
 
+# if defined(FISOC_OM_GRID)
        CALL ESMF_FieldGet(fieldList(ii), grid=grid, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
@@ -925,6 +942,23 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+# elif defined(FISOC_OM_MESH)
+       CALL ESMF_FieldGet(fieldList(ii), mesh=mesh, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       fieldListCum(ii) = ESMF_FieldCreate(mesh, typekind=fieldTypeKind, name=fieldNameCum, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# else
+       msg = "ERROR: FISOC does not recognise OM geom type."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
 
     END DO
 
