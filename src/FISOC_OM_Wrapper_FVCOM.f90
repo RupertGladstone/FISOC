@@ -16,7 +16,7 @@ MODULE FISOC_OM_Wrapper
   USE ALL_VARS
   USE LIMS
   USE mod_par
-!  USE mod_main
+ !  USE mod_main
 
   IMPLICIT NONE
 
@@ -146,10 +146,10 @@ CONTAINS
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB, OM_ExpFB
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
     TYPE(ESMF_VM),INTENT(IN)              :: vm
-
-    LOGICAL   :: verbose_coupling, OM_initCavityFromISM, ISM2OM_init_vars
-    INTEGER   :: localpet
     
+    LOGICAL   :: verbose_coupling, OM_initCavityFromISM, ISM2OM_init_vars
+    INTEGER   :: localpet, urc
+
     rc = ESMF_FAILURE
     
     CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
@@ -195,19 +195,16 @@ CONTAINS
     END IF
 
     IF (OM_initCavityFromISM) THEN
-      msg = "Cavity reset NYI for FVCOM"
-      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-           line=__LINE__, file=__FILE__, rc=rc)
-      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!      msg = "Cavity reset NYI for FVCOM"
+!      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+!           line=__LINE__, file=__FILE__, rc=rc)
+!      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      CALL CavityReset(OM_ImpFB,FISOC_config,rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) & 
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
-
-! TODO: allow cavity reset
-!       CALL CavityReset(OM_ImpFB,FISOC_config,localPet,rc=rc)
-!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!            line=__LINE__, file=__FILE__)) & 
-!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-!    END IF
-
+    
     CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) & 
@@ -384,7 +381,7 @@ CONTAINS
     IF (localPet.EQ.0) THEN
        WRITE (OM_outputUnit,*) 'FISOC is about to call FVCOM finalize.'
     END IF
-!TODO: FVCOM finalize
+    CALL FVCOM_finalize()
     IF (localPet.EQ.0) THEN
        WRITE (OM_outputUnit,*) 'FISOC has just called FVCOM finalize.'
     END IF
@@ -481,6 +478,60 @@ CONTAINS
   END SUBROUTINE GetFieldDataFromOM
   
 
+  SUBROUTINE CavityReset(OM_ImpFB,FISOC_config,rc)
+
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+
+    INTEGER                               :: fieldCount, localPet, petCount
+    TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
+    CHARACTER(len=ESMF_MAXSTR)            :: fieldName
+    REAL(ESMF_KIND_R8),POINTER            :: ptr(:)
+    INTEGER                               :: IstrR, IendR, JstrR, JendR ! tile start and end coords
+    INTEGER                               :: ii, jj, nn
+!    INTEGER                               :: LBi, UBi, LBj, UBj ! tile start and end coords including halo
+
+    rc = ESMF_FAILURE
+        
+    ! get a list of fields and their names from the OM export field bundle
+     fieldCount = 0
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldCount=fieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(fieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldList=fieldList, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    fieldLoop: DO nn = 1,fieldCount
+       
+       CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       IF (TRIM(ADJUSTL(fieldName)).EQ.'ISM_z_l0') THEN
+         ZISF = ptr         
+       END IF
+
+       IF (ASSOCIATED(ptr)) THEN
+         NULLIFY(ptr)
+       END IF
+       
+    END DO fieldLoop
+    
+    rc = ESMF_SUCCESS
+    
+  END SUBROUTINE CavityReset
+
+
 
   !--------------------------------------------------------------------------------------
   ! update the fields in the OM from the ocean import field bundle
@@ -532,7 +583,7 @@ CONTAINS
        
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
          
-       CASE ('OM_dDdt_l0')
+       CASE ('ISM_dddt')
          ISF_DDDT = ptr
          
        CASE DEFAULT
