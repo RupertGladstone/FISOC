@@ -16,7 +16,7 @@ MODULE FISOC_OM_Wrapper
   USE ALL_VARS
   USE LIMS
   USE mod_par
-  USE mod_main
+!  USE mod_main
 
   ! TODO figure out which modules we need to get the FVCOM variables, assuming that we 
   ! can't get what we want through the nesting state.
@@ -420,14 +420,6 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   SUBROUTINE getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc)
 
-    USE mod_iceshelfvar, ONLY : ICESHELFVAR
-    USE mod_param, ONLY       : BOUNDS, Ngrids
-    USE mod_stepping, ONLY    : nnew
-    USE mod_grid , ONLY       : GRID
-    USE mod_average, ONLY     : AVERAGE
-
-    IMPLICIT NONE
-
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ExpFB
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
@@ -480,7 +472,7 @@ CONTAINS
          !         DO ii = M ! loop over all local nodes including boundary and halo nodes
          !           ptr(ii) = melt_avg(ii)
          !         END IF
-       END DO
+         !       END DO
        
        CASE DEFAULT
          msg = "ERROR: unknown variable"
