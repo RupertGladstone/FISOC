@@ -16,6 +16,8 @@ MODULE FISOC_OM_Wrapper
   USE ALL_VARS
   USE LIMS
   USE mod_par
+  USE mod_wd
+  USE mod_isf
  !  USE mod_main
 
   IMPLICIT NONE
@@ -195,6 +197,10 @@ CONTAINS
     END IF
 
     IF (OM_initCavityFromISM) THEN
+!      msg = "Cavity reset NYI for FVCOM"
+!      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+!           line=__LINE__, file=__FILE__, rc=rc)
+!      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
       CALL CavityReset(OM_ImpFB,FISOC_config,rc=rc)
       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
            line=__LINE__, file=__FILE__)) & 
@@ -445,11 +451,15 @@ CONTAINS
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        
        ptr = FISOC_missingData
-        
+       
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
        
        CASE ('OM_dBdt_l0')
          ptr = melt_avg
+         !         DO ii = M ! loop over all local nodes including boundary and halo nodes
+         !           ptr(ii) = melt_avg(ii)
+         !         END IF
+         !       END DO
        
        CASE DEFAULT
          msg = "ERROR: unknown variable"
