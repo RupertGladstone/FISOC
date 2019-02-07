@@ -509,8 +509,20 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        
-       IF (TRIM(ADJUSTL(fieldName)).EQ.'ISM_z_l0') THEN
-         ZISF = ptr         
+      ! IF (TRIM(ADJUSTL(fieldName)).EQ.'ISM_z_l0') THEN
+      IF (TRIM(ADJUSTL(fieldName)).EQ.'ISM_thick') THEN
+        ! converting ice draft from ice thickness from FISOC
+         ZISF     =   SQRT(ptr*RHO_isf/DRDZ)
+         CALL     ISF_JUDGE
+         CALL     WET_JUDGE
+         D    =  H + EL-ZISF
+         DT   =  H + ET-ZISF
+         WHERE (D<=MIN_DEPTH)  D  =  MIN_DEPTH
+         WHERE (DT<=MIN_DEPTH) DT =  MIN_DEPTH
+         DTFA =  D
+         CALL N2E2D(D,D1)
+         CALL N2E2D(DT,DT1)
+         CALL N2E2D(ZISF,ZISF1)       
        END IF
 
        IF (ASSOCIATED(ptr)) THEN
