@@ -517,12 +517,12 @@ CONTAINS
        CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-      ! IF (TRIM(ADJUSTL(fieldName)).EQ.'ISM_z_l0') THEN
-      IF (TRIM(ADJUSTL(fieldName)).EQ.'ISM_thick') THEN
-        ! converting ice draft from ice thickness from FISOC
-         ZISF     =   SQRT(ptr*RHO_isf/DRDZ)
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        IF (TRIM(ADJUSTL(fieldName)).EQ.'ISM_thick') THEN
+        ! converting ice draft from ice thickness from FISOC, needs to be updated to a more advanced formula
+         DO ii  =  1, MT
+            ZISF(ii)     =   ptr(ii)*RHO_isf/RHO_on
+         END DO
          CALL     ISF_JUDGE
          CALL     WET_JUDGE
          D    =  H + EL-ZISF
@@ -599,7 +599,10 @@ CONTAINS
          
        CASE ('ISM_dddt')
          ISF_DDDT = ptr
-         
+
+       CASE ('ISM_dsdt')
+         ISF_DSDT = ptr
+                
        CASE DEFAULT
          msg = "ERROR: unknown variable"
          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
@@ -706,11 +709,10 @@ CONTAINS
     DO ii = 1, FVCOM_numElems
        nn = (ii-1)*3
        elemIds(ii)    = EGID_X(ii)
-       elemConn(nn+1) = NVG(EGID_X(ii),4)
-       elemConn(nn+2) = NVG(EGID_X(ii),3)
-       elemConn(nn+3) = NVG(EGID_X(ii),2)
-    END DO
-
+       elemConn(nn+1) = NV(ii,4)
+       elemConn(nn+2) = NV(ii,3)
+       elemConn(nn+3) = NV(ii,2)
+    END DO 
     !----------------------------------------------------------------!       
     ! Create Mesh structure in 1 step
     ESMF_FVCOMMesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
