@@ -122,3 +122,7 @@ cp -r FISOC_mesh1a_DEM  ../longThinMIS_periodic
 # Note from elmerice wiki (should we avoid periodic BCs?):
 # 2013-03-07: GetHydrostaticloads has an issue for periodic boundary conditions: the force is half what it should be on the periodic boundary whereas the residual account for the fact that the domain is periodic. TODO: fix this! 
 #
+
+# Following added by Qin on 21.02.2019
+
+Ex4_fvcom is a test case for FISOC-FVCOM coupling, which is identical to Ex4_BensBox with a modification of the horizontal resolution from 5 km to 3 km. The ocean is homegenious with a constant temperature of -1.9 degree and salinity of 34.6 PSU. The ice draft will be overwritten during the second phase of initialization by the ice draft converted from ice thickness provided by the ice model. 
