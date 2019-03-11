@@ -449,15 +449,27 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     NumRouteHandleItems = 0
+    WRITE (msg, "(A,I0)") &
+         "Total number of items: ",ListLen 
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+         line=__LINE__, file=__FILE__, rc=rc)
     DO ii = 1,ListLen
-       IF (OM_ExpSt_TypeList(ii).EQ.ESMF_STATEITEM_ROUTEHANDLE) THEN
-          NumRouteHandleItems = NumRouteHandleItems + 1
-          RouteHandleIndex = ii
-       END IF
+      WRITE (msg, "(A,I0)") &
+           "Current item type: ",OM_ExpSt_TypeList(ii) 
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      IF (OM_ExpSt_TypeList(ii).EQ.ESMF_STATEITEM_ROUTEHANDLE) THEN
+        NumRouteHandleItems = NumRouteHandleItems + 1
+        RouteHandleIndex = ii
+        WRITE (msg, "(A,I0)") &
+             "Current routehandle item number: ",ii 
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+             line=__LINE__, file=__FILE__, rc=rc)
+      END IF
     END DO
     IF (NumRouteHandleItems.EQ.1) THEN
        OM2ISM_HandleName = OM_ExpSt_NameList(RouteHandleIndex)
-    ELSE
+     ELSE
        WRITE (msg, "(A,I0)") &
             "Cannot get route handle from OM export state.  Wrong number of route handle items: ", NumRouteHandleItems
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
@@ -618,16 +630,28 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     NumRouteHandleItems = 0
+    WRITE (msg, "(A,I0)") &
+         "Total number of items: ",ListLen 
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+         line=__LINE__, file=__FILE__, rc=rc)
     DO ii = 1,ListLen
-       IF (ISM_ExpSt_TypeList(ii).EQ.ESMF_STATEITEM_ROUTEHANDLE) THEN
-          NumRouteHandleItems = NumRouteHandleItems + 1
-          RouteHandleIndex = ii
-       END IF
+      WRITE (msg, "(A,I0)") &
+           "Current item type: ",ISM_ExpSt_TypeList(ii) 
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      IF (ISM_ExpSt_TypeList(ii).EQ.ESMF_STATEITEM_ROUTEHANDLE) THEN
+        NumRouteHandleItems = NumRouteHandleItems + 1
+        RouteHandleIndex = ii
+        WRITE (msg, "(A,I0)") &
+             "Current routehandle item number: ",ii 
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+             line=__LINE__, file=__FILE__, rc=rc)
+      END IF
     END DO
     IF (NumRouteHandleItems.EQ.1) THEN
-       ISM2OM_HandleName = ISM_ExpSt_NameList(RouteHandleIndex)
+      ISM2OM_HandleName = ISM_ExpSt_NameList(RouteHandleIndex)
     ELSE
-       WRITE (msg, "(A,I0)") &
+      WRITE (msg, "(A,I0)") &
             "Cannot get route handle from ISM export state.  Wrong number of route handle items: ", NumRouteHandleItems
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
