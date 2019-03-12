@@ -17,10 +17,11 @@ MODULE FISOC_utils_MOD
        FISOC_shrink, FISOC_VMAllGather, Unique1DArray,         &
        FISOC_OneGrid, FISOC_cavityCheckOptions,                & 
        FISOC_getFirstFieldRank, FISOC_makeRHfromFB,            &
-       FISOC_getGridOrMeshFromFB, FISOC_regridFB,              &
+       FISOC_State2StateCopyFB, FISOC_regridFB,                &
        FISOC_GridCompRun, FISOC_FieldListGetField,             &
-       FISOC_State2StateCopyFB
-  
+       FISOC_getGridFromFB, FISOC_getMeshFromFB,               &                
+       FISOC_ConfigStringListContains
+!         FISOC_getGridOrMeshFromFB, 
 
   INTERFACE Unique1DArray
      MODULE PROCEDURE Unique1DArray_I4
@@ -337,8 +338,37 @@ CONTAINS
     RETURN
 
   END FUNCTION  FISOC_OM2ISM
+  
+  
+  !------------------------------------------------------------------------------
+  LOGICAL FUNCTION FISOC_ConfigStringListContains(FISOC_config,itemName,listName,rc)
+    
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: itemName, listName
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: stringList(:)
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+    
+    rc = ESMF_FAILURE
 
+    CALL FISOC_getStringListFromConfig(FISOC_config, listName, stringList, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    FISOC_ConfigStringListContains = FISOC_listContains(itemName,stringList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    IF (ALLOCATED(stringList)) DEALLOCATE(stringList)
+
+    rc = ESMF_SUCCESS
+
+    RETURN
+
+  END FUNCTION FISOC_ConfigStringListContains
+  
 
   !------------------------------------------------------------------------------
   LOGICAL FUNCTION FISOC_listContains(itemName,list,rc)
@@ -1402,10 +1432,8 @@ print*,'catch error and set default if missing att'
        END IF
 
        IF ( (ii.EQ.1) .AND. (PRESENT(RouteHandle)) ) THEN
-print*,"need RH"
-print*,"need RH"
-print*,"need RH"
-print*,"need RH"
+         print*,"*** need RH ***"
+         print*,"*** need RH ***"
        END IF
 
        CALL ESMF_FieldGet(field=field, localDe=0, farrayPtr=field_ptr, rc=rc)
@@ -2129,13 +2157,9 @@ print*,"need RH"
   ! fields from the source and target field bundles to set up the 
   ! route handle.
   !
-  ! source_gridType and target_gridType must be either ESMF_mesh or 
-  ! ESMF_grid
-  !
   SUBROUTINE FISOC_makeRHfromFB(sourceFB,targetFB, &
        Regrid_method,verbose_coupling,regridRouteHandle,vm,rc)
     
-!    CHARACTER(len=ESMF_MAXSTR),INTENT(IN)   :: source_gridType, target_gridType
     TYPE(ESMF_fieldBundle)                  :: sourceFB, targetFB
     TYPE(ESMF_RouteHandle),INTENT(OUT)      :: regridRouteHandle
     TYPE(ESMF_RegridMethod_Flag),INTENT(IN) :: Regrid_method
@@ -2208,16 +2232,46 @@ print*,"need RH"
   END SUBROUTINE FISOC_makeRHfromFB
 
 
-
   !--------------------------------------------------------------------
-  !
-  ! assuming all fields in the bundle are on the same grid or mesh, 
-  ! use the first field to get the grid or mesh object and return it.
-  SUBROUTINE FISOC_getGridOrMeshFromFB(FB,gridType,grid,mesh,rc)
+  SUBROUTINE FISOC_getGridFromFB(FB,grid,rc)
 
-    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: gridType
     TYPE(ESMF_FieldBundle),INTENT(INOUT)  :: FB
     TYPE(ESMF_grid),INTENT(OUT)           :: grid
+    INTEGER,OPTIONAL,INTENT(OUT)          :: rc
+
+    TYPE(ESMF_Field),ALLOCATABLE  :: FieldList(:)
+    INTEGER                       :: FieldCount     
+
+    rc = ESMF_FAILURE
+
+    ! How many fields?...
+    CALL ESMF_FieldBundleGet(FB, fieldCount=FieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! ... get list of fields from bundle.
+    ALLOCATE(FieldList(FieldCount))
+    CALL ESMF_FieldBundleGet(FB, fieldList=FieldList,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Get grid from first field in list
+    CALL ESMF_FieldGet(FieldList(1), grid=grid, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_getGridFromFB
+
+
+  !--------------------------------------------------------------------
+  SUBROUTINE FISOC_getMeshFromFB(FB,mesh,rc)
+
+    TYPE(ESMF_FieldBundle),INTENT(INOUT)  :: FB
     TYPE(ESMF_mesh),INTENT(OUT)           :: mesh
     INTEGER,OPTIONAL,INTENT(OUT)          :: rc
 
@@ -2239,28 +2293,15 @@ print*,"need RH"
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! Get grid or mesh from first field in list
-    SELECT CASE (gridType)
-    CASE("ESMF_grid","ESMF_Grid")
-       CALL ESMF_FieldGet(FieldList(1), grid=grid, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CASE("ESMF_mesh","ESMF_Mesh")
-       CALL ESMF_FieldGet(FieldList(1), mesh=mesh, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CASE DEFAULT
-       msg = "ERROR: FISOC does not recognise OM_gridType"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END SELECT
+    ! Get grid from first field in list
+    CALL ESMF_FieldGet(FieldList(1), mesh=mesh, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     rc = ESMF_SUCCESS
 
-  END SUBROUTINE FISOC_getGridOrMeshFromFB
+  END SUBROUTINE FISOC_getMeshFromFB
 
 
 

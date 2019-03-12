@@ -64,7 +64,11 @@ CONTAINS
     INTEGER, INTENT(OUT)       :: rc
 
     TYPE(ESMF_config)          :: FISOC_config
+# if defined(FISOC_OM_GRID)
     TYPE(ESMF_grid)            :: OM_grid
+# elif defined(FISOC_OM_MESH)
+    TYPE(ESMF_mesh)            :: OM_mesh
+# endif
     TYPE(ESMF_fieldBundle)     :: OM_ExpFB,OM_ExpFBcum
     TYPE(ESMF_VM)              :: vm
     LOGICAL                    :: ISM_UseOMGrid, OM_UseISMGrid
@@ -111,7 +115,16 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! model-specific initialisation
+# if defined(FISOC_OM_GRID)
     CALL FISOC_OM_Wrapper_Init_Phase1(FISOC_config,vm,OM_ExpFB,OM_grid,rc=rc)
+# elif defined(FISOC_OM_MESH)
+    CALL FISOC_OM_Wrapper_Init_Phase1(FISOC_config,vm,OM_ExpFB,OM_mesh,rc=rc)
+# else
+    msg = "ERROR: FISOC does not recognise OM geom type."
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+         line=__LINE__, file=__FILE__, rc=rc)
+    CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -366,7 +379,6 @@ CONTAINS
        
     END IF OM_cumulate
     
-
     ! turn off alarms relating to data exchange and cumulating
     IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN
        CALL ESMF_AlarmRingerOff(alarm_ISM_exportAvailable, rc=rc)
@@ -397,7 +409,11 @@ CONTAINS
     TYPE(ESMF_fieldbundle)       :: OM_ImpFB, OM_ExpFB
     INTEGER                      :: FieldCount,ii, localPet
     TYPE(ESMF_field),ALLOCATABLE :: FieldList(:)
+# if defined(FISOC_OM_GRID)
     TYPE(ESMF_grid)              :: OM_grid
+# elif defined(FISOC_OM_MESH)
+    TYPE(ESMF_grid)              :: OM_mesh
+# endif
     LOGICAL                      :: ISM_UseOMGrid, OM_UseISMGrid
     
     rc = ESMF_FAILURE
@@ -440,11 +456,19 @@ CONTAINS
            line=__LINE__, file=__FILE__)) &
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
       
+# if defined(FISOC_OM_GRID)
       CALL ESMF_FieldGet(FieldList(1), grid=OM_grid, rc=rc)
       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
            line=__LINE__, file=__FILE__)) &
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
       CALL ESMF_GridDestroy(OM_grid,rc=rc)
+# elif defined(FISOC_OM_MESH)
+      CALL ESMF_FieldGet(FieldList(1), mesh=OM_mesh, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      CALL ESMF_MeshDestroy(OM_mesh,rc=rc)
+# endif
       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
            line=__LINE__, file=__FILE__)) &
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -505,6 +529,346 @@ CONTAINS
 
   END SUBROUTINE FISOC_OM_finalise  
 
+
+  !------------------------------------------------------------------------------
+  SUBROUTINE OM_HandleCavity(FISOC_config, FISOC_clock, OM_ImpFB, OM_ExpFB, localPet, rc)
+    
+!    USE mod_param, ONLY       : BOUNDS, Ngrids
+    
+    TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: OM_ImpFB, OM_ExpFB
+    TYPE(ESMF_Clock),INTENT(IN)              :: FISOC_clock
+    INTEGER,INTENT(IN)                       :: localPet
+    INTEGER,INTENT(OUT),OPTIONAL             :: rc
+
+    CHARACTER(len=ESMF_MAXSTR)               :: OM_cavityUpdate, label, listLabel
+    TYPE(ESMF_Alarm)                         :: alarm_ISM_exportAvailable
+    INTEGER, SAVE                            :: linterpCounter=0
+    INTEGER                                  :: dt_ratio, ISM_dt_int
+
+    REAL(ESMF_KIND_R8)          :: linterpFactor, ISM_dt, OM_WCmin, CavCorr
+    TYPE(ESMF_field)            :: ISM_z_l0_previous, ISM_z_l0_linterp 
+    TYPE(ESMF_field)            :: ISM_z_l0_field, OM_z_l0_field, dddt_field
+    TYPE(ESMF_field)            :: OM_bed_field
+    TYPE(ESMF_field)            :: OM_z_lts_field,ISM_z_lts_field,ISM_dsdt_field
+    REAL(ESMF_KIND_R8),POINTER  :: ptr_curr(:,:),ptr_prev(:,:),ptr_linterp(:,:)
+    REAL(ESMF_KIND_R8),POINTER  :: ISM_z_l0(:,:), OM_z_l0(:,:), dddt(:,:)
+    REAL(ESMF_KIND_R8),POINTER  :: OM_bed(:,:)
+    REAL(ESMF_KIND_R8),POINTER  :: OM_z_lts(:,:),ISM_z_lts(:,:),ISM_dsdt(:,:)
+    INTEGER                     :: ii,jj,arrShape(2)
+    INTEGER                     :: IendR, IstrR, JendR, JstrR
+
+    REAL(ESMF_KIND_R8), POINTER :: ptrX(:,:), ptrY(:,:)
+# if defined(FISOC_OM_GRID)
+    TYPE(ESMF_grid)             :: OM_grid
+# elif defined(FISOC_OM_MESH)
+    TYPE(ESMF_mesh)             :: OM_mesh
+# endif
+    INTEGER                     :: exclusiveLBound(2),exclusiveUBound(2),exclusiveCount(2),computationalLBound(2)
+    INTEGER                     :: computationalUBound(2),computationalCount(2),totalLBound(2),totalUBound(2)
+
+    LOGICAL                     :: CalculateUpperSurface
+
+    rc = ESMF_FAILURE
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_cavityUpdate,    & 
+         label='OM_cavityUpdate:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, dt_ratio,           & 
+         label='dt_ratio:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    SELECT CASE (OM_cavityUpdate)
+
+    CASE('Rate','RecentIce')
+       ! handled elsewhere, do nothing
+      
+    CASE('CorrectedRate')
+      
+       !       msg = "OM_cavityUpdate NYI: "//OM_cavityUpdate
+      !       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+      !            line=__LINE__, file=__FILE__, rc=rc)
+      !       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+
+      ! ISM var dddt will be used.  If an ISM export is available, which means 
+      ! dddt has just been calculated, we modify dddt here to impose a 
+      ! correcting drift. The drift is designed to reduce the ISM-OM 
+      ! discrepancy over one ISM timestep.
+      CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_ISM_exportAvailable", alarm_ISM_exportAvailable, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN 
+        
+        ! check whether we need to take into consideration the upper ice surface.
+        ! By default only the lower surface will be used.
+        label = "ISM_dsdt"
+        listLabel = "ISM2OM_vars"
+        CalculateUpperSurface = FISOC_ConfigStringListContains(FISOC_config,label,listLabel,rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+        ! We need the OM cavity geom... 
+        CALL ESMF_FieldBundleGet(OM_ExpFB, fieldName="OM_z_l0", field=OM_z_l0_field, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        CALL ESMF_FieldGet(field=OM_z_l0_field, farrayPtr=OM_z_l0, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+        ! ... the OM bedrock... 
+        CALL ESMF_FieldBundleGet(OM_ExpFB, fieldName="OM_bed", field=OM_bed_field, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        CALL ESMF_FieldGet(field=OM_bed_field, farrayPtr=OM_bed, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+        ! ...and the ISM cavity geom.
+        CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_z_l0", field=ISM_z_l0_field, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        CALL ESMF_FieldGet(field=ISM_z_l0_field, farrayPtr=ISM_z_l0, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+        ! And we need dddt, the cavity rate, in order to update it with the 
+        ! drift correction.
+        CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_dddt", field=dddt_field, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        CALL ESMF_FieldGet(field=dddt_field, farrayPtr=dddt, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+        ! If we're considering the upper ice surface we also need:
+        ! OM upper ice surface
+        ! ISM upper ice surface
+        ! ISM change rate of upper surface, dsdt
+        UpperSurf: IF (CalculateUpperSurface) THEN          
+          CALL ESMF_FieldBundleGet(OM_ExpFB, fieldName="OM_z_lts", field=OM_z_lts_field, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldGet(field=OM_z_lts_field, farrayPtr=OM_z_lts, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_z_lts", field=ISM_z_lts_field, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldGet(field=ISM_z_lts_field, farrayPtr=ISM_z_lts, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldBundleGet(OM_ImpFB, fieldName="ISM_dsdt", field=ISM_dsdt_field, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          CALL ESMF_FieldGet(field=ISM_dsdt_field, farrayPtr=ISM_dsdt, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)          
+        END IF UpperSurf
+        
+        ! ISM time step in seconds is used (we are modifying dddt here in 
+        ! metres per second)
+        CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt_int, 'ISM_dt_sec',rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        ISM_dt = REAL(ISM_dt_int,ESMF_KIND_R8)
+        
+        ! TODO: access this from the OM instead of FISOC config?  For ROMS it would be DCRIT.
+        CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_WCmin, 'OM_WCmin',rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+        CALL FISOC_ConfigDerivedAttribute(FISOC_config, CavCorr, 'OM_CavCorr',rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+        IF ( (SIZE(dddt).NE.SIZE(ISM_z_l0)) .OR.     & 
+             (SIZE(dddt).NE.SIZE(OM_z_l0))  .OR.     & 
+             (SIZE(dddt).NE.SIZE(OM_bed)) ) THEN
+          msg = "ERROR: array size inconsistency in corrected cavity rate calc."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          
+        END IF
+        
+        ! TODO: get and check stagger locs
+        ! TODO: move grid/mesh choice to cpp
+        ! get the grid or mesh from the OM exp bundle.  
+# if defined(FISOC_OM_GRID)
+        CALL FISOC_getGridFromFB(OM_expFB,OM_grid,rc=rc)
+# elif defined(FISOC_OM_MESH)
+        CALL FISOC_getMeshFromFB(OM_expFB,OM_mesh,rc=rc)
+# else
+        msg="invalid CPP options for OM geom type"
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__, rc=rc)          
+        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+# if defined(FISOC_OM_GRID)
+        CALL ESMF_GridGetCoord(OM_grid,                 &
+             coordDim=1,                                &
+             exclusiveLBound=exclusiveLBound,           &
+             exclusiveUBound=exclusiveUBound,           &
+             computationalLBound=computationalLBound,   & 
+             computationalUBound=computationalUBound,   & 
+             totalLBound=totalLBound,                   & 
+             totalUBound=totalUBound,                   & 
+             farrayPtr=ptrX,                            &
+             rc=rc)
+        
+        !!          arrShape = SHAPE(dddt)
+        !          IstrR=BOUNDS(Ngrids)%IstrR(localPet)
+        !          IendR=BOUNDS(Ngrids)%IendR(localPet)
+        !          JstrR=BOUNDS(Ngrids)%JstrR(localPet)
+        !          JendR=BOUNDS(Ngrids)%JendR(localPet)
+        
+        DO jj=computationalLBound(2),computationalUBound(2)
+          DO ii=computationalLBound(1),computationalUBound(1)
+            dddt(ii,jj) = dddt(ii,jj) +                          &
+                 CavCorr*( MAX(ISM_z_l0(ii,jj),OM_bed(ii,jj)+    &
+                 OM_WCmin)-OM_z_l0(ii,jj) ) / ISM_dt
+            IF (CalculateUpperSurface) THEN          
+              ISM_dsdt(ii,jj) = ISM_dsdt(ii,jj) +  CavCorr *     & 
+                   (ISM_z_lts(ii,jj)-OM_z_lts(ii,jj)) / ISM_dt
+            END IF
+          END DO
+        END DO
+        
+        !          DO jj=JstrR, JendR
+        !            DO ii=IstrR, IendR
+        !              dddt(ii,jj) = dddt(ii,jj) +                          &
+        !                   CavCorr*( MAX(ISM_z_l0(ii,jj),OM_bed(ii,jj)+    &
+        !                   OM_WCmin)-OM_z_l0(ii,jj) ) / ISM_dt
+        !            END DO
+        !          END DO
+# else
+        msg="invalid OM geom type for correctedRate in handleCavity"
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__, rc=rc)          
+        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
+        
+        NULLIFY(ISM_z_l0,OM_z_l0,OM_bed,dddt,ptrX)
+        IF (CalculateUpperSurface) THEN          
+          NULLIFY(ISM_dsdt,ISM_z_lts,OM_z_lts)
+        END IF
+      END IF
+      
+      
+    CASE('Linterp')
+ !      msg = "OM_cavityUpdate NYI: "//OM_cavityUpdate
+ !      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+ !           line=__LINE__, file=__FILE__, rc=rc)
+ !      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       ! If an ISM export is available this means the ISM cavity has been 
+       ! updated.  Each time this happens we can reset a counter.  The 
+       ! counter is used to count steps since the last ISM cavity update. 
+       ! We rely on dt_ratio governing the total number of steps until 
+       ! the next ISM cavity update. 
+       ! Note: we assume the ISM initialised both curr and previous cavity 
+       ! geom to the initial cavity geom, otherwise we would pass invalid 
+       ! cavity to OM
+       CALL ESMF_ClockGetAlarm(FISOC_clock, "alarm_ISM_exportAvailable", alarm_ISM_exportAvailable, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldname='ISM_z_l0', field=ISM_z_l0_field, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldGet(field=ISM_z_l0_field, farrayPtr=ptr_curr, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldname='ISM_z_l0_previous', field=ISM_z_l0_previous, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldGet(field=ISM_z_l0_previous, farrayPtr=ptr_prev, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL ESMF_FieldBundleGet(OM_ImpFB, fieldname='ISM_z_l0_linterp', field=ISM_z_l0_linterp, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       CALL ESMF_FieldGet(field=ISM_z_l0_linterp, farrayPtr=ptr_linterp, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN 
+          linterpCounter = 0
+          linterpFactor  = 0.0
+       ELSE
+          linterpCounter = linterpCounter + 1
+          linterpFactor  = REAL(linterpCounter,ESMF_KIND_R8)/REAL(dt_ratio,ESMF_KIND_R8)
+       END IF
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       ptr_linterp = ptr_prev*(1.0-linterpFactor) + ptr_curr*(linterpFactor)
+
+       NULLIFY(ptr_prev)
+       NULLIFY(ptr_curr)
+       NULLIFY(ptr_linterp)
+
+       ! now turn on ISM export alarm, because the ISM may not have turned 
+       ! it on, but the time interpolated cavity is effectively a new ISM 
+       ! export, at least from the OM perspective
+       CALL ESMF_AlarmRingerOn(alarm_ISM_exportAvailable, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)              
+       
+    CASE DEFAULT
+       msg = "OM_cavityUpdate not recognised"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END SELECT
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE OM_HandleCavity
 
 
   !------------------------------------------------------------------------------

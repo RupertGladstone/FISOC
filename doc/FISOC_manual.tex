@@ -365,6 +365,9 @@ FISOC\_DRAFT\\
 To tell ROMS to expect to receive a vertical temperature gradient 
 at the ice base from FISOC: \\
 FISOC\_DTDZ\\
+To tell ROMS to calculate the averages of the variables provided to FISOC at 
+the end of each ROMS run call:\\
+ROMS\_AVERAGES\\
 If ice shelf geometry evolution is required in ROMS this options must be 
 defined:\\
 ICESHELF\_MORPH\\
@@ -405,7 +408,7 @@ For example (see also the example FISOC build script):
 export CPPFLAGS="$CPPFLAGS -D ROMS_DRAFT"
 \end{lstlisting}
 At the time of writing, the relevant values are ROMS\_MASKING, ROMS\_SPHERICAL, 
-ROMS\_DDDT, ROMS\_DSDT and ROMS\_DRAFT.  The general rule is that any of these directives that 
+ROMS\_DDDT, ROMS\_DSDT, ROMS\_DRAFT and ROMS\_AVERAGES. Use of the averaged melt rate from ROMS is activated in FISOC by the ROMS\_AVERAGES cpp. The general rule is that any of these directives that 
 are defined for the ROMS compilation need to be defined also for the FISOC 
 compilation. 
 
@@ -456,16 +459,45 @@ FISOC\_OM to ``dummy'' at compile time.  This can help to test the compilation, 
 but performs no meaningful science.  
 
 In verbose mode (Section~\ref{sec:config}) some run time information may be printed to the screen.  
-Independently of this, log files are always written, 
-with default filenames of ``PET\#.FISOC.Log'', where ``\#'' is a number from 0 upwards indicating the 
-``Persistent Execution Thread'' (PET). 
-These logs containing run time messages and errors can be helpful with troubleshooting.
-Note that FISOC appends to the logs rather than over-writing at run time, so you may wish to delete old logs 
-periodically. 
+Independently of this, log files are always written (see below). 
+
+
+
+
+
+
+\subsection{FISOC output files}
+
+
+The outputs from FISOC include: \\
+1. Standard out from the job.  In interactive runs it is written to the screen. \\
+2. Standard out from the ice model.  This is redirected to a file named in the FISOC\_config file. \\
+3. Standard out from the ocean model.  This is redirected to a file named in the FISOC\_config file. \\
+4. ESMF log files (usually named PET*.log). 
+
+FISOC can output basic netcdf files from the OM generic wrapper 
+on the OM grid. 
+FISOC can do this for both ISM and OM variables.
+This capability is mainly recommended just for sanity checking.
+
+%The ISM and OM have their standard out directed to files named in the 
+%FISOC\_config.rc file. 
+%At time of writing (5/12/2017) ROMS stdout is not correctly implemented and sometimes 
+%writes to fort.31.
+
+FISOC log files have default filenames of ``PET\#.FISOC.Log'', where ``\#'' is a number from 0 upwards 
+indicating the ``Persistent Execution Thread'' (PET). 
+These logs are created by FISOC/ESMF and contain run time messages and errors that can 
+be helpful with troubleshooting.
+Note that by default FISOC appends to the logs rather than over-writing at run time, so you may wish to delete 
+old logs periodically. 
 
 Aside: PET is an ESMF abstraction designed to be general over differing parallel implementations. 
 In FISOC, there is always a 1:1 relationship between PETs and MPI processes. 
-%(Section~\ref{sec:FISOC_SDG}). 
+
+
+
+
 
 
 \subsection{FISOC runtime configuration}
@@ -523,7 +555,7 @@ FISOC\_ISM or FISOC\_utils. This list is allowed to be empty.              \\
 \textbf{ISM\_maskOMvars:} [LOGICAL] [optional]                             \\
 Determines whether the ISM\_maskOMvars should be turned on or not. The generic
 pre-requisite for this is that ISM\_gmask must be present, i.e. it must be a 
-member of either FISOC\_ISM\_ReqVars or FISO\C_ISM\_DerVars.
+member of either FISOC\_ISM\_ReqVars or FISOC\_ISM\_DerVars.
 The Elmer-specific pre-requisite is that the Elmer variable GroundedMask must
 exist according to the .sif.
 \vspace{6pt}
@@ -989,11 +1021,6 @@ If the error messages to the screen are not helpful, remember to check whether u
 information has been logged.  By default this will be in files in the current directory 
 with names like PETX.FISOC.Log (where X is a process number).
 
-The ISM and OM also have their standard out directed to files named in the 
-FISOC\_config.rc file. 
-At time of writing (5/12/2017) ROMS stdout is not correctly implemented and sometimes 
-writes to fort.31.
-
 A segmentation fault has been known to occurr in the case of an incorrect path to the ROMS 
 configuration file (the .in file). 
 
@@ -1095,20 +1122,14 @@ and the input file is ROMS/External/ocean\_iceshelf2d\_toy\_gl.in.
 
 
 \section{Post processing}
+
 The default expectation is that standard approaches to visualising and 
 processing outputs will be used for OM and ISM components separately. 
-The outputs from FISOC includes:
-1. Standard out from the job.  In interactive runs it is written to the screen.
-2. Standard out from the ice model.  This is redirected to a file named in the FISOC_config file.
-3. Standard out from the ocean model.  This is redirected to a file named in the FISOC_config file.
-4. ESMF log files (usually named PET*.log).
-FISOC can output basic netcdf files from the OM generic wrapper 
-on the OM grid. 
-FISOC can do this for both ISM and OM variables.
-This capability is mainly recommended just for sanity checking.
+
 
 Options for jointly visualising/processing outputs from both components 
-will be discussed at the FISOC winter workshop 2018.
+will be considered in the future. 
+With some python scripting this could perhaps be done using paraview.
 
 %It is expected that the OM and ISM components will output data in their usual formats, 
 %and that this will form the basis for most output visualisation and post-processing.
