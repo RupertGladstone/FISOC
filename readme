@@ -1,0 +1,4 @@
+Command to access the tag version of ROMS and Elmer/Ice:
+	git checkout elmerice_FISOC_MISOMIP1
+	git checkout v1.0_MISOMIP1
+Running with ESMF Version   : ESMF_8_0_0_beta_snapshot_23-29-g73bb430
