@@ -551,7 +551,9 @@ CONTAINS
     USE mod_param, ONLY       : BOUNDS, Ngrids
     USE mod_stepping, ONLY    : nnew
     USE mod_grid , ONLY       : GRID
+#if defined(ROMS_AVERAGES)
     USE mod_average, ONLY     : AVERAGE
+#endif
 
     IMPLICIT NONE
 
