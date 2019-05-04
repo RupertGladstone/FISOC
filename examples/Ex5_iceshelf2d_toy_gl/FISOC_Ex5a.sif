@@ -2,7 +2,7 @@
 !--------------------------------------------------------
 $yearinsec = 365.25*24*60*60
 $rhoi = 910.0/(1.0e6*yearinsec^2)
-$rhow = 1000.0/(1.0e6*yearinsec^2)
+$rhow = 1027.0/(1.0e6*yearinsec^2)
 $rhor = 2000.0/(1.0e6*yearinsec^2)
 $A1 = 2.89165e-13*yearinsec*1.0e18
 $A2 = 2.42736e-02*yearinsec*1.0e18
