@@ -51,6 +51,9 @@ MODULE MOD_ElmerGeom
   REAL(KIND=dp),PARAMETER    :: ROMS_dy_e5        = ROMS_Esize_e5 / REAL(ROMS_Mm_e5,dp)
   REAL(KIND=dp)              :: ROMS_j_over_Mm_e5
 
+  REAL(KIND=dp),PARAMETER    :: rho_i = 910.0_dp
+  REAL(KIND=dp),PARAMETER    :: rho_o = 1027.0_dp
+
 CONTAINS
   
   !-------------------------------------------------------------------------------
@@ -136,9 +139,9 @@ REAL(KIND=dp) FUNCTION Ex1_UpperSurface_w(Model, node, x_dist) RESULT(UpperSurfa
   REAL(KIND=dp),INTENT(IN)  :: x_dist
   
   IF ( x_dist .LE. ROMS_gl_dist) THEN
-     UpperSurface =  Ex1_bedrock(x_dist) - Ex1_bedrock(ROMS_gl_dist) * ( 1000.0_dp / 910.0_dp )
+     UpperSurface =  Ex1_bedrock(x_dist) - Ex1_bedrock(ROMS_gl_dist) * ( rho_o / rho_i )
   ELSE
-     UpperSurface = -Ex1_LowerSurface(x_dist) * ( 1000.0_dp / 910.0_dp - 1.0_dp )
+     UpperSurface = -Ex1_LowerSurface(x_dist) * ( rho_o / rho_i - 1.0_dp )
   END IF
   
 END FUNCTION Ex1_UpperSurface_w
@@ -167,7 +170,7 @@ REAL(KIND=dp) FUNCTION Ex4_UpperSurface_w(Model, node, x_dist) RESULT(UpperSurfa
   INTEGER,INTENT(IN)        :: node
   REAL(KIND=dp),INTENT(IN)  :: x_dist
   
-  UpperSurface = -Ex4_LowerSurface(x_dist) * ( 1000.0_dp / 910.0_dp - 1.0_dp )
+  UpperSurface = -Ex4_LowerSurface(x_dist) * ( rho_o / rho_i - 1.0_dp )
 
 END FUNCTION Ex4_UpperSurface_w
 
@@ -212,7 +215,7 @@ REAL(KIND=dp) FUNCTION Ex5_UpperSurface_w(Model, node, x_dist) RESULT(UpperSurfa
   INTEGER,INTENT(IN)        :: node
   REAL(KIND=dp),INTENT(IN)  :: x_dist
   
-  UpperSurface = -Ex5_LowerSurface(x_dist) * ( 1000.0_dp / 910.0_dp - 1.0_dp )
+  UpperSurface = -Ex5_LowerSurface(x_dist) * ( rho_o / rho_i - 1.0_dp )
   IF (Ex5_LowerSurface(x_dist).LE.Ex5_bedrock(x_dist)) THEN
      UpperSurface = UpperSurface + 0.1*(Ex5_bedrock(x_dist) - Ex5_LowerSurface(x_dist))
   END IF
