@@ -132,6 +132,7 @@ End
 Body Force 2
   FS lower Accumulation Flux 1 = Real 0.0e0
   FS lower Accumulation Flux 2 = Real 0.0e0
+!  FS lower Accumulation Flux 3 = Real 0.0e0
   FS lower Accumulation Flux 3 = Equals meltRate
 End
 

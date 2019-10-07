@@ -12,7 +12,7 @@ $GLTolerance = 1.0e-4
 $name = "BensBoxISM_5b"
 $m = 1.0/3.0
 $dt = 864000.0 / yearinsec
-#$dt = 10.0/360.0 ! /864.0 !/86400
+!$dt = 10.0/360.0 ! /864.0 !/86400
 
 
 !--------------------------------------------------------
@@ -62,7 +62,6 @@ Simulation
   Extruded Mesh Levels = Integer 10
   Restart File = "BensBoxISM_5a.result"
   Restart Position = 0  
-  Restart before initial conditions = Logical True
 End
 
 !--------------------------------------------------------
@@ -93,17 +92,16 @@ End
 !--------------------------------------------------------
 Initial Condition 1
 !  depth = Real 0.0
-!  height = Real 0.0
+  height = Real 0.0
   Pressure = Real 0.0
   Velocity 1 = Real 0.0
   Velocity 2 = Real 0.0
   Velocity 3 = Real 0.0
-  meltRate = Real 0.0
-!  Normal Vector 1 = Real 0.0
-!  Normal Vector 2 = Real 0.0
-!  Normal Vector 3 = Real 0.0
-!  Temperature = Real 265.0
-!  Temperature Homologous = Real -10.0
+  Normal Vector 1 = Real 0.0
+  Normal Vector 2 = Real 0.0
+  Normal Vector 3 = Real 0.0
+  Temperature = Real 265.0
+  Temperature Homologous = Real -10.0
 End
 
 Initial Condition 2
@@ -128,7 +126,7 @@ Body Force 1
   Flow BodyForce 1 = Real 0.0
   Flow BodyForce 2 = Real 0.0
   Flow BodyForce 3 = Real $gravity
-!  Temperature Volume Source = Equals W ! The volumetric heat source 
+  Temperature Volume Source = Equals W ! The volumetric heat source 
 End
 
 Body Force 2
@@ -140,10 +138,8 @@ End
 Body Force 3
   FS upper Accumulation Flux 1 = Real 0.0e0
   FS upper Accumulation Flux 2 = Real 0.0e0
-  FS upper Accumulation Flux 3 = Variable Coordinate 3
-    Real MATC "1.0 * rhow/rhoi"
-!  FS upper Accumulation Flux 3 = Variable Coordinate 2
-!    Real MATC "2.0 * (100000.0-tx(0))/100000.0 * rhow/rhoi"
+  FS upper Accumulation Flux 3 = Variable Coordinate 2
+    Real MATC "2.0 * (100000.0-tx(0))/100000.0 * rhow/rhoi"
 End
 
 !--------------------------------------------------------
@@ -266,7 +262,6 @@ End
 
 Solver 5
 !  Exec solver = never
-  Exec Solver = "Before timestep"
   Equation = "Normal Vector"
   Procedure = "ElmerIceSolvers" "ComputeNormalSolver"
   Variable = "Normal Vector"
@@ -469,7 +464,7 @@ Solver 13
 End
 
 Solver 14
-!  Exec Solver = Never
+  Exec Solver = Never
   Equation = "Save Boundaries"
   Procedure = File "SaveData" "SaveBoundaryValues"
   Variable = String -nooutput dummyvar
@@ -518,13 +513,13 @@ End
 
 !--------------------------------------------------------
 Equation 1
-  Active Solvers(12) = 1 3 5 7 8 9 10 13 14 15 16 17
+  Active Solvers(11) = 1 3 5 7 8 9 10 13 15 16 17
   Flow Solution Name = String "Flow Solution"
   Convection = Computed
 End
 
 Equation 2
-  Active Solvers(4) = 2 4 6 11 
+  Active Solvers(5) = 2 4 6 11 14
   Flow Solution Name = String "Flow Solution"
   Convection = Computed
 End
@@ -566,7 +561,8 @@ Boundary Condition 2
   ComputeNormal = Logical True
 
   External Pressure = Variable Coordinate 3
-    Real Procedure "ElmerIceUSF" "SeaPressure"
+    Real Procedure "Buoyancy" "SeaPressure"
+!    Real Procedure "ElmerIceUSF" "SeaPressure"
   Compute Sea Pressure = Logical True
 
   Temperature Flux BC = Logical True
@@ -636,7 +632,8 @@ Boundary Condition 4
     Real Procedure "ElmerIceUSF" "SeaSpring"
 
   External Pressure = Variable Coordinate 3
-    Real Procedure "ElmerIceUSF" "SeaPressure"
+    Real Procedure "Buoyancy" "SeaPressure"
+!    Real Procedure "ElmerIceUSF" "SeaPressure"
 
   Compute Sea Pressure = Logical True
   Compute Sea Spring = Logical True
