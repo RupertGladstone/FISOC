@@ -74,6 +74,7 @@ CONTAINS
     LOGICAL                       :: verbose_coupling
     TYPE(ESMF_config)             :: FISOC_config
     TYPE(ESMF_RegridMethod_Flag)  :: Regrid_method
+    TYPE(ESMF_ExtrapMethod_Flag)  :: Extrap_method
 
     rc = ESMF_FAILURE
 
@@ -99,6 +100,10 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CALL  FISOC_ConfigDerivedAttribute(FISOC_config, Extrap_method, label='ISM2OM_extrap:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Create the import bundle for the OM.  This will be populated with 
     ! the ISM fields, regridded onto the OM grid or mesh.  It will be added 
@@ -123,7 +128,7 @@ CONTAINS
 
     ! use the first field from the field bundles to make a route handle
     CALL FISOC_makeRHfromFB(ISM_ExpFB,OM_ExpFB,        &
-         Regrid_method,verbose_coupling,ISM2OM_regridRouteHandle,vm,rc=rc)
+         Regrid_method,Extrap_method,verbose_coupling,ISM2OM_regridRouteHandle,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -153,7 +158,6 @@ CONTAINS
     ! and add them to the OM import state.
 
     ! get the grid or mesh from the OM exp bundle.  
-    ! TODO: update this since changing to using cpp defs to determine geom type.
 # if defined(FISOC_OM_GRID)
     CALL FISOC_getGridFromFB(OM_expFB,OM_grid,rc=rc)
 # elif defined(FISOC_OM_MESH)
@@ -252,6 +256,7 @@ CONTAINS
     LOGICAL                       :: verbose_coupling
     TYPE(ESMF_config)             :: FISOC_config
     TYPE(ESMF_RegridMethod_Flag)  :: Regrid_method
+    TYPE(ESMF_ExtrapMethod_Flag)  :: Extrap_method
 
     rc = ESMF_FAILURE
 
@@ -273,6 +278,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL  FISOC_ConfigDerivedAttribute(FISOC_config, Regrid_method, label='OM2ISM_regrid:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL  FISOC_ConfigDerivedAttribute(FISOC_config, Extrap_method, label='OM2ISM_extrap:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -300,7 +310,7 @@ CONTAINS
 
     ! use the first field from the field bundles to make a route handle
     CALL FISOC_makeRHfromFB(OM_ExpFB,ISM_ExpFB,        &
-         Regrid_method,verbose_coupling,OM2ISM_regridRouteHandle,vm,rc=rc)
+         Regrid_method,Extrap_method,verbose_coupling,OM2ISM_regridRouteHandle,vm,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)

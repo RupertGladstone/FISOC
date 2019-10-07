@@ -56,6 +56,7 @@ MODULE FISOC_utils_MOD
      MODULE PROCEDURE FISOC_ConfigDerivedAttributeReal
      MODULE PROCEDURE FISOC_ConfigDerivedAttributeString
      MODULE PROCEDURE FISOC_ConfigDerivedAttributeRegridMethod
+     MODULE PROCEDURE FISOC_ConfigDerivedAttributeExtrapMethod
   END INTERFACE
 
   CHARACTER(len=ESMF_MAXSTR) :: msg
@@ -1167,6 +1168,78 @@ CONTAINS
 
   END SUBROUTINE FISOC_ConfigDerivedAttributeRegridMethod
 
+
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE FISOC_ConfigDerivedAttributeExtrapMethod(FISOC_config, derivedAttribute, label,rc)
+    
+    CHARACTER(len=*),INTENT(IN)             :: label
+    TYPE(ESMF_config),INTENT(INOUT)         :: FISOC_config
+    TYPE(ESMF_ExtrapMethod_Flag),INTENT(OUT):: derivedAttribute
+    INTEGER,OPTIONAL,INTENT(OUT)            :: rc
+    
+    CHARACTER(len=ESMF_MAXSTR)              :: extrapMethodChar
+    INTEGER                                 :: rc_local
+
+    rc = ESMF_FAILURE
+
+    SELECT CASE(label)
+
+    CASE('ISM2OM_extrap:')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, extrapMethodChar, label='ISM2OM_extrap:', rc=rc_local)
+       IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+          extrapMethodChar = "ESMF_EXTRAPMETHOD_NEAREST_STOD"
+          msg = "WARNING: ISM2OM_extrap not found, setting to NEAREST_STOD."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+
+    CASE('OM2ISM_extrap:')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, extrapMethodChar, label='OM2ISM_extrap:', rc=rc_local)
+       IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+          extrapMethodChar = "ESMF_EXTRAPMETHOD_NEAREST_STOD"
+          msg = "WARNING: OM2ISM_extrap not found, setting to NEAREST_STOD."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+
+    CASE DEFAULT
+       msg = 'ERROR: unrecognised derived config attribute label: '//label
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    END SELECT
+
+    
+    SELECT CASE (extrapMethodChar)
+      
+    CASE("ESMF_EXTRAPMETHOD_NONE")
+      derivedAttribute = ESMF_EXTRAPMETHOD_NONE
+    CASE("ESMF_EXTRAPMETHOD_NEAREST_IDAVG")
+      derivedAttribute = ESMF_EXTRAPMETHOD_NEAREST_IDAVG
+    CASE("ESMF_EXTRAPMETHOD_NEAREST_STOD")
+      derivedAttribute = ESMF_EXTRAPMETHOD_NEAREST_STOD
+
+    CASE DEFAULT
+      msg = 'ERROR: extrap method NYI in FISOC: '//extrapMethodChar
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)          
+    END SELECT
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_ConfigDerivedAttributeExtrapMethod
+
+  
   !--------------------------------------------------------------------------------------
   SUBROUTINE FISOC_ConfigDerivedAttributeLogical(FISOC_config, derivedAttribute, label,rc)
     
@@ -1761,12 +1834,13 @@ print*,'catch error and set default if missing att'
   ! afterwards.
   !
   SUBROUTINE FISOC_FieldRegridStore(vm, InField, OutField, regridmethod, &
-       unmappedaction, routeHandle, rc)
+       unmappedaction, extrapMethod, routeHandle, rc)
 
     TYPE(ESMF_VM),INTENT(IN)                          :: vm
     TYPE(ESMF_Field),INTENT(INOUT)                    :: InField, OutField
     TYPE(ESMF_RegridMethod_Flag),INTENT(IN),OPTIONAL  :: regridmethod
     TYPE(ESMF_UnmappedAction_Flag),INTENT(IN),OPTIONAL:: unmappedaction
+    TYPE(ESMF_ExtrapMethod_Flag),INTENT(IN),OPTIONAL  :: extrapMethod
 
     TYPE(ESMF_RouteHandle),INTENT(OUT),OPTIONAL       :: routeHandle
     INTEGER,INTENT(OUT),OPTIONAL                      :: rc
@@ -1840,7 +1914,8 @@ print*,'catch error and set default if missing att'
 
     ! create the routehandle for regridding
     CALL ESMF_FieldRegridStore(InField, OutField, regridmethod=regridmethod, &
-         unmappedaction=unmappedaction, routehandle=routeHandle, rc=rc)
+         unmappedaction=unmappedaction, routehandle=routeHandle,             &
+         extrapMethod=extrapMethod, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -2197,11 +2272,12 @@ print*,'catch error and set default if missing att'
   ! route handle.
   !
   SUBROUTINE FISOC_makeRHfromFB(sourceFB,targetFB, &
-       Regrid_method,verbose_coupling,regridRouteHandle,vm,rc)
+       Regrid_method,Extrap_method,verbose_coupling,regridRouteHandle,vm,rc)
     
     TYPE(ESMF_fieldBundle)                  :: sourceFB, targetFB
     TYPE(ESMF_RouteHandle),INTENT(OUT)      :: regridRouteHandle
     TYPE(ESMF_RegridMethod_Flag),INTENT(IN) :: Regrid_method
+    TYPE(ESMF_ExtrapMethod_Flag),INTENT(IN) :: Extrap_method
     TYPE(ESMF_vm),INTENT(IN)                :: vm
     LOGICAL,INTENT(IN)                      :: verbose_coupling
     INTEGER,INTENT(OUT),OPTIONAL            :: rc

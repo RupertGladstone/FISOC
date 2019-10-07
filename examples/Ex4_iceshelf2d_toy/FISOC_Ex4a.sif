@@ -2,7 +2,7 @@
 !--------------------------------------------------------
 $yearinsec = 365.25*24*60*60
 $rhoi = 910.0/(1.0e6*yearinsec^2)
-$rhow = 1000.0/(1.0e6*yearinsec^2)
+$rhow = 1027.0/(1.0e6*yearinsec^2)
 $rhor = 2000.0/(1.0e6*yearinsec^2)
 $A1 = 2.89165e-13*yearinsec*1.0e18
 $A2 = 2.42736e-02*yearinsec*1.0e18
@@ -205,14 +205,23 @@ Solver 1
 End
 
 Solver 2
-  Exec Solver = Never
-!  Exec Solver = Before all
-  Equation = "GroundedMaskInit"
-  Procedure = "ElmerIceSolvers" "GroundedSolver"
-  Bedrock Variable = String "bedrock"
-  Variable = GroundedMask
+!  Exec Solver = Never
+  Equation = "Flowdepth"
+  Procedure = File "ElmerIceSolvers" "FlowDepthSolver"
+  Variable = String "Depth"
   Variable DOFs = 1
-  Toler = Real $GLTolerance
+  Linear System Solver = "Direct"
+  Linear System Direct Method = "cPardiso"
+!  Linear System Direct Method = umfpack
+  Linear System Iterative Method = "BiCGStab"
+  Linear System Max Iterations = 300
+  Linear System Convergence Tolerance = 1.0E-09
+  Linear System Abort Not Converged = False
+  Linear System Preconditioning = "ILU0"
+  Linear System Residual Output = 1
+  Gradient = Real -1.0E00
+  Calc Free Surface = Logical True
+  Freesurf Name = String "FS upper"
 End
 
 Solver 3
@@ -258,8 +267,9 @@ Solver 6
   Flow Model = Stokes
   Linear System Solver = Direct
 !  Linear System Direct Method = umfpack
-  Linear System Direct Method = MUMPS
-  Mumps percentage increase working space = Integer 200
+  Linear System Direct Method = "cPardiso"
+!  Linear System Direct Method = MUMPS
+!  Mumps percentage increase working space = Integer 200
   Nonlinear System Max Iterations = 50
   Nonlinear System Convergence Tolerance  = 1.0e-4
   Nonlinear System Newton After Iterations = 100
@@ -289,6 +299,7 @@ Solver 7
   Exported Variable 1 DOFs = 6   ! 4 in 2D, 6 in 3D
 
   Linear System Solver = "Direct"
+  Linear System Direct Method = "cPardiso"
 !  Linear System Solver = "Iterative"
 
 !  Linear System Iterative Method = "BiCGStab"
@@ -311,7 +322,8 @@ Solver 8
   procedure =  "ElmerIceSolvers" "DeformationalHeatSolver"
 
   Linear System Solver = direct
-  Linear System direct Method = umfpack
+  Linear System Direct Method = "cPardiso"
+!  Linear System direct Method = umfpack
 End
 
 Solver 9
@@ -383,8 +395,6 @@ Solver 10
   Exported Variable 3 DOFS = 1
   Exported Variable 4 = height
   Exported Variable 4 DOFS = 1
-  Exported Variable 5 = depth
-  Exported Variable 5 DOFS = 1
 End
 
 Solver 11
@@ -476,13 +486,13 @@ End
 
 !--------------------------------------------------------
 Equation 1
-  Active Solvers(10) = 1 4 6 7 8 9 12 14 15 16
+  Active Solvers(11) = 1 2 4 6 7 8 9 12 14 15 16
   Flow Solution Name = String "Flow Solution"
   Convection = Computed
 End
 
 Equation 2
-  Active Solvers(5) = 2 3 5 10 13
+  Active Solvers(4) = 3 5 10 13
   Flow Solution Name = String "Flow Solution"
   Convection = Computed
 End
