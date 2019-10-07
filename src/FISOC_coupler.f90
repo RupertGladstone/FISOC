@@ -158,7 +158,6 @@ CONTAINS
     ! and add them to the OM import state.
 
     ! get the grid or mesh from the OM exp bundle.  
-    ! TODO: update this since changing to using cpp defs to determine geom type.
 # if defined(FISOC_OM_GRID)
     CALL FISOC_getGridFromFB(OM_expFB,OM_grid,rc=rc)
 # elif defined(FISOC_OM_MESH)
