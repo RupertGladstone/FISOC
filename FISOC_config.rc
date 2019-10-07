@@ -21,7 +21,7 @@
   ISM2OM_regrid:      ESMF_REGRIDMETHOD_NEAREST_STOD
 
 #  OM_configFile:      /home/gladstone/R1CON/R1CON
-  OM_configFile:      R1CON
+  OM_configFile:       iceshelf2dtoy
   OM_stdoutFile:      ./FVCOM_stdout.asc
   OM_writeNetcdf:     .FALSE.
   OM_NCfreq:          all
