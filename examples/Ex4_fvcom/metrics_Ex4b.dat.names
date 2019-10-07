@@ -2,7 +2,7 @@ Elmer version: 8.3
 Elmer revision: 9bf74dc
 Elmer compilation date: 2018-11-14
 Solver input file: fisoc_ex4b.sif
-File started at: 2019/02/22 15:47:22
+File started at: 2019/08/19 10:07:56
  
 Variables in columns of matrix: ./metrics_Ex4b.dat
    1: int: temperature with heat content coef

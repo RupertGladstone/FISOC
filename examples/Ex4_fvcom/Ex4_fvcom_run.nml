@@ -34,7 +34,7 @@
  &NML_IO
  INPUT_DIR       = '/home/elmeruser/Source/FISOC/examples/Ex4_fvcom/input/',
  OUTPUT_DIR      = '/home/elmeruser/Source/FISOC/examples/Ex4_fvcom/output',
- IREPORT    =    100,
+ IREPORT    =    1000,
  VISIT_ALL_VARS  = F,
  WAIT_FOR_VISIT  = F,
  USE_MPI_IO_MODE = F
@@ -47,7 +47,7 @@
  STATIC_SSH_ADJ  =  0.0000000E+00
  /
  &NML_RESTART
- RST_ON  = T,
+ RST_ON  = F,
  RST_FIRST_OUT   = '2000-01-01 00:00:00',
  RST_OUT_INTERVAL   = 'days=30.0',
  RST_OUTPUT_STACK        =           1
@@ -55,8 +55,8 @@
  &NML_NETCDF
  NC_ON   = T,
  NC_FIRST_OUT    = '2000-01-01 00:00:00',
- NC_OUT_INTERVAL = 'seconds= 3600.0',
- NC_OUTPUT_STACK =           24,
+ NC_OUT_INTERVAL = 'days= 10.0',
+ NC_OUTPUT_STACK =           100,
  NC_GRID_METRICS = F,
  NC_FILE_DATE    = F,
  NC_VELOCITY     = T,
@@ -242,7 +242,7 @@
  ICE_SHORTWAVE   =  0.0000000E+00,
  ICE_CLOUD_COVER =  0.0000000E+00
  ICESHELF_MODEL  = T,
- ICESHELF_DRAFT_INI_FILE ='ini_zisf.nc'
+ ICESHELF_DRAFT_INI_FILE ='ini1_zisf.nc'
  ICESHELF_DRDZ          = 8.3927E-4,
  ICESHELF_GAMAT         = 0.2,
  ICESHELF_DRAG_COEFFICIENT = 0.0025,
