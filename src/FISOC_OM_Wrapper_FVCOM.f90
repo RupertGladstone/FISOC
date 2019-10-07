@@ -454,6 +454,9 @@ CONTAINS
        
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
        
+       CASE ('OM_z_l0')
+         ptr = -zisf
+
        CASE ('OM_dBdt_l0')
          ptr = melt_avg
          !         DO ii = M ! loop over all local nodes including boundary and halo nodes
