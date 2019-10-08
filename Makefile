@@ -68,6 +68,7 @@ info:
 	$(info ******************************************************************)
 	$(info Generic FISOC build information)
 	$(info ESMFMKFILE        [${ESMFMKFILE}])
+	$(info ESMF_F90COMPILER  [${ESMF_F90COMPILER}])
 	$(info CPPFLAGS          [${CPPFLAGS}])
 	$(info FFLAGS            [${FFLAGS}])
 	$(info Additional ESMF Fortran compilation flags)
