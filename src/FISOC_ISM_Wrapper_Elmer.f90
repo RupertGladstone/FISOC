@@ -1012,7 +1012,7 @@ print*,"Hang on, need to get temperature exchange going too..."
   !------------------------------------------------------------------------------
   ! These module-scope route handles are for array mappings between the ESMF 
   ! fields (with unique nodes) and Elmer fields (with some node duplication 
-  ! across node boundaries).
+  ! across partition boundaries).
   !
   ! Input vars:
   ! ESMF_ElmerMesh - Arrays created on this mesh will not duplicate nodes 
