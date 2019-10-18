@@ -521,27 +521,28 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-        IF (TRIM(ADJUSTL(fieldName)).EQ.'ISM_thick') THEN
-        PRINT*,"find the thickness for reset cavity"
-        ! converting ice draft from ice thickness from FISOC, needs to be updated to a more advanced formula
-         DO ii  =  1, MT
-             IF(ii==10) WRITE(999,*) ZISF(II),ptr(ii)
-            ZISF(ii)     =   ptr(ii)*RHO_isf/RHO_on
-         END DO
-         CALL     ISF_JUDGE
-         CALL     WET_JUDGE
-         D    =  H + EL-ZISF
-         DT   =  H + ET-ZISF
-         WHERE (D<=MIN_DEPTH)  D  =  MIN_DEPTH
-         WHERE (DT<=MIN_DEPTH) DT =  MIN_DEPTH
-         DTFA =  D
-         CALL N2E2D(D,D1)
-         CALL N2E2D(DT,DT1)
-         CALL N2E2D(ZISF,ZISF1)       
-       END IF
 
+       IF (TRIM(ADJUSTL(fieldName)).EQ.'ISM_thick') THEN
+          PRINT*,"find the thickness for reset cavity"
+          ! converting ice draft from ice thickness from FISOC, needs to be updated to a more advanced formula
+          DO ii  =  1, MT
+             IF(ii==10) WRITE(999,*) ZISF(II),ptr(ii)
+             ZISF(ii)     =   ptr(ii)*RHO_isf/RHO_on
+          END DO
+          CALL     ISF_JUDGE
+          CALL     WET_JUDGE
+          D    =  H + EL-ZISF
+          DT   =  H + ET-ZISF
+          WHERE (D<=MIN_DEPTH)  D  =  MIN_DEPTH
+          WHERE (DT<=MIN_DEPTH) DT =  MIN_DEPTH
+          DTFA =  D
+          CALL N2E2D(D,D1)
+          CALL N2E2D(DT,DT1)
+          CALL N2E2D(ZISF,ZISF1)       
+       END IF
+       
        IF (ASSOCIATED(ptr)) THEN
-         NULLIFY(ptr)
+          NULLIFY(ptr)
        END IF
        
     END DO fieldLoop
