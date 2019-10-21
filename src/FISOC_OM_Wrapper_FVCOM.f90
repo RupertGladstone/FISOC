@@ -28,7 +28,10 @@ MODULE FISOC_OM_Wrapper
        FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize
 
   
-  INTEGER                               :: mpic
+  ! TODO: don't use mpic for anything other than passing to FVCOM.  All mpi operations 
+  ! should be through the ESMF VM commands.
+  INTEGER, SAVE                :: mpic
+  INTEGER, ALLOCATABLE, SAVE   :: ownedNodeIDs(:) ! subset of local nodes owned by current partition
 
 CONTAINS
   
@@ -455,14 +458,14 @@ CONTAINS
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
        
        CASE ('OM_z_l0')
-         ptr = -zisf
-
+          DO ii = 1,SIZE(ownedNodeIDs)
+             ptr(ii) = -zisf(ownedNodeIds(ii))
+          END DO
+          
        CASE ('OM_dBdt_l0')
-         ptr = melt_avg
-         !         DO ii = M ! loop over all local nodes including boundary and halo nodes
-         !           ptr(ii) = melt_avg(ii)
-         !         END IF
-         !       END DO
+          DO ii = 1,SIZE(ownedNodeIDs)
+             ptr(ii) = melt_avg(ownedNodeIds(ii))
+          END DO
        
        CASE DEFAULT
          msg = "ERROR: unknown variable"
@@ -707,6 +710,7 @@ CONTAINS
       nodeOwners(ii) = nodeOwnersGL_recv(NGID_X(ii))
     END DO
     elemTypes         =  ESMF_MESHELEMTYPE_TRI
+
     
     ! loop over to get nodeIds nodeCoords
     DO ii = 1, FVCOM_numNodes
@@ -724,6 +728,12 @@ CONTAINS
        elemConn(nn+2) = NV(ii,3)
        elemConn(nn+3) = NV(ii,2)
     END DO 
+
+    ! get a list od node ids for the subset of nodes that are locally owned
+    ! (to be used in mapping FVCOM variables to ESMF fields)
+    CALL FISOC_locallyOwnedNodes(localPet,nodeIds,nodeOwners,ownedNodeIDs)
+
+
     !----------------------------------------------------------------!       
     ! Create Mesh structure in 1 step
     ESMF_FVCOMMesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
@@ -744,6 +754,7 @@ CONTAINS
     DEALLOCATE(elemConn)
     DEALLOCATE(elemTypes)	
 
+!TODO: put this in PET logs
 print*,"FINISHED FVCOM MESH CREATION"
     
   END SUBROUTINE FVCOM2ESMF_mesh

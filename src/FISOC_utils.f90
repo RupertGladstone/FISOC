@@ -20,7 +20,7 @@ MODULE FISOC_utils_MOD
        FISOC_State2StateCopyFB, FISOC_regridFB,                &
        FISOC_GridCompRun, FISOC_FieldListGetField,             &
        FISOC_getGridFromFB, FISOC_getMeshFromFB,               &                
-       FISOC_ConfigStringListContains
+       FISOC_ConfigStringListContains, FISOC_locallyOwnedNodes
 !         FISOC_getGridOrMeshFromFB, 
 
   INTERFACE Unique1DArray
@@ -2490,5 +2490,42 @@ print*,'catch error and set default if missing att'
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_regridFB
+
+
+  !------------------------------------------------------------------------------
+  ! localNodeIDs is an array of all node ids on the current partition.  This can
+  ! include nodes at partition boundaries (or halo nodes) owned by neighbouring 
+  ! partitions. 
+  ! This subroutine returns an array of node ids owned by the current partition. 
+  ! This is a subset of all nodes contained in localNodeIDs.
+  SUBROUTINE FISOC_locallyOwnedNodes(localPet,localNodeIDS,nodeOwners,ownedNodeIDs)
+
+    INTEGER,INTENT(IN)              :: localPet, localNodeIDs(:), nodeOwners(:)
+    INTEGER,ALLOCATABLE,INTENT(OUT) :: ownedNodeIDs(:)
+
+    INTEGER                         :: LON_count, ii
+
+    ! TODO: fail fast if size of nodeOwners .ne. size of localnodeIDs
+    
+    ! How many of the nodes are locally owned?
+    LON_count = 0
+    DO ii = 1,SIZE(localNodeIDs)
+       IF (nodeOwners(ii).EQ.localPet) THEN
+          LON_count = LON_count + 1
+       END IF
+    END DO
+    !TODO: fail fast if already allocated/associated
+    ALLOCATE(ownedNodeIDs(LON_count))
+
+    LON_count = 0
+    DO ii = 1,SIZE(localNodeIDs)
+       IF (nodeOwners(ii).EQ.localPet) THEN
+          LON_count = LON_count + 1
+          ownedNodeIDs(LON_count) = localNodeIDs(ii)
+       END IF
+    END DO
+
+  END SUBROUTINE FISOC_locallyOwnedNodes
+
 
 END MODULE FISOC_utils_MOD
