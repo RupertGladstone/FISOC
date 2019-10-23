@@ -755,8 +755,6 @@ print*,"Hang on, need to get temperature exchange going too..."
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-       ptr = FISOC_missingData
-
        ! access the Elmer/Ice version of the current field
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
 

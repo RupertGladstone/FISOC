@@ -207,10 +207,6 @@ CONTAINS
     END IF
 
     IF (OM_initCavityFromISM) THEN
-!      msg = "Cavity reset NYI for FVCOM"
-!      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-!           line=__LINE__, file=__FILE__, rc=rc)
-!      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
       CALL CavityReset(OM_ImpFB,FISOC_config,rc=rc)
       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
            line=__LINE__, file=__FILE__)) & 
@@ -527,12 +523,15 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!            line=__LINE__, file=__FILE__)) &
+!           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        IF (TRIM(ADJUSTL(fieldName)).EQ.'ISM_thick') THEN
+
+          CALL FISOC_ArrayRedistFromField(RH_ESMF2FVCOM,fieldList(nn),distgridFVCOM,ptr)
+
           PRINT*,"find the thickness for reset cavity"
           ! converting ice draft from ice thickness from FISOC, needs to be updated to a more advanced formula
           DO ii  =  1, MT
@@ -579,7 +578,6 @@ CONTAINS
     REAL(ESMF_KIND_R8),POINTER            :: ptr(:)
     INTEGER                               :: IstrR, IendR, JstrR, JendR ! tile start and end coords
     INTEGER                               :: ii, jj, nn
-!    INTEGER                               :: LBi, UBi, LBj, UBj ! tile start and end coords including halo
 
     rc = ESMF_FAILURE
 
@@ -600,6 +598,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+!TODO:print statements to ESMF logs
     PRINT*,'fieldCount is', fieldCount 
 
     fieldLoop: DO nn = 1,fieldCount
@@ -608,31 +607,22 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        
-!       CALL FISOC_ArrayRedistFromField(RH_ESMF2FVCOM,fieldList(nn),distgridFVCOM,ptr)
-
-IF (localPET .EQ. 0) THEN
-PRINT*, ' ptr ',fieldName
-print*, ptr
-END IF
+       CALL FISOC_ArrayRedistFromField(RH_ESMF2FVCOM,fieldList(nn),distgridFVCOM,ptr)
 
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
          
        CASE ('ISM_dddt')
-         ISF_DDDT = ptr
-         PRINT*, 'Maximum of ISF_DDDT is',MAXVAL(ABS(ptr))
-
+          ISF_DDDT = ptr
+          PRINT*, 'Maximum of ISF_DDDT is',MAXVAL(ABS(ptr))
+          
        CASE ('ISM_dsdt')
-         ISF_DSDT = ptr
-       PRINT*, 'Maximum of ISF_DSDT is',MAXVAL(ABS(ptr))
-
+          ISF_DSDT = ptr
+          PRINT*, 'Maximum of ISF_DSDT is',MAXVAL(ABS(ptr))
+          
        CASE ('ISM_thick','ISM_z_l0','ISM_z_l0_previous','ISM_z_lts','ISM_z_lts_previous')
           
-                
+          
        CASE DEFAULT
          msg = "ERROR: unknown variable"
          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
