@@ -599,7 +599,9 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     PRINT*,'fieldCount is', fieldCount 
+
     fieldLoop: DO nn = 1,fieldCount
        
        CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
@@ -611,6 +613,13 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        
+!       CALL FISOC_ArrayRedistFromField(RH_ESMF2FVCOM,fieldList(nn),distgridFVCOM,ptr)
+
+IF (localPET .EQ. 0) THEN
+PRINT*, ' ptr ',fieldName
+print*, ptr
+END IF
+
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
          
        CASE ('ISM_dddt')
