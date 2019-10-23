@@ -33,6 +33,13 @@ MODULE FISOC_OM_Wrapper
   INTEGER, SAVE                :: mpic
   INTEGER, ALLOCATABLE, SAVE   :: ownedNodeIDs(:) ! subset of local nodes owned by current partition
 
+  ! Route handle for mapping from ESMF fields to FVCOM fields (one to many mapping)
+  TYPE(ESMF_RouteHandle),SAVE  :: RH_ESMF2FVCOM
+
+  ! nodal distgrid, an ESMF object holding information about the distribution of 
+  ! FVCOM nodes across partitions, needed for the one to many mapping.
+  TYPE(ESMF_distgrid),SAVE     :: distgridFVCOM
+
 CONTAINS
   
   !--------------------------------------------------------------------------------------
@@ -746,6 +753,8 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 	
+    CALL FISOC_CreateOneToManyRouteHandle(ESMF_FVCOMMesh,NGID_X,RH_ESMF2FVCOM,distgridFVCOM,vm)
+
     DEALLOCATE(nodeIds)
     DEALLOCATE(nodeCoords)
     DEALLOCATE(nodeOwners)

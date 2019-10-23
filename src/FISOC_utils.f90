@@ -21,7 +21,8 @@ MODULE FISOC_utils_MOD
        FISOC_GridCompRun, FISOC_FieldListGetField,             &
        FISOC_getGridFromFB, FISOC_getMeshFromFB,               &                
        FISOC_ConfigStringListContains, FISOC_locallyOwnedNodes,&
-       FISOC_CreateOneToManyRouteHandle
+       FISOC_CreateOneToManyRouteHandle,                       & 
+       FISOC_ArrayRedistFromField
 !         FISOC_getGridOrMeshFromFB, 
 
   INTERFACE Unique1DArray
@@ -2630,6 +2631,47 @@ print*,'catch error and set default if missing att'
     
   END SUBROUTINE FISOC_CreateOneToManyRouteHandle
 
+  !------------------------------------------------------------------------------
+  ! Taking as input a source field,routehandle and distgrid for the destination
+  ! field: extract the array from the source field, create a destination array 
+  ! using the distgrid, and use these with the routehandle in an ESMF_ArrayRedist 
+  ! operation.  Return a pointer to the the destination array.
+  !
+  ! Written for application of FISOC_CreateOneToManyRouteHandle.
+  !
+  SUBROUTINE FISOC_ArrayRedistFromField(RH,sourceField,distgridDest,destArrPtr)
+    TYPE(ESMF_routeHandle),INTENT(INOUT) :: RH
+    TYPE(ESMF_field),INTENT(IN)          :: sourceField
+    TYPE(ESMF_distgrid),INTENT(IN)       :: distgridDest
+    REAL(ESMF_KIND_R8),POINTER           :: destArrPtr(:)
 
+    TYPE(ESMF_Array)                     :: sourceArray, destArray
+    INTEGER                              :: rc
+    
+    CALL ESMF_FieldGet(sourceField, array=sourceArray, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    ! we need to create a dest array on the fly (and then convert from the 
+    ! array to the dest variable after the redist)
+    destArray = ESMF_ArrayCreate(distgridDest, ESMF_TYPEKIND_R8, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
+    
+    ! now redist the source array onto the dest array
+    CALL ESMF_ArrayRedist(sourceArray, destArray, RH, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    ! ...and get a pointer to the data
+    CALL ESMF_ArrayGet(destArray, farrayPtr=destArrPtr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+  END SUBROUTINE FISOC_ArrayRedistFromField
 
 END MODULE FISOC_utils_MOD
