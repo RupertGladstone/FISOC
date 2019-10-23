@@ -83,7 +83,6 @@ MODULE FISOC_ISM_Wrapper
   ! Route handles for switching between Elmer arrays (which include duplicated nodes 
   ! along partition boundaries) and corresponding ESMF arrays (which don't)
   TYPE(ESMF_RouteHandle),SAVE :: RH_ESMF2Elmer
-!  TYPE(ESMF_RouteHandle) :: RH_Elmer2ESMF ! not needed because the redist operation in this direction is not well defined
 
   ! nodal distgrid, an ESMF object holding information about the distribution of 
   ! Elmer nodes across partitions, needed for the redist related operations.
@@ -1001,7 +1000,8 @@ print*,"Hang on, need to get temperature exchange going too..."
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
     END IF
-    CALL CreateArrayMappingRouteHandles(ESMF_ElmerMesh,nodeIDs_global,vm)
+!    CALL CreateArrayMappingRouteHandles(ESMF_ElmerMesh,nodeIDs_global,vm)
+    CALL FISOC_CreateOneToManyRouteHandle(ESMF_ElmerMesh,nodeIDs_global,RH_ESMF2Elmer,distgridElmer,vm)
 
     IF (ALLOCATED(elemConn)) DEALLOCATE(elemConn)
     IF (ALLOCATED(nodeIds_global)) DEALLOCATE(nodeIds_global)
