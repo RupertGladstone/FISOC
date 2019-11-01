@@ -461,12 +461,12 @@ CONTAINS
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
        
        CASE ('OM_z_l0')
-          DO ii = 1,SIZE(ownedNodeIDs)
+          DO ii = 1,SIZE(ptr)
              ptr(ii) = -zisf(ownedNodeIds(ii))
           END DO
           
        CASE ('OM_dBdt_l0')
-          DO ii = 1,SIZE(ownedNodeIDs)
+          DO ii = 1,SIZE(ptr)
              ptr(ii) = melt_avg(ownedNodeIds(ii))
           END DO
        
@@ -533,9 +533,9 @@ CONTAINS
           CALL FISOC_ArrayRedistFromField(RH_ESMF2FVCOM,fieldList(nn),distgridFVCOM,ptr)
 
           PRINT*,"find the thickness for reset cavity"
-          ! converting ice draft from ice thickness from FISOC, needs to be updated to a more advanced formula
+          ! TODO: converting ice draft from ice thickness from FISOC, needs to be updated to a more advanced formula
+!Rupert's comment: why not just use the ice lower surface instead of applying floatation to thickness? (see ROMS wrapper)
           DO ii  =  1, MT
-             IF(ii==10) WRITE(999,*) ZISF(II),ptr(ii)
              ZISF(ii)     =   ptr(ii)*RHO_isf/RHO_on
           END DO
           CALL     ISF_JUDGE
@@ -598,7 +598,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!TODO:print statements to ESMF logs
+!TODO: remove or move print statements to ESMF logs
     PRINT*,'fieldCount is', fieldCount 
 
     fieldLoop: DO nn = 1,fieldCount
@@ -613,11 +613,15 @@ CONTAINS
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
          
        CASE ('ISM_dddt')
-          ISF_DDDT = ptr
+          DO ii = 1,SIZE(ptr)
+             ISF_DDDT(ii) = ptr(ii)
+          END DO
           PRINT*, 'Maximum of ISF_DDDT is',MAXVAL(ABS(ptr))
           
        CASE ('ISM_dsdt')
-          ISF_DSDT = ptr
+          DO ii = 1,SIZE(ptr)
+             ISF_DSDT(ii) = ptr(ii)
+          END DO
           PRINT*, 'Maximum of ISF_DSDT is',MAXVAL(ABS(ptr))
           
        CASE ('ISM_thick','ISM_z_l0','ISM_z_l0_previous','ISM_z_lts','ISM_z_lts_previous')
@@ -653,7 +657,7 @@ CONTAINS
 
     INTEGER                          :: ii, nn, IERR
     CHARACTER(len=ESMF_MAXSTR)       :: subroutineName = "FVCOM2ESMF_mesh"
-    INTEGER,ALLOCATABLE              :: elemTypes(:), elemIds(:),elemConn(:)
+    INTEGER,ALLOCATABLE              :: elemTypes(:), elemIds(:),elemConn(:), localNodeIDs(:)
     INTEGER,ALLOCATABLE              :: nodeIds(:),nodeOwners(:),nodeOwnersGL(:),nodeOwnersGL_recv(:)
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
     INTEGER                          :: localPet, petCount 
@@ -682,6 +686,9 @@ CONTAINS
     ! and module par for retreating  EGID NGID
     FVCOM_numNodes        = MT
     FVCOM_numElems        = NT
+!TODO: just use FVCOM vars directly, no need for intermediate vars, i.e. remove FVCOM_numNodes etc
+
+    ALLOCATE(localNodeIds(M))
 
     ALLOCATE(nodeIds(FVCOM_numNodes))
     ALLOCATE(nodeCoords(FVCOM_numNodes*2))
@@ -699,6 +706,7 @@ CONTAINS
     nodeOwnersGL = -1
     DO nn=1,M
       nodeOwnersGL(NGID(nn))=localPET
+      localNodeIds(nn) = nn
     END DO
     CALL MPI_Allreduce(nodeOwnersGL,nodeOwnersGL_recv,MGL,MPI_INT,MPI_MAX,mpic,IERR)
 
@@ -737,7 +745,7 @@ CONTAINS
 
     ! get a list od node ids for the subset of nodes that are locally owned
     ! (to be used in mapping FVCOM variables to ESMF fields)
-    CALL FISOC_locallyOwnedNodes(localPet,nodeIds,nodeOwners,ownedNodeIDs)
+    CALL FISOC_locallyOwnedNodes(localPet,localNodeIds,nodeOwners,ownedNodeIDs)
 
 
     !----------------------------------------------------------------!       
@@ -752,7 +760,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 	
-    CALL FISOC_CreateOneToManyRouteHandle(ESMF_FVCOMMesh,NGID_X,RH_ESMF2FVCOM,distgridFVCOM,vm)
+    CALL FISOC_CreateOneToManyRouteHandle(ESMF_FVCOMMesh,NGID_X(1:),RH_ESMF2FVCOM,distgridFVCOM,vm)
 
     DEALLOCATE(nodeIds)
     DEALLOCATE(nodeCoords)
