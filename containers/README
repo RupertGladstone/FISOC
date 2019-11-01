@@ -1,9 +1,13 @@
 
 This folder should contain recipes or definition files for containers that are of use to FISOC users or developers.  FS is short for FISOC Singularity.
 
-TODO: place the images somewhere accessible online, perhaps in the sylabs library?
-
 The images themselves are too big to store in this git repository.
+TODO: place the images somewhere accessible online, perhaps in the sylabs library?
 
 FS_post.def - contains a python installation with vtk and paraview modules included, so that python scripts to process vtu files (as produced by Elmer) can be easily run.
 
+Example command to build an image from a singularity definition file:
+sudo singularity build FC_proc.sif FC_proc.def
+
+Singularity documentation can be found here:
+https://sylabs.io/
