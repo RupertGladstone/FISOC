@@ -13,4 +13,9 @@ MODULE FISOC_types_MOD
   INTEGER,PARAMETER            :: OM_outputUnit = 37, ISM_outputUnit = 32
   INTEGER,PARAMETER            :: CLOCKWISE=1, ANTI_CLOCKWISE=2
 
+  ! This time information is set at run time.
+  TYPE(ESMF_Time)              :: FISOC_time, FISOC_startTime, FISOC_endTime
+!  TYPE(ESMF_TimeInterval)      :: FISOC_OM_TI, FISOC_ISM_TI
+  ! TODO: intialise these to zero?
+
 END MODULE FISOC_types_MOD

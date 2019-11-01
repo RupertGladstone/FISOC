@@ -2,7 +2,7 @@
 !--------------------------------------------------------
 $yearinsec = 365.25*24*60*60
 $rhoi = 910.0/(1.0e6*yearinsec^2)
-$rhow = 1000.0/(1.0e6*yearinsec^2)
+$rhow = 1027.0/(1.0e6*yearinsec^2)
 $rhor = 2000.0/(1.0e6*yearinsec^2)
 $A1 = 2.89165e-13*yearinsec*1.0e18
 $A2 = 2.42736e-02*yearinsec*1.0e18
@@ -262,7 +262,8 @@ Solver 6
   Flow Model = Stokes
   Linear System Solver = Direct
 !  Linear System Direct Method = umfpack
-  Linear System Direct Method = MUMPS
+!  Linear System Direct Method = MUMPS
+  Linear System Direct Method = cPardiso
   Mumps percentage increase working space = Integer 200
   Nonlinear System Max Iterations = 50
   Nonlinear System Convergence Tolerance  = 1.0e-4
@@ -293,6 +294,7 @@ Solver 7
   Exported Variable 1 DOFs = 6   ! 4 in 2D, 6 in 3D
 
   Linear System Solver = "Direct"
+  Linear System Direct Method = cPardiso
 !  Linear System Solver = "Iterative"
 
 !  Linear System Iterative Method = "BiCGStab"
@@ -315,7 +317,8 @@ Solver 8
   procedure =  "ElmerIceSolvers" "DeformationalHeatSolver"
 
   Linear System Solver = direct
-  Linear System direct Method = umfpack
+  Linear System Direct Method = cPardiso
+!  Linear System direct Method = umfpack
 End
 
 Solver 9

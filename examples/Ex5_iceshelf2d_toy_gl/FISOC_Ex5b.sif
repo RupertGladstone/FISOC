@@ -3,7 +3,7 @@
 $yearinsec = 360*24*60*60
 !$yearinsec = 365.25*24*60*60
 $rhoi = 910.0/(1.0e6*yearinsec^2)
-$rhow = 1000.0/(1.0e6*yearinsec^2)
+$rhow = 1027.0/(1.0e6*yearinsec^2)
 $rhor = 2000.0/(1.0e6*yearinsec^2)
 $A1 = 2.89165e-13*yearinsec*1.0e18
 $A2 = 2.42736e-02*yearinsec*1.0e18
@@ -11,7 +11,8 @@ $gravity = -9.81*yearinsec^2
 $GLTolerance = 1.0e-4
 $name = "BensBoxISM_5b"
 $m = 1.0/3.0
-$dt = 3.0/360.0 ! /864.0 !/86400
+$dt = 864000.0 / yearinsec
+!$dt = 10.0/360.0 ! /864.0 !/86400
 
 
 !--------------------------------------------------------
@@ -179,6 +180,10 @@ Material 1
 
   Temperature Field Variable = String "Temperature Homologous" 
 
+  ! Heat capacity times ice density for the total heat content calculation
+  Heat Content Coef = Variable Temperature
+    Real MATC "capacity(tx)*rhoi*1.0e6*yearinsec^2"
+
   Cauchy = Logical True
 
 End
@@ -229,7 +234,8 @@ Solver 3
   Variable = String "Depth"
   Variable DOFs = 1
   Linear System Solver = "Direct"
-  Linear System Direct Method = umfpack
+  Linear System Direct Method = "cPardiso"
+!  Linear System Direct Method = umfpack
   Linear System Iterative Method = "BiCGStab"
   Linear System Max Iterations = 300
   Linear System Convergence Tolerance = 1.0E-09
@@ -284,13 +290,14 @@ Solver 7
   Flow Model = Stokes
   Linear System Solver = Direct
 !  Linear System Direct Method = umfpack
-  Linear System Direct Method = MUMPS
-  Mumps percentage increase working space = Integer 200
+!  Linear System Direct Method = MUMPS
+  Linear System Direct Method = "cPardiso"
+  Mumps percentage increase working space = Integer 300
   Nonlinear System Max Iterations = 100
   Nonlinear System Convergence Tolerance  = 1.0e-5
   Nonlinear System Newton After Iterations = 100
   Nonlinear System Newton After Tolerance = 1.0e-05
-  Nonlinear System Relaxation Factor = 0.4
+!  Nonlinear System Relaxation Factor = 0.8
   Nonlinear System Reset Newton = Logical True
   Steady State Convergence Tolerance = Real 1.0e-3
   Linear System Abort Not Converged = True
@@ -316,6 +323,7 @@ Solver 8
 
   Linear System Solver = "Direct"
 !  Linear System Solver = "Iterative"
+  Linear System Direct Method = "cPardiso"
 
 !  Linear System Iterative Method = "BiCGStab"
   Linear System Iterative Method = "BiCGStabl"
@@ -337,7 +345,8 @@ Solver 9
   procedure =  "ElmerIceSolvers" "DeformationalHeatSolver"
 
   Linear System Solver = direct
-  Linear System direct Method = umfpack
+  Linear System Direct Method = "cPardiso"
+!  Linear System direct Method = umfpack
 End
 
 Solver 10
@@ -496,6 +505,7 @@ Solver 17
   Parallel Reduce = Logical True
   Variable 1 = Temperature
   Operator 1 = int
+!  Coefficient 1 = Heat Content Coef
 !  Coefficient 1 = Heat Capacity
   Variable 2 = Temperature
   Operator 2 = volume
@@ -551,7 +561,8 @@ Boundary Condition 2
   ComputeNormal = Logical True
 
   External Pressure = Variable Coordinate 3
-    Real Procedure "ElmerIceUSF" "SeaPressure"
+    Real Procedure "Buoyancy" "SeaPressure"
+!    Real Procedure "ElmerIceUSF" "SeaPressure"
   Compute Sea Pressure = Logical True
 
   Temperature Flux BC = Logical True
@@ -621,7 +632,8 @@ Boundary Condition 4
     Real Procedure "ElmerIceUSF" "SeaSpring"
 
   External Pressure = Variable Coordinate 3
-    Real Procedure "ElmerIceUSF" "SeaPressure"
+    Real Procedure "Buoyancy" "SeaPressure"
+!    Real Procedure "ElmerIceUSF" "SeaPressure"
 
   Compute Sea Pressure = Logical True
   Compute Sea Spring = Logical True
