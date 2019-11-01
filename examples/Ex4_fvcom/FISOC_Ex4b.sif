@@ -1,21 +1,23 @@
 !--------------------------------------------------------
 !--------------------------------------------------------
-$yearinsec = 365.25*24*60*60
+!$yearinsec = 365.25*24*60*60
+$yearinsec = 360.0*24*60*60
 $rhoi = 910.0/(1.0e6*yearinsec^2)
-$rhow = 1027.0/(1.0e6*yearinsec^2)
+$rhow = 1000.0/(1.0e6*yearinsec^2)
 $rhor = 2000.0/(1.0e6*yearinsec^2)
 $A1 = 2.89165e-13*yearinsec*1.0e18
 $A2 = 2.42736e-02*yearinsec*1.0e18
 $gravity = -9.81*yearinsec^2
 $GLTolerance = 1.0e-3
-$name = "BensBoxISM_5a"
+$name = "Ex4_fvcom"
 $m = 1.0/3.0
-$dt = 0.25*365.0/365.0
+$dt = 864000.0 / yearinsec
+!$dt = 0.25*365.0/365.0
 
 
 !--------------------------------------------------------
 Header
-  Mesh DB "FISOC_Ex5"
+  Mesh DB "FISOC_Ex4"
 End
 
 
@@ -46,10 +48,10 @@ End
 Simulation
   Bandwidth optimization = Logical False
   Coordinate System  = Cartesian 3D
-  Simulation Type ="Steady"
+  Simulation Type ="Transient"
   Timestepping Method = "BDF"
   BDF Order = 1
-  Timestep Intervals = 4000
+  Timestep Intervals = 1  ! 4000
   Timestep Sizes = Real $dt
   Steady State Min Iterations = 3
   Steady State Max Iterations = 3
@@ -58,6 +60,9 @@ Simulation
   Output File = "$name".result" !"
   max output level = 9
   Extruded Mesh Levels = Integer 10
+  Restart File = "BensBoxISM_4a.result"
+  Restart Position = 0  
+  Restart before initial conditions = Logical False
 End
 
 !--------------------------------------------------------
@@ -102,19 +107,17 @@ End
 
 Initial Condition 2
   meltRate = Real 0.0
-  bedrock = Variable Coordinate 2 
-    Real Procedure  "FISOC_Elmer_geometries" "ex5_bedrock_w"
   FS lower = Variable Coordinate 2
-    Real Procedure  "FISOC_Elmer_geometries" "Ex5_LowerSurface_w"
+    Real Procedure  "FISOC_Elmer_geometries" "Ex4_LowerSurface_w"
   ReferenceFS lower = Variable Coordinate 2
-    Real Procedure  "FISOC_Elmer_geometries" "Ex5_LowerSurface_w"
+    Real Procedure  "FISOC_Elmer_geometries" "Ex4_LowerSurface_w"
 End
 
 Initial Condition 3
   FS upper = Variable Coordinate 2 
-    Real Procedure  "FISOC_Elmer_geometries" "Ex5_UpperSurface_w"
+    Real Procedure  "FISOC_Elmer_geometries" "Ex4_UpperSurface_w"
   ReferenceFS upper = Variable Coordinate 2 
-    Real Procedure  "FISOC_Elmer_geometries" "Ex5_UpperSurface_w"
+    Real Procedure  "FISOC_Elmer_geometries" "Ex4_UpperSurface_w"
 End
 
 !--------------------------------------------------------
@@ -122,7 +125,7 @@ Body Force 1
   Flow BodyForce 1 = Real 0.0
   Flow BodyForce 2 = Real 0.0
   Flow BodyForce 3 = Real $gravity
-  Temperature Volume Source = Equals W ! The volumetric heat source 
+!  Temperature Volume Source = Equals W ! The volumetric heat source 
 End
 
 Body Force 2
@@ -176,20 +179,21 @@ Material 1
 
   Temperature Field Variable = String "Temperature Homologous" 
 
+  ! Heat capacity times ice density for the total heat content calculation
+  Heat Content Coef = Variable Temperature
+    Real MATC "capacity(tx)*rhoi*1.0e6*yearinsec^2"
+
   Cauchy = Logical True
 
 End
 
 Material 2
   Density =  Real $rhoi
-  Min FS lower = Equals bedrock
   Max FS lower = Real 0.0
 End
 
 Material 3
   Density =  Real $rhoi
-  Min FS upper = Variable bedrock
-    Real MATC "tx(0) + 10.0"
   Max FS upper = Variable ReferenceFS upper
     Real MATC "tx(0) + 10000.0"
 End
@@ -220,8 +224,8 @@ Solver 2
 End
 
 Solver 3
-!  Exec Solver = Never
-  Exec Solver = "Before TimeStep"
+  Exec Solver = Never
+!  Exec Solver = "Before TimeStep"
   Equation = GroundedMask
   Procedure = "ElmerIceSolvers" "GroundedSolver"
   Variable = GroundedMask
@@ -262,8 +266,7 @@ Solver 6
   Flow Model = Stokes
   Linear System Solver = Direct
 !  Linear System Direct Method = umfpack
-!  Linear System Direct Method = MUMPS
-  Linear System Direct Method = cPardiso
+  Linear System Direct Method = MUMPS
   Mumps percentage increase working space = Integer 200
   Nonlinear System Max Iterations = 50
   Nonlinear System Convergence Tolerance  = 1.0e-4
@@ -276,7 +279,7 @@ Solver 6
 End
 
 Solver 7
-  Exec Solver = Never
+!  Exec Solver = Never
   Equation = String "StressSolver"
   Procedure =  File "ElmerIceSolvers" "ComputeDevStress"
   ! this is just a dummy, hence no output is needed
@@ -294,7 +297,6 @@ Solver 7
   Exported Variable 1 DOFs = 6   ! 4 in 2D, 6 in 3D
 
   Linear System Solver = "Direct"
-  Linear System Direct Method = cPardiso
 !  Linear System Solver = "Iterative"
 
 !  Linear System Iterative Method = "BiCGStab"
@@ -317,12 +319,11 @@ Solver 8
   procedure =  "ElmerIceSolvers" "DeformationalHeatSolver"
 
   Linear System Solver = direct
-  Linear System Direct Method = cPardiso
-!  Linear System direct Method = umfpack
+  Linear System direct Method = umfpack
 End
 
 Solver 9
-!  Exec Solver = Never
+  Exec Solver = Never
   Equation = String "Homologous Temperature Equation"
   Procedure =  File "ElmerIceSolvers" "TemperateIceSolver"
   ! Comment next line in parallel, as EliminateDirichlet does
@@ -361,8 +362,8 @@ Solver 9
 End
 
 Solver 10
-  Exec Solver = Never
-!  Exec Solver = "After TimeStep"
+!  Exec Solver = Never
+  Exec Solver = "After TimeStep"
   Equation =  String "Lower Free Surface"
   Variable = "FS lower"
   Variable DOFs = 1
@@ -395,8 +396,8 @@ Solver 10
 End
 
 Solver 11
-  Exec Solver = Never
-!  Exec Solver = "After TimeStep"
+!  Exec Solver = Never
+  Exec Solver = "After TimeStep"
   Equation =  String "Upper Free Surface"
   Variable = "FS upper"
   Variable DOFs = 1
@@ -467,19 +468,42 @@ Solver 15
   Operator 2 = height
 End
 
+
 Solver 16
 !  Exec Solver = String "never"
   Exec Solver = "After Timestep"
   Equation = "SaveMetrics"
   Procedure = "SaveData" "SaveScalars"
-  Filename = File "metrics_Ex5a.dat"
+  Filename = File "metrics_Ex4b.dat"
   Parallel Reduce = Logical True
   Variable 1 = temperature
   Operator 1 = int
+  Coefficient 1 = Heat Content Coef
 !  Coefficient 1 = Heat Capacity
   Variable 2 = temperature
   Operator 2 = volume
 End
+
+!Solver 16
+!  Exec Solver = String "never"
+!!  Output Directory = File "/mnt/hgfs/VMshare/FISEX4"
+!  Variable = String -nooutput dummyvar
+!  Variable DOFs = Integer 1
+!  Exec Solver = "After Timestep"
+!  Equation = "SaveMetrics"
+!!  Equation = "Save Heat Content"
+!  Procedure = "SaveData" "SaveScalars"
+!  Filename = File "metrics_Ex4b.dat"
+!!  Filename = File "ISMheat.asc"
+!  Parallel Reduce = Logical True
+!  Variable 1 = temperature
+!  Operator 1 = int
+!!  Coefficient 1 = Heat Capacity
+!!  Coefficient 1 = Temperature Heat Capacity
+!!  Coefficient 1 = Heat Content Coef
+!  Variable 2 = temperature
+!  Operator 2 = volume
+!End
 
 !--------------------------------------------------------
 Equation 1
@@ -509,17 +533,13 @@ Boundary Condition 1
   Target Boundaries(4)  = 1 2 3 4
 
   Normal-Tangential Velocity = Logical True
-  Normal-Tangential Velocity Rotate = Logical False
+  Mass consistent normals = Logical True
+!  Normal-Tangential Velocity Rotate = Logical False
 !  Flow Force BC = Logical True
   ComputeNormal = Logical True
 
 !  Velocity 1 = Real 0.0
-  Slip Coefficient 1 = Real 10.0
-  Slip Coefficient 2 = Real 0.000025
-  Slip Coefficient 3 = Real 0.000025
-!  Slip Coefficient 1 = Real 100.0
-!  Slip Coefficient 2 = Real 0.0
-!  Slip Coefficient 3 = Real 0.0
+  Slip Coefficient 1 = Real 10000.0
 
   External Pressure = Variable depth
     Real MATC "1.0 * rhoi * gravity * tx"
@@ -540,41 +560,14 @@ Boundary Condition 2
   height = Real 0.0
 
   Normal-Tangential Velocity = Logical True
-!  Normal-Tangential Velocity Rotate = Logical False
-!  Flow Force BC = Logical True
-  ComputeNormal = Logical True
+  Mass Consistent Normals = Logical True
 
   ComputeNormal = Logical True
-  ComputeNormal Condition = Variable GroundedMask
-    Real MATC "tx + 0.5"
-
-  Normal-Tangential Velocity = Logical True
-  Velocity 1 = Real 0.0
-  Velocity 1 Condition = Variable GroundedMask
-    Real MATC "tx + 0.5"
-
-  FS Lower = Equals bedrock
-  FS Lower Condition = Variable GroundedMask
-    Real MATC "tx + 0.5"  
 
   Grounding Line Definition = string discontinuous
 
-  Slip Coefficient 2 = Variable Coordinate 3
-    Real Procedure "ElmerIceUSF" "SlidCoef_Contact"
-  Slip Coefficient 3 = Variable Coordinate 3
-    Real Procedure "ElmerIceUSF" "SlidCoef_Contact"
-
   Flow Force BC = Logical True
   
-  Sliding Law = String Budd
-  Budd Friction Coefficient = Real $0.02/1000.0
-  Budd Velocity Exponent = Real $m
-  Budd Zab Exponent = Real 1.0
-  Budd Linear Velocity = Real 0.1
-  Budd Ocean Density = Real $rhow
-  Budd Gravity = Real $gravity
-  Budd Floatation = Logical True
-
   Slip Coefficient 1 = Variable Coordinate 3
     Real Procedure "ElmerIceUSF" "SeaSpring"
 
@@ -586,7 +579,6 @@ Boundary Condition 2
 
   Temperature = Variable Pressure
         Real MATC "pressuremeltingpoint(tx)"
-!  Temperature = Real 273.15
 
   Save Scalars = logical true
 End
@@ -595,6 +587,7 @@ Boundary Condition 3
   Name = "upper_surface"
   Target Boundaries(1) = 6
   Body Id = 3
+  Mass consistent normals = Logical True
   ComputeNormal = Logical True
   depth = Real 0.0
   Temperature = Real 263.15

@@ -463,11 +463,11 @@ CONTAINS
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
       CALL ESMF_GridDestroy(OM_grid,rc=rc)
 # elif defined(FISOC_OM_MESH)
-      CALL ESMF_FieldGet(FieldList(1), mesh=OM_mesh, rc=rc)
-      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-           line=__LINE__, file=__FILE__)) &
-           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-      CALL ESMF_MeshDestroy(OM_mesh,rc=rc)
+!      CALL ESMF_FieldGet(FieldList(1), mesh=OM_mesh, rc=rc)
+!      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!           line=__LINE__, file=__FILE__)) &
+!           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!      CALL ESMF_MeshDestroy(OM_mesh,rc=rc)
 # endif
       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
            line=__LINE__, file=__FILE__)) &

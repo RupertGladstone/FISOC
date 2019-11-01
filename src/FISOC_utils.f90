@@ -20,7 +20,9 @@ MODULE FISOC_utils_MOD
        FISOC_State2StateCopyFB, FISOC_regridFB,                &
        FISOC_GridCompRun, FISOC_FieldListGetField,             &
        FISOC_getGridFromFB, FISOC_getMeshFromFB,               &                
-       FISOC_ConfigStringListContains
+       FISOC_ConfigStringListContains, FISOC_locallyOwnedNodes,&
+       FISOC_CreateOneToManyRouteHandle,                       & 
+       FISOC_ArrayRedistFromField
 !         FISOC_getGridOrMeshFromFB, 
 
   INTERFACE Unique1DArray
@@ -183,29 +185,29 @@ CONTAINS
 
     count = 0
     DO ii=1,SIZE(ISM2OM_Vars)
-
-          IF (TRIM('ISM_z_l0').EQ.TRIM(ISM2OM_Vars(ii))) THEN
-             IF (OM_cavityUpdate.NE.'RecentIce') cavityUpdateMismatch = .TRUE.
-             count = count + 1
+       
+       IF (TRIM('ISM_z_l0').EQ.TRIM(ISM2OM_Vars(ii))) THEN
+          IF (OM_cavityUpdate.NE.'RecentIce') cavityUpdateMismatch = .TRUE.
+          count = count + 1
+       END IF
+       
+       IF (TRIM('ISM_z_l0_linterp').EQ.TRIM(ISM2OM_Vars(ii))) THEN
+          IF (OM_cavityUpdate.NE.'Linterp') cavityUpdateMismatch = .TRUE.
+          count = count + 1
+       END IF
+       
+       IF (TRIM('ISM_dddt').EQ.TRIM(ISM2OM_Vars(ii))) THEN
+          IF ( (OM_cavityUpdate.NE.'Rate')          &
+               .AND.                                &
+               (OM_cavityUpdate.NE.'CorrectedRate') &
+               ) THEN
+             cavityUpdateMismatch = .TRUE.
           END IF
-          
-          IF (TRIM('ISM_z_l0_linterp').EQ.TRIM(ISM2OM_Vars(ii))) THEN
-             IF (OM_cavityUpdate.NE.'Linterp') cavityUpdateMismatch = .TRUE.
-             count = count + 1
-          END IF
-
-          IF (TRIM('ISM_dddt').EQ.TRIM(ISM2OM_Vars(ii))) THEN
-             IF ( (OM_cavityUpdate.NE.'Rate')          &
-                  .AND.                                &
-                  (OM_cavityUpdate.NE.'CorrectedRate') &
-                  ) THEN
-                cavityUpdateMismatch = .TRUE.
-                count = count + 1
-             END IF
-          END IF
-          
+          count = count + 1
+       END IF
+       
     END DO
-
+    
     IF (count.eq.0) THEN
        msg = 'no ISM cavity variable will be passed to the OM'
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
@@ -608,6 +610,11 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
+    CALL ESMF_ClockGet(FISOC_clock, currTime=FISOC_time, startTime=FISOC_startTime, stopTime=FISOC_endTime, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
     msg = "created and initialised clocks and alarms"  
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
          line=__LINE__, file=__FILE__, rc=rc)
@@ -625,7 +632,11 @@ CONTAINS
     INTEGER,OPTIONAL,INTENT(OUT)          :: rc
 
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
+# if defined(FISOC_OM_GRID)
     REAL(ESMF_KIND_R8),POINTER            :: field_ptr(:,:)
+# elif defined(FISOC_OM_MESH)
+    REAL(ESMF_KIND_R8),POINTER            :: field_ptr(:)
+# endif
     INTEGER                               :: fieldCount, ii
 
     rc = ESMF_FAILURE
@@ -645,15 +656,15 @@ CONTAINS
 
     ! loop over fields, setting all values to zero
     DO ii=1,fieldCount
-       CALL ESMF_FieldGet(field=fieldList(ii), farrayPtr=field_ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-       field_ptr(:,:) = 0.0
-
+      CALL ESMF_FieldGet(field=fieldList(ii), farrayPtr=field_ptr, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      field_ptr = 0.0
+      
     END DO
-
+    
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_zeroBundle
@@ -672,7 +683,11 @@ CONTAINS
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:),fieldListCum(:)
     TYPE(ESMF_TypeKind_Flag)              :: fieldTypeKind
     CHARACTER(len=ESMF_MAXSTR)            :: fieldName, fieldNameCum
+# if defined(FISOC_OM_GRID)
     REAL(ESMF_KIND_R8),POINTER            :: fieldCum_ptr(:,:), field_ptr(:,:) 
+# elif defined(FISOC_OM_MESH)
+    REAL(ESMF_KIND_R8),POINTER            :: fieldCum_ptr(:), field_ptr(:) 
+# endif
     TYPE(ESMF_GRID)                       :: grid
 
     rc = ESMF_FAILURE
@@ -746,7 +761,7 @@ CONTAINS
           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        END IF
     
-       fieldCum_ptr(:,:) = fieldCum_ptr(:,:) + field_ptr(:,:)
+       fieldCum_ptr = fieldCum_ptr + field_ptr
 
     END DO
 
@@ -772,7 +787,11 @@ CONTAINS
     CHARACTER(len=ESMF_MAXSTR)            :: fieldName, fieldNameCum
     INTEGER                               :: OM_cum_steps, ii, fieldCount, fieldCountCum 
     TYPE(ESMF_field)                      :: fieldCum, field
+# if defined(FISOC_OM_GRID)
     REAL(ESMF_KIND_R8),POINTER            :: fieldCum_ptr(:,:), field_ptr(:,:) 
+# elif defined(FISOC_OM_MESH)
+    REAL(ESMF_KIND_R8),POINTER            :: fieldCum_ptr(:), field_ptr(:) 
+# endif
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:),fieldListCum(:)
     TYPE(ESMF_TypeKind_Flag)              :: fieldTypeKind
 
@@ -853,7 +872,7 @@ CONTAINS
           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        END IF
     
-       field_ptr(:,:) = fieldCum_ptr(:,:) / OM_cum_steps
+       field_ptr = fieldCum_ptr / OM_cum_steps
 
     END DO
 
@@ -881,7 +900,11 @@ CONTAINS
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:),fieldListCum(:)
     TYPE(ESMF_TypeKind_Flag)              :: fieldTypeKind
     CHARACTER(len=ESMF_MAXSTR)            :: fieldName, fieldNameCum
+# if defined(FISOC_OM_GRID)
     TYPE(ESMF_GRID)                       :: grid
+# elif defined(FISOC_OM_MESH)
+    TYPE(ESMF_MESH)                       :: mesh
+# endif
 
     rc = ESMF_FAILURE
 
@@ -912,6 +935,7 @@ CONTAINS
 
        fieldNameCum = TRIM(fieldName)//"_cum"
 
+# if defined(FISOC_OM_GRID)
        CALL ESMF_FieldGet(fieldList(ii), grid=grid, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
@@ -921,6 +945,23 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+# elif defined(FISOC_OM_MESH)
+       CALL ESMF_FieldGet(fieldList(ii), mesh=mesh, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       fieldListCum(ii) = ESMF_FieldCreate(mesh, typekind=fieldTypeKind, name=fieldNameCum, rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# else
+       msg = "ERROR: FISOC does not recognise OM geom type."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# endif
 
     END DO
 
@@ -1114,8 +1155,8 @@ CONTAINS
        derivedAttribute = ESMF_REGRIDMETHOD_NEAREST_STOD
     CASE("ESMF_REGRIDMETHOD_CONSERVE")
        derivedAttribute = ESMF_REGRIDMETHOD_CONSERVE
-    CASE("ESMF_REGRIDMETHOD_CONSERVE_2ND")
-       derivedAttribute = ESMF_REGRIDMETHOD_CONSERVE_2ND
+!    CASE("ESMF_REGRIDMETHOD_CONSERVE_2ND")
+!       derivedAttribute = ESMF_REGRIDMETHOD_CONSERVE_2ND
     CASE("ESMF_REGRIDMETHOD_PATCH")
        derivedAttribute = ESMF_REGRIDMETHOD_PATCH
     CASE DEFAULT
@@ -2451,5 +2492,186 @@ print*,'catch error and set default if missing att'
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_regridFB
+
+
+  !------------------------------------------------------------------------------
+  ! localNodeIDs is an array of all node ids on the current partition.  This can
+  ! include nodes at partition boundaries (or halo nodes) owned by neighbouring 
+  ! partitions. 
+  ! This subroutine returns an array of node ids owned by the current partition. 
+  ! This is a subset of all nodes contained in localNodeIDs.
+  SUBROUTINE FISOC_locallyOwnedNodes(localPet,localNodeIDS,nodeOwners,ownedNodeIDs)
+
+    INTEGER,INTENT(IN)              :: localPet, localNodeIDs(:), nodeOwners(:)
+    INTEGER,ALLOCATABLE,INTENT(OUT) :: ownedNodeIDs(:)
+
+    INTEGER                         :: LON_count, ii
+
+    ! TODO: fail fast if size of nodeOwners .ne. size of localnodeIDs
+    
+    ! How many of the nodes are locally owned?
+    LON_count = 0
+    DO ii = 1,SIZE(localNodeIDs)
+       IF (nodeOwners(ii).EQ.localPet) THEN
+          LON_count = LON_count + 1
+       END IF
+    END DO
+    !TODO: fail fast if already allocated/associated
+    ALLOCATE(ownedNodeIDs(LON_count))
+
+    LON_count = 0
+    DO ii = 1,SIZE(localNodeIDs)
+       IF (nodeOwners(ii).EQ.localPet) THEN
+          LON_count = LON_count + 1
+          ownedNodeIDs(LON_count) = localNodeIDs(ii)
+       END IF
+    END DO
+
+  END SUBROUTINE FISOC_locallyOwnedNodes
+
+
+  !------------------------------------------------------------------------------
+  ! The route handle is for array mappings between the ESMF fields defined on 
+  ! meshes (with unique nodes) and component (e.g. Elmer) fields with some node 
+  ! duplication across partition boundaries).
+  !
+  ! Variable naming here: "source" refers to the ESMF mesh and fields and "dest" 
+  ! (short for destination) refers to the component (e.g. Elmer) mesh and fields. 
+  ! Note that both are for holding component information, but the source ones are
+  ! in ESMF run time structures and the dest are in native component structures.
+  !
+  ! Input args:
+  ! sourceMesh - Arrays created on this mesh will not duplicate nodes 
+  ! nodeIDs - global dest node IDs on the current partition, including nodes 
+  ! duplicated across partition boundaries.
+  !
+  ! Output args:
+  ! a routehandle and dest distgrid object to be used later to implement the one 
+  ! to many mapping.
+  !
+  SUBROUTINE FISOC_CreateOneToManyRouteHandle(sourceMesh,nodeIDs,RH,distgridDest,vm)
+
+    TYPE(ESMF_mesh), INTENT(IN) :: sourceMesh
+    INTEGER,INTENT(IN)          :: nodeIDs(:) 
+    TYPE(ESMF_vm),INTENT(IN)    :: vm
+
+    TYPE(ESMF_RouteHandle),INTENT(OUT) :: RH 
+    TYPE(ESMF_distgrid),INTENT(OUT)    :: distgridDest
+
+    TYPE(ESMF_distgrid):: distgridSource
+    TYPE(ESMF_array)   :: DummyArr_source  ! will not contain duplicate nodes
+    TYPE(ESMF_array)   :: DummyArr_dest    ! may contain duplicate nodes
+    INTEGER            :: rc
+    INTEGER            :: localPET
+    REAL(ESMF_KIND_R8),POINTER :: ptr_source(:),ptr_dest(:)
+
+
+    ! Create dummy array on the distgrid for ESMF source mesh
+    CALL ESMF_MeshGet(sourceMesh, nodalDistgrid=distgridSource, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    DummyArr_source = ESMF_ArrayCreate(distgridSource, ESMF_TYPEKIND_R8, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF (localPet.EQ.0) THEN
+       msg = "one2many routehandles: creating distrgrid"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
+
+    ! Create a distgrid containing sequence indices for the dest array, i.e. 
+    ! containing the duplicate node IDs.  This can be used to create an array 
+    ! including duplicates, like the dest fields.
+    distgridDest  = ESMF_DistgridCreate(arbSeqIndexList=nodeIDs, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    DummyArr_dest = ESMF_ArrayCreate(distgridDest, ESMF_TYPEKIND_R8, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! initialilse arrays to zero, probably not needed
+    CALL ESMF_ArrayGet(DummyArr_dest, farrayPtr=ptr_dest, rc=rc)
+    CALL ESMF_ArrayGet(DummyArr_source,  farrayPtr=ptr_source, rc=rc)
+    ptr_dest=0.0
+    ptr_source=0.0
+    IF (ASSOCIATED(ptr_dest)) NULLIFY(ptr_dest)
+    IF (ASSOCIATED(ptr_source)) NULLIFY(ptr_source)
+    
+    ! Create the route handle for later use 
+    IF (localPet.EQ.0) THEN
+       msg = "one2many routehandles: store routehandle"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
+    CALL ESMF_ArrayRedistStore(DummyArr_source, DummyArr_dest, &
+         RH, ignoreUnmatchedIndices=.TRUE., rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Tidy up 
+    IF (localPet.EQ.0) THEN
+       msg = "one2many routehandles: tidy up"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+    END IF
+    CALL ESMF_ArrayDestroy(DummyArr_dest, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_ArrayDestroy(DummyArr_source, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+  END SUBROUTINE FISOC_CreateOneToManyRouteHandle
+
+  !------------------------------------------------------------------------------
+  ! Taking as input a source field,routehandle and distgrid for the destination
+  ! field: extract the array from the source field, create a destination array 
+  ! using the distgrid, and use these with the routehandle in an ESMF_ArrayRedist 
+  ! operation.  Return a pointer to the the destination array.
+  !
+  ! Written for application of FISOC_CreateOneToManyRouteHandle.
+  !
+  SUBROUTINE FISOC_ArrayRedistFromField(RH,sourceField,distgridDest,destArrPtr)
+    TYPE(ESMF_routeHandle),INTENT(INOUT) :: RH
+    TYPE(ESMF_field),INTENT(IN)          :: sourceField
+    TYPE(ESMF_distgrid),INTENT(IN)       :: distgridDest
+    REAL(ESMF_KIND_R8),POINTER           :: destArrPtr(:)
+
+    TYPE(ESMF_Array)                     :: sourceArray, destArray
+    INTEGER                              :: rc
+    
+    CALL ESMF_FieldGet(sourceField, array=sourceArray, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    ! we need to create a dest array on the fly (and then convert from the 
+    ! array to the dest variable after the redist)
+    destArray = ESMF_ArrayCreate(distgridDest, ESMF_TYPEKIND_R8, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
+    
+    ! now redist the source array onto the dest array
+    CALL ESMF_ArrayRedist(sourceArray, destArray, RH, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    ! ...and get a pointer to the data
+    CALL ESMF_ArrayGet(destArray, farrayPtr=destArrPtr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+  END SUBROUTINE FISOC_ArrayRedistFromField
 
 END MODULE FISOC_utils_MOD

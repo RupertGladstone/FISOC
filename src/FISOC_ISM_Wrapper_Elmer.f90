@@ -83,7 +83,6 @@ MODULE FISOC_ISM_Wrapper
   ! Route handles for switching between Elmer arrays (which include duplicated nodes 
   ! along partition boundaries) and corresponding ESMF arrays (which don't)
   TYPE(ESMF_RouteHandle),SAVE :: RH_ESMF2Elmer
-!  TYPE(ESMF_RouteHandle) :: RH_Elmer2ESMF ! not needed because the redist operation in this direction is not well defined
 
   ! nodal distgrid, an ESMF object holding information about the distribution of 
   ! Elmer nodes across partitions, needed for the redist related operations.
@@ -619,10 +618,10 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!            line=__LINE__, file=__FILE__)) &
+!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        CALL ESMF_FieldGet(fieldList(nn), array=ESMFarr, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
@@ -648,6 +647,8 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+       CALL FISOC_ArrayRedistFromField(RH_ESMF2Elmer,fieldList(nn),distgridElmer,ptr)
+
        ! check if the current variable is in the list of variables to be passed 
        ! to Elmer
        IF (FISOC_OM2ISM(fieldName,FISOC_config,rc=rc)) THEN
@@ -670,6 +671,7 @@ CONTAINS
           
 
           CASE ('OM_temperature_l0')
+! TODO:
 print*,"Hang on, need to get temperature exchange going too..."
 !             EI_field => VariableGet( CurrentModel % Mesh % Variables, &
 !                  EIname_temperature_l0, UnFoundFatal=.TRUE.)
@@ -690,7 +692,7 @@ print*,"Hang on, need to get temperature exchange going too..."
           IF (ASSOCIATED(ptr)) THEN
              NULLIFY(ptr)
           END IF
-
+!TODO: destroy or nullify temporary arrays?
        END IF
 
     END DO fieldLoop
@@ -963,14 +965,13 @@ print*,"Hang on, need to get temperature exchange going too..."
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
     END IF
-    CALL locallyOwnedNodes(localPet)
+    CALL FISOC_locallyOwnedNodes(localPet,EI_nodeIDs,nodeOwners,ownedNodeIDs)
 
     ! TODO (probably not urgent, maybe not needed at all)
     ! Note that ElmerMesh%ParallelInfo%GlobalDOFs may already contain global unique node ids 
     ! (not just for the boundary of interest but for the whole mesh). It might make sense to 
     ! use these rather than construct the uniqueIDs here. 
     
-
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        msg = "Elmer mesh: building element connectivity"
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
@@ -999,7 +1000,8 @@ print*,"Hang on, need to get temperature exchange going too..."
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
     END IF
-    CALL CreateArrayMappingRouteHandles(ESMF_ElmerMesh,nodeIDs_global,vm)
+!    CALL CreateArrayMappingRouteHandles(ESMF_ElmerMesh,nodeIDs_global,vm)
+    CALL FISOC_CreateOneToManyRouteHandle(ESMF_ElmerMesh,nodeIDs_global,RH_ESMF2Elmer,distgridElmer,vm)
 
     IF (ALLOCATED(elemConn)) DEALLOCATE(elemConn)
     IF (ALLOCATED(nodeIds_global)) DEALLOCATE(nodeIds_global)
@@ -1012,7 +1014,7 @@ print*,"Hang on, need to get temperature exchange going too..."
   !------------------------------------------------------------------------------
   ! These module-scope route handles are for array mappings between the ESMF 
   ! fields (with unique nodes) and Elmer fields (with some node duplication 
-  ! across node boundaries).
+  ! across partition boundaries).
   !
   ! Input vars:
   ! ESMF_ElmerMesh - Arrays created on this mesh will not duplicate nodes 
@@ -1252,32 +1254,6 @@ print*,"Hang on, need to get temperature exchange going too..."
 print*,"node ordering to go here if needed..."
 
   END SUBROUTINE buildElementConnectivity
-
-
-  !------------------------------------------------------------------------------
-  SUBROUTINE locallyOwnedNodes(localPet)
-
-    INTEGER,INTENT(IN) :: localPet
-    INTEGER :: LON_count, ii
-    
-    ! How many of the nodes are locally owned?
-    LON_count = 0
-    DO ii = 1,SIZE(EI_NodeIDs)
-       IF (nodeOwners(ii).EQ.localPet) THEN
-          LON_count = LON_count + 1
-       END IF
-    END DO
-    ALLOCATE(ownedNodeIDs(LON_count))
-
-    LON_count = 0
-    DO ii = 1,SIZE(EI_NodeIDs)
-       IF (nodeOwners(ii).EQ.localPet) THEN
-          LON_count = LON_count + 1
-          ownedNodeIDs(LON_count) = EI_NodeIDs(ii)
-       END IF
-    END DO
-
-  END SUBROUTINE locallyOwnedNodes
 
   
   !------------------------------------------------------------------------------

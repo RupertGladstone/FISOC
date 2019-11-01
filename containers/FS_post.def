@@ -1,0 +1,72 @@
+#Bootstrap: library
+#From: debian
+
+Bootstrap: localimage
+From: debian_latest.sif
+
+%post
+
+ mkdir /tmpbuild
+ cd /tmpbuild
+
+ apt-get update
+ apt-get install -y wget
+ apt-get install -y build-essential
+ apt-get install -y python
+ apt-get install -y python-pip
+ apt-get install -y libxt-dev 
+ python -m pip install pip setuptools wheel
+ python -m pip install scikit-build
+
+ # Install OpenGL
+ apt-get update && apt-get install --yes build-essential libgl1-mesa-dev
+
+ # Download, extract & build CMake
+ wget http://www.cmake.org/files/v3.5/cmake-3.5.0.tar.gz \
+ && tar xzf cmake-3.5.0.tar.gz
+ cd cmake-3.5.0 \
+ && ./configure --prefix=/usr/local \
+ && make \
+ && make install
+
+ # Download & build Tcl
+ cd /tmpbuild
+ wget http://prdownloads.sourceforge.net/tcl/tcl8.6.6-src.tar.gz && tar -zxvf tcl8.6.6-src.tar.gz
+ cd tcl8.6.6/unix && ./configure && make && make install
+
+ # Download & build Tk
+ cd /tmpbuild
+ wget http://prdownloads.sourceforge.net/tcl/tk8.6.6-src.tar.gz && tar -zxvf tk8.6.6-src.tar.gz
+ cd tk8.6.6/unix && ./configure && make && make install
+
+ # obtain vtk code
+ cd /tmpbuild
+ wget http://www.vtk.org/files/release/7.1/VTK-7.1.1.tar.gz && tar -zxvf VTK-7.1.1.tar.gz
+
+ # Building VTK with python interfaces
+ mkdir /vtk-build2
+ cd /vtk-build2/ && cmake \
+ -DCMAKE_BUILD_TYPE:STRING=Release \
+ -DBUILD_TESTING:BOOL=OFF \
+ -DVTK_WRAP_PYTHON:BOOL=ON \
+ -DVTK_WRAP_PYTHON_SIP:BOOL=ON \
+ -DVTK_WRAP_TCL:BOOL=ON \
+ -DVTK_PYTHON_VERSION:STRING=3 \
+ -DVTK_USE_TK:BOOL=ON \
+ /tmpbuild/VTK-7.1.1
+
+ # Build VTK
+ cd /vtk-build2/ && make
+
+ # Now install the python bindings
+ cd /vtk-build2/Wrapping/Python && make && make install
+
+ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib:/vtk-build2/lib
+
+ apt-get install -y paraview
+
+
+%runscript
+ python --version
+ python3 --version
+ pip --version
