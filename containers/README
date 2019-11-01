@@ -1,5 +1,5 @@
 
-This folder should contain recipes or definition files for images that are of use to FISOC users or developers.  FS is short for FISOC Singularity.
+This folder should contain recipes or definition files for containers that are of use to FISOC users or developers.  FS is short for FISOC Singularity.
 
 TODO: place the images somewhere accessible online, perhaps in the sylabs library?
 
