@@ -3,7 +3,7 @@
 % function to prepare ROMS output netcdf file for reading into
 % Paraview. Involves creation of two (x,y) 1-dimensional coordinate
 % variables. Some assumptions about the ROMS output file are
-% hard-code here.  Also, converts ROMS hybrid vertical coord to
+% hard-coded here.  Also, converts ROMS hybrid vertical coord to
 % cartesian (assumes that some ROMS matlab functionality is
 % available, specifically set_depth_nozice and stretching).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -67,11 +67,12 @@ w_rho_data = zeros(nx,ny,N,nt); % we want w vel on rho points
 
 disp(['process z coord '])
 for tt = 1:nt
+    disp([tt])
     dpz = zeta(:,:,tt) + draft(:,:,tt);
-    z_rho_data(:,:,:,tt)=set_depth_nozice(Vtransform, Vstretching,theta_s, ...
+    z_rho_data(:,:,:,tt)=set_depth(Vtransform, Vstretching,theta_s, ...
                                                       theta_b, hc, N,igrid_rho, ...
                                                       h, dpz, report);
-    z_w_data(:,:,:,tt)=set_depth_nozice(Vtransform, Vstretching,theta_s, ...
+    z_w_data(:,:,:,tt)=set_depth(Vtransform, Vstretching,theta_s, ...
                                                     theta_b, hc, N,igrid_w, ...
                                                     h, dpz, report);
 end
