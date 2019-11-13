@@ -1189,8 +1189,8 @@ CONTAINS
     CASE('ISM2OM_extrap:')
        CALL ESMF_ConfigGetAttribute(FISOC_config, extrapMethodChar, label='ISM2OM_extrap:', rc=rc_local)
        IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
-          extrapMethodChar = "ESMF_EXTRAPMETHOD_NEAREST_STOD"
-          msg = "WARNING: ISM2OM_extrap not found, setting to NEAREST_STOD."
+          extrapMethodChar = "ESMF_EXTRAPMETHOD_NONE"
+          msg = "WARNING: ISM2OM_extrap not found, setting to ESMF_EXTRAPMETHOD_NONE."
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
                line=__LINE__, file=__FILE__)
        ELSE
@@ -1202,8 +1202,8 @@ CONTAINS
     CASE('OM2ISM_extrap:')
        CALL ESMF_ConfigGetAttribute(FISOC_config, extrapMethodChar, label='OM2ISM_extrap:', rc=rc_local)
        IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
-          extrapMethodChar = "ESMF_EXTRAPMETHOD_NEAREST_STOD"
-          msg = "WARNING: OM2ISM_extrap not found, setting to NEAREST_STOD."
+          extrapMethodChar = "ESMF_EXTRAPMETHOD_NONE"
+          msg = "WARNING: OM2ISM_extrap not found, setting to ESMF_EXTRAPMETHOD_NONE."
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
                line=__LINE__, file=__FILE__)
        ELSE
@@ -2338,6 +2338,7 @@ print*,'catch error and set default if missing att'
     ! Create a route handle to add to the state object.  This will be used for regridding.
     CALL FISOC_FieldRegridStore(vm, sourceFieldList(1), targetFieldList(1), &
          regridmethod=Regrid_method, &
+         extrapMethod=Extrap_method, &
          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
          routehandle=regridRouteHandle, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
