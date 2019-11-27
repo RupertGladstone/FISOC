@@ -1,0 +1,27 @@
+
+*** Currently just notes, to be tidied/merged with manual ***
+
+Notes on getting ROMS viewable in Paraview.
+
+1. Use ncrcat to gt required subset of vars into one file.
+2. Use matlab script to process coord vars so that Paraview can read them properly.
+
+
+Example ncrcat command for processing ROMS output files.  This command concatenates a subset of the ROMS output data into one netcdf file.  The concatenated file should be suitable for processing through the matlab scripts that prep for reading ROMS netcdf files into Paraview.
+
+ncrcat -O -p . -d ocean_time,,,2 -n 72,2,1 ocean_his_0001.nc ocean_his_select.nc -v ocean_time,x_rho,y_rho,Sb,Tb,draft,zeta,m,ubar_eastward,vbar_northward,w,u_eastward,v_northward,temp,salt,h,wetdry_mask_rho,Vtransform,Vstretching,theta_s,theta_b,hc
+
+From NCO manual re "-n" option (we use this to determine which files to include):
+NCO decodes lists of such filenames encoded using the ‘-n’ syntax.  The simpler (three-argument) ‘-n’ usage takes the form -n file_number, digit_number, numeric_increment where file number is the number of files, digit number is the fixed number of numeric digits  comprising the numeric suffix,  and numeric increment is  the  constant,  integer-valued difference between the numeric suffix of any two consecutive files.
+
+From NCO manual re "-d" option (we use this to skip output steps for example if we want the same number of output steps in both ice and ocean):
+The stride is specified as the optional fourth argument to the ‘-d’ hyperslab specification: -d dim,[min][,[max][,[stride]]].  Specify stride as an integer (i.e., no decimal point) following the third comma in the ‘-d’ argument.
+
+
+ROMS Matlab repository information is available here:
+https://www.myroms.org/wiki/Matlab_Scripts
+You will need a ROMS account to access the matlab scripts in their subversion repository.  In particular set_depth.m is needed if using the ROMS2para.m function provided here.
+
+On my laptop it is checked out here:
+/home/gladstone/Source/ROMS_matlab/utility/set_depth.m
+
