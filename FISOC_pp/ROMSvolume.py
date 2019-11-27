@@ -5,7 +5,9 @@ import numpy
 # ROMS2para.m to set up the coords.
 # The time series of ocean volume is written to text file.
 
-inFile = "/media/sf_VBshare/ocean_his_bil.nc"
+#inFile = "/media/sf_VBshare/FISOC_Ex4_cp/ocean_his_select.nc"     # FX4_cp (nearest)
+inFile = "/media/sf_VBshare/FISOC_Ex4_interp/ocean_his_select.nc" # ER_FX4_interp (bilin)
+#inFile = "/media/sf_VBshare/FISOC_Ex4_RO/ocean_his_select.nc"     # FX4_RO ROMS only
 
 ib = 1 # ignore boundary: number of grid cells to ignore at edge of domain
 

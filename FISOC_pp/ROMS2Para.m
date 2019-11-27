@@ -5,7 +5,7 @@
 % variables. Some assumptions about the ROMS output file are
 % hard-coded here.  Also, converts ROMS hybrid vertical coord to
 % cartesian (assumes that some ROMS matlab functionality is
-% available, specifically set_depth_nozice and stretching).
+% available, specifically set_depth and stretching).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function [returnCode] = ROMS2Para(inFileName)
@@ -33,7 +33,7 @@ theta_s     = ncread(inFileName,'theta_s');
 theta_b     = ncread(inFileName,'theta_b');
 hc          = ncread(inFileName,'hc');
 h           = double(ncread(inFileName,'h'));
-igrid_rho = 1; igrid_w   = 5; % see set_depth_nozice for grid
+igrid_rho = 1; igrid_w   = 5; % see set_depth for grid
                               % stagger info
 report = 0; % verbose or not
 nt = length(time);
