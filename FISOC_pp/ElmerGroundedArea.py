@@ -5,10 +5,11 @@ import glob
 import numpy as np
 #import matplotlib.pyplot as plt 
 
-GeomID_us = 103
-GeomID_ls = 102
+#GeomID_us = 103
+#GeomID_ls = 102
 
-vtu_path = "/media/sf_VBshare/FISOC_Ex5_bil2/"
+#vtu_path = "/media/sf_VBshare/FISOC_Ex5_bil2/"
+vtu_path = "/files/"
 
 #-----------------------------------------------------------------------------------
 def access_pvtu(pvtu_file):
@@ -57,7 +58,7 @@ if __name__ == "__main__":
     filesElmer=glob.glob(vtu_path+'*.pvtu')
     filesElmer.sort()
     
-    graOutFile = open("graOverTime.asc","w+")
+    graOutFile = open(vtu_path+"graOverTime.asc","w+")
     graArr = np.zeros(len(filesElmer))
 
     for file_name in filesElmer:
