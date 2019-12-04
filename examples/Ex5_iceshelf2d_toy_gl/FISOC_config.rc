@@ -2,7 +2,7 @@
 #  Regrid_method:      ESMF_REGRIDMETHOD_BILINEAR
 #  Regrid_method:      ESMF_REGRIDMETHOD_NEAREST_STOD
 
-  ISM_configFile:     FISOC_Ex5b.sif
+  ISM_configFile:     FISOC_Ex5.sif
   FISOC_ISM_ReqVars:  ISM_z_l0 ISM_thick ISM_gmask 
 #  ISM_varNames: 'Coordinate 3' Depth groundedmask 
   FISOC_ISM_DerVars:  ISM_z_lts ISM_z_l0_previous ISM_z_lts_previous ISM_dddt ISM_dsdt 
@@ -12,26 +12,28 @@
   ISM_maskOMvars:     .TRUE.
   ISM_stdoutFile:     ./EI_out
   ISM_gridType:       ESMF_mesh
-#  ISM2OM_regrid:      ESMF_REGRIDMETHOD_BILINEAR
-  ISM2OM_regrid:      ESMF_REGRIDMETHOD_NEAREST_STOD
+  ISM2OM_regrid:      ESMF_REGRIDMETHOD_BILINEAR
+  ISM2OM_extrap:      ESMF_EXTRAPMETHOD_NEAREST_STOD
+#  ISM_ProjVector:     0. 0. -1.
   ISM_BodyID:         2
 
   OM_configFile:      ocean_iceshelf2d_toy_gl.in
   OM_gridType:        ESMF_grid
-  OM_stdoutFile:      ./ROMS_stdout.asc
+  OM_stdoutFile:      ./ROMS_stdout
   OM_writeNetcdf:     .FALSE.
   OM_NCfreq:          all
   output_dir:         ./FISOCoutputs
-  OM_initCavityFromISM: .TRUE.
   OM_CavCorr:         0.01
   OM_cavityUpdate:    CorrectedRate # Linterp
+  OM_initCavityFromISM: .TRUE.
   FISOC_OM_ReqVars:   OM_dBdt_l0 OM_z_l0 OM_bed OM_z_lts
+#  FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0 OM_z_l0 OM_bed OM_z_lts
 #  FISOC_OM_DerVars:   
   OM_ReqVars_stagger: CENTER CENTER CENTER CENTER
   OM2ISM_vars:        OM_dBdt_l0
   OM_WCmin:           5.0
   OM2ISM_regrid:      ESMF_REGRIDMETHOD_BILINEAR
-#  OM2ISM_regrid:      ESMF_REGRIDMETHOD_NEAREST_STOD
+  OM2ISM_extrap:      ESMF_EXTRAPMETHOD_NEAREST_STOD
 
   OM_outputInterval:  1
 
@@ -41,6 +43,7 @@
   start_month:        1
   end_year:           101
   end_month:          1
+#  runLength_ISM_steps: 3
 
 #  verbose_coupling:   .FALSE.
   verbose_coupling:   .TRUE.
