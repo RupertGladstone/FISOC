@@ -6,11 +6,12 @@ TODO: place the images somewhere accessible online, perhaps in the sylabs librar
 
 FS_post.def - contains a python installation with vtk and paraview modules included, so that python scripts to process vtu files (as produced by Elmer) can be easily run.
 
-Example command to build an image from a singularity definition file:
+Example command to build an image from a singularity definition file (this takes some time, of the order of an hour or so):
 sudo singularity build FC_proc.sif FC_proc.def
 
-Example command to launch a container with bound directories to FISOC output files and postprocessing scripts:
+Example command to launch a container in which important host directories (containing FISOC output files and postprocessing scripts) are bound to the container:
 singularity shell --bind /media/sf_VBshare/FISOC_Ex5_bil2:/files,/home/gladstone/Source/FISOC/FISOC_pp/:/scripts FS_post.sif/
+singularity shell --bind /host/path/to/output/files:/files,/host/path/to/FISOC/clone/FISOC_pp/:/scripts FS_post.sif/
 
 The above command launches an interactive shell.  FISOC postprocessing scripts can then be run at the command line.  For example, to create a text file containing a time series of grounded area from Elmer:
 python /scripts/ElmerGroundedArea.py
