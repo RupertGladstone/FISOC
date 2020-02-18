@@ -10,6 +10,9 @@ Grid creation is similar to Ex1 too, see also Ex1 README.
 To make the mesh:
 ElmerGrid 1 2 FISOC_Ex4.grd
 
+To make the Elmer mesh from an FVCOM mesh file:
+ElmerGrid 16 2 FVCOMmeshFile
+
 To partition the mesh for parallel runs (4 partitions):
 ElmerGrid 2 2 FISOC_Ex4 -partition 1 4 0 2
 
