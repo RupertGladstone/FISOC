@@ -31,6 +31,7 @@ export FISOC_ISM="Elmer"
 export FISOC_ISM_LIBS="-lelmersolver"
 export FISOC_ISM_INCLUDE="$ELMER_HOME/share/elmersolver/include"
 export FISOC_ISM_LIBPATH="$ELMER_HOME/lib/elmersolver/"
+export FISOC_ISM_GEOM="FISOC_ISM_GRID" 
 
 export LD_LIBRARY_PATH="/short/gh8/cxz581/lib:$LD_LIBRARY_PATH"
 export LD_LIBRARY_PATH="$ELMER_HOME/lib:$LD_LIBRARY_PATH"
