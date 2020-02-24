@@ -155,6 +155,10 @@ install: info $(FISOC_EXE)
 .PHONY: clean
 
 clean:
-	rm -f FISOC_caller* *.o *.mod $(SRCDIR)/*.o $(SRCDIR)/*.mod
+	$(info )
+	$(info ******************************************************************)
+	$(info ***             CLEANING!                                      ***)
+	$(info ******************************************************************)
+	 rm -f $(FISOC_EXE) *.o *.mod $(SRCDIR)/*.o $(SRCDIR)/*.mod
 
 
