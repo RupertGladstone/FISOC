@@ -23,6 +23,8 @@ MODULE FISOC_ISM_Wrapper
 !  REAL(ESMF_KIND_R8),PARAMETER          :: secperyear = 365.0*24.*60.*60. 
   INTEGER,PARAMETER                     :: secperyear = 365.0*24.*60.*60. 
   INTEGER                               :: year = NOYEAR, ISM_stepCounter = 1
+  INTEGER                               :: file_counter = 1, file_subCounter = 1, EntriesPerFile = 1
+  CHARACTER(len=ESMF_MAXSTR)            :: FileStyle
 
 ! TODO: resolve some code duplication between init 1 and run.  Setting up file names etc. for getting the var from netcdf.
 ! TODO: hard code timestep check instead of hard coding timestep itself.  Put expected timestep in config file.
@@ -117,6 +119,16 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
+    CALL FISOC_ConfigDerivedAttribute(FOOL_config, EntriesPerFile, 'EntriesPerFile:', rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL FISOC_ConfigDerivedAttribute(FOOL_config, FileStyle, 'FileStyle:', rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     ! We don't need to construct the grid if we're simply using the OM grid
     IF (ISM_UseOMGrid) THEN
       msg = "Using OM grid for ISM"
@@ -226,7 +238,7 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL         :: rc
 
     CHARACTER(len=ESMF_MAXSTR)   :: fileName
-    INTEGER                      :: localPet
+    INTEGER                      :: localPet, ForcingStartYr
     INTEGER                      :: rank, ISM_dt_sec
     TYPE(ESMF_grid)              :: FOOLgrid
     TYPE(ESMF_field)             :: field
@@ -280,14 +292,39 @@ CONTAINS
        PRINT*,""
     END IF
 
+    CALL ESMF_ConfigGetAttribute(FOOL_config, ForcingStartYr, label='ForcingStartYr:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF (year.eq.NOYEAR) THEN
+       year = ForcingStartYr
+       file_counter = year
+    END IF
+
     ! Get the fields needed from our ISM, in this case just the netcdf file
     CALL getFieldDataFromISM(ISM_ExpFB,FISOC_config)
+
+    ! step forward the counters needed for reading netcdf files
+
+    ! TODO: tidy up where we get "year" from!  Using the main FISOC_clock probably.  This is ugly at the moment.
+    ! Or just use counters instead of time as such.  For now the mix is a hack.
+!    year = year + 1
+    
+    IF (file_subCounter.EQ.EntriesPerFile) THEN
+      file_subCounter = 1
+      file_counter    = file_counter + 1
+    ELSE
+      file_subCounter = file_subCounter + 1
+    END IF
+    year = file_counter ! TODO: remove this hack
+    
 
   END SUBROUTINE FISOC_ISM_Wrapper_Run
 
 
   
-  !--------------------------------------------------------------------------------------                                                                                                                                                     
+  !-------------------------------------------------------------------------------------- 
   SUBROUTINE getFieldDataFromISM(ISM_ExpFB,FISOC_config)
 
     TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: ISM_ExpFB 
@@ -402,6 +439,8 @@ CONTAINS
              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)        
         IF (numForcingFiles.EQ.1) THEN
           CALL readFromNC(FileName,ISM_varNames(nn),FOOLgrid,ptr,1,ISM_stepCounter)
+        ELSE IF (EntriesPerFile.GT.1) THEN
+          CALL readFromNC(FileName,ISM_varNames(nn),FOOLgrid,ptr,1,file_subCounter)          
         ELSE
           CALL readFromNC(FileName,ISM_varNames(nn),FOOLgrid,ptr,1)
         END IF
@@ -438,7 +477,7 @@ CONTAINS
     CHARACTER(len=ESMF_MAXSTR),INTENT(OUT) :: fileName
 
     INTEGER                      :: NumForcingFiles, rc
-    INTEGER                      :: ForcingInterval_yr, ForcingStartYr
+    INTEGER                      :: ForcingInterval_yr
     CHARACTER(len=ESMF_MAXSTR)   :: ForcingBaseName 
     CHARACTER(len=ESMF_MAXSTR)   :: ForcingDir, fileNumber
 
@@ -464,16 +503,13 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_ConfigGetAttribute(FOOL_config, ForcingStartYr, label='ForcingStartYr:', rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    IF (year.eq.NOYEAR) THEN
-       year = ForcingStartYr
-    END IF
-
-    WRITE (fileNumber, "(I0)") year
+    
+    SELECT CASE(FileStyle)
+    CASE ("ROMS_history")
+      WRITE (fileNumber, "(I0.4)") year
+    CASE DEFAULT
+      WRITE (fileNumber, "(I0)") year
+    END SELECT
 
     IF (NumForcingFiles.GT.1) THEN
       fileName = TRIM(ADJUSTL(ForcingDir))//TRIM(ADJUSTL(ForcingBaseName))//TRIM(ADJUSTL(fileNumber))//".nc"
@@ -481,13 +517,11 @@ CONTAINS
       fileName = TRIM(ADJUSTL(ForcingDir))//TRIM(ADJUSTL(ForcingBaseName))//".nc"
     END IF
 
-    ! Increment year for next time (we assume here the ISM timestep is 1 year)
-    year = year + 1
-
   END SUBROUTINE makeFileName
 
 
 
+  !-------------------------------------------------------------------------------------- 
   SUBROUTINE readFromNC(FileName,VarName,FOOLgrid,ptr,scaling,timeStep)
 
     REAL(ESMF_KIND_R8),POINTER,INTENT(INOUT) :: ptr(:,:)
@@ -535,10 +569,18 @@ CONTAINS
     IF(status /= nf90_NoErr) CALL handle_err(status)
     
     IF (PRESENT(TimeStep)) THEN
-      status = nf90_get_var(ncid, varid, values,      &
-           start = (/ lby, lbx, TimeStep /),          &
-           count = (/ ny,  nx,  1        /)            )
-      IF(status /= nf90_NoErr) CALL handle_err(status)
+      SELECT CASE(FileStyle)
+      CASE("ROMS_history")
+        status = nf90_get_var(ncid, varid, values,      &
+             start = (/ lby, lbx, TimeStep /),          &
+             count = (/ ny,  nx,  1        /)            )
+        IF(status /= nf90_NoErr) CALL handle_err(status)
+      CASE DEFAULT
+        status = nf90_get_var(ncid, varid, values,      &
+             start = (/ lby, lbx, TimeStep /),          &
+             count = (/ ny,  nx,  1        /)            )
+        IF(status /= nf90_NoErr) CALL handle_err(status)
+      END SELECT
     ELSE
       status = nf90_get_var(ncid, varid, values,      &
            start = (/ lby,  lbx /),                    &
@@ -552,9 +594,13 @@ CONTAINS
 !    ptr = TRANSPOSE(values)
     ptr = values
 
-    ptr = ptr / scaling ! e.g. to convert from m/yr to m/s
-!    ptr = ptr/31557600.0
-
+    SELECT CASE(FileStyle)
+    CASE("ROMS_history")
+    CASE DEFAULT    
+      ptr = ptr / scaling ! e.g. to convert from m/yr to m/s
+      !    ptr = ptr/31557600.0
+    END SELECT
+      
     DEALLOCATE(values)
 
     rc = ESMF_SUCCESS
