@@ -119,12 +119,12 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    CALL FISOC_ConfigDerivedAttribute(FOOL_config, EntriesPerFile, 'EntriesPerFile:', rc)
+    CALL FISOC_ConfigDerivedAttribute(FOOL_config, EntriesPerFile, 'EntriesPerFile', rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL FISOC_ConfigDerivedAttribute(FOOL_config, FileStyle, 'FileStyle:', rc)
+    CALL FISOC_ConfigDerivedAttribute(FOOL_config, FileStyle, 'FileStyle', rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
