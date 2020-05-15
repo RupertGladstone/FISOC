@@ -2042,7 +2042,7 @@ print*,'catch error and set default if missing att'
     END DO
 
     IF ( numIgnores .GE. SIZE(arrayIn) ) THEN
-       msg= "FATAL: too many ignored vals in FISOC_shrinkInt"
+       msg= "FATAL: too many ignored vals in FISOC_shrinkReal"
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
