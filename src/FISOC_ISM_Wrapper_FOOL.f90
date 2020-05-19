@@ -63,7 +63,7 @@ CONTAINS
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM_ReqVarList(:)
     CHARACTER(len=ESMF_MAXSTR)            :: label
     CHARACTER(len=ESMF_MAXSTR)            :: FOOL_configName, ISM_gridLayout
-    INTEGER                               :: localPet, ISM_dt_sec
+    INTEGER                               :: localPet, ISM_dt_sec, ForcingStartYr
     LOGICAL                               :: verbose_coupling, ISM_UseOMGrid
 
     CHARACTER(len=ESMF_MAXSTR)   :: fileName
@@ -181,6 +181,16 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    CALL ESMF_ConfigGetAttribute(FOOL_config, ForcingStartYr, label='ForcingStartYr:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF (year.eq.NOYEAR) THEN
+       year = ForcingStartYr
+       file_counter = year
+    END IF
+
     ! Get the fields needed from our ISM, in this case just the netcdf file
     CALL getFieldDataFromISM(ISM_ExpFB,FISOC_config)
     
@@ -292,16 +302,6 @@ CONTAINS
        PRINT*,""
     END IF
 
-    CALL ESMF_ConfigGetAttribute(FOOL_config, ForcingStartYr, label='ForcingStartYr:', rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    IF (year.eq.NOYEAR) THEN
-       year = ForcingStartYr
-       file_counter = year
-    END IF
-
     ! Get the fields needed from our ISM, in this case just the netcdf file
     CALL getFieldDataFromISM(ISM_ExpFB,FISOC_config)
 
@@ -319,10 +319,10 @@ CONTAINS
     END IF
     year = file_counter ! TODO: remove this hack
     
-
   END SUBROUTINE FISOC_ISM_Wrapper_Run
 
 
+  
   
   !-------------------------------------------------------------------------------------- 
   SUBROUTINE getFieldDataFromISM(ISM_ExpFB,FISOC_config)
@@ -471,6 +471,7 @@ CONTAINS
   
 
 
+  !--------------------------------------------------------------------------------------
   SUBROUTINE makeFileName(FOOL_config,fileName)
 
     TYPE(ESMF_config),INTENT(INOUT)        :: FOOL_config
