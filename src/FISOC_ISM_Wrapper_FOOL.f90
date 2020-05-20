@@ -394,7 +394,12 @@ CONTAINS
         SELECT CASE (TRIM(ADJUSTL(fieldName)))
           
         CASE ('ISM_z_l0')
-          CALL readFromNC(FileName,'zice',FOOLgrid,ptr,1)
+          SELECT CASE(FileStyle)
+          CASE ("ROMS_history")
+            CALL readFromNC(FileName,'draft',FOOLgrid,ptr,1)
+          CASE DEFAULT
+            CALL readFromNC(FileName,'zice',FOOLgrid,ptr,1)
+          END SELECT
           
         CASE ('ISM_z_lts')
           CALL readFromNC(FileName,'sice',FOOLgrid,ptr,1)
