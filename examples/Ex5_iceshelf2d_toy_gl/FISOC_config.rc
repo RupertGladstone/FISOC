@@ -26,11 +26,11 @@
   OM_CavCorr:         0.01
   OM_cavityUpdate:    CorrectedRate # Linterp
   OM_initCavityFromISM: .TRUE.
-  FISOC_OM_ReqVars:   OM_dBdt_l0 OM_z_l0 OM_bed OM_z_lts
-#  FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0 OM_z_l0 OM_bed OM_z_lts
+  FISOC_OM_ReqVars:   OM_bmb OM_z_l0 OM_bed OM_z_lts
+#  FISOC_OM_ReqVars:   OM_bmb OM_temperature_l0 OM_z_l0 OM_bed OM_z_lts
 #  FISOC_OM_DerVars:   
   OM_ReqVars_stagger: CENTER CENTER CENTER CENTER
-  OM2ISM_vars:        OM_dBdt_l0
+  OM2ISM_vars:        OM_bmb
   OM_WCmin:           5.0
   OM2ISM_regrid:      ESMF_REGRIDMETHOD_BILINEAR
   OM2ISM_extrap:      ESMF_EXTRAPMETHOD_NEAREST_STOD

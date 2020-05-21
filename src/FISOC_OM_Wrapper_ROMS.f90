@@ -280,8 +280,8 @@ CONTAINS
 
     INTEGER                    :: localPet, rc
     LOGICAL                    :: verbose_coupling
-    TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_dBdt_l0
-    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)
+    TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_bmb
+    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_bmb_ptr(:,:)
     INTEGER                    :: OM_dt_sec
     REAL(ESMF_KIND_R8)         :: OM_dt_sec_float
 
@@ -625,7 +625,7 @@ CONTAINS
        
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
          
-       CASE ('OM_dBdt_l0')
+       CASE ('OM_bmb')
          DO jj = JstrR, JendR
            DO ii = IstrR, IendR
 # if defined(ROMS_AVERAGES)

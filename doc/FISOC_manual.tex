@@ -715,10 +715,6 @@ Note that the units given in Table~\ref{tab:vars} are suggested units.  FISOC do
 the user must ensure unit consistency.  There may be hard coded unit assumptions in the model specific 
 wrappers.
 
-Note: dBdt is probably not a suitable choice for ice shelf basal melt rate.  
-Simply m (i.e. full name OM\_m) would probably be better, to avoid confusion with dddt 
-(rate of change of ice draft).
-
 \begin{table}
   \begin{center}
     \begin{tabular}{ l|l|l }
@@ -747,15 +743,29 @@ Simply m (i.e. full name OM\_m) would probably be better, to avoid confusion wit
       ISM\_velocity\_l0     & Ice flow velocity at the ice base            & m/a \\
       ISM\_maskOMvars       & Mask the fields being passed from OM         &   \\
                             & to the ISM                                   &   \\
-      OM\_dBdt\_l0          & Ice shelf basal melt rate.                   & m/a \\
+      OM\_bmb               & Ice shelf basal melt rate.                   & m/a \\
       OM\_temperature\_l0   & Ocean temperature at the ice ocean           &   \\
                             & interface.                                   &   \\
+      OM\_z\_l0             & Height relative to sea level of the ice      & m \\
+                            & base.                                        &   \\
+      OM\_bed               & Ocean bathymetry
+      OM\_z\_lts            & Height relative to sea level of the ice      & m \\
+                            & top surface.                                 &   \\
     \end{tabular}
   \end{center}
   \caption{FISOC standard variables and typical units.  
-    Note that heights relative to sea level are always positive upward.}
+    Note that heights relative to sea level are always positive upward.
+    Some variables in this table differ only in their prefix (ISM or OM).
+    The only differnce is that they are defined on the geometry object
+    (grid or mesh)  of their respective component.
+    For example ISM\_z\_lts is needed to pass the ice upper surface from the ISM
+    to the OM, and OM\_z\_lts is needed in order to derive a drift correction if
+    the correctedRate cavity option is used.
+  }
   \label{tab:vars}
 \end{table}
+
+
 
 As a naming convention, ``z'' refers to the vertical coordinate, and ``l0'' and ``l1'' refer to the 
 model level at the ice-ocean interface (this would typically be the lowest level of the ISM or 

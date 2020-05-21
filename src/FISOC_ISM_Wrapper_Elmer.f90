@@ -48,7 +48,7 @@ MODULE FISOC_ISM_Wrapper
   !  FISOC_ISM_ReqVars:  ISM_z_l0 ISM_z_lts 
   !  ISM_varNames:       'Zb' 'Zs'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_gmask          = 'groundedmask'
-  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_dBdt_l0        = 'meltRate'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_bmb        = 'meltRate'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_temperature_l0 = 'oceanTemperature'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_temperature_l1 = 'oceanTemperature'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_velocity_l0    = 'Velocity'
@@ -315,8 +315,8 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL         :: rc
 
     INTEGER                      :: localPet
-    TYPE(ESMF_field)             :: OM_dBdt_l0, ISM_z_l0, ISM_z_l1
-    REAL(ESMF_KIND_R8),POINTER   :: OM_dBdt_l0_ptr(:),ISM_z_l0_ptr(:),ISM_z_l1_ptr(:)
+    TYPE(ESMF_field)             :: OM_bmb, ISM_z_l0, ISM_z_l1
+    REAL(ESMF_KIND_R8),POINTER   :: OM_bmb_ptr(:),ISM_z_l0_ptr(:),ISM_z_l1_ptr(:)
     LOGICAL                      :: verbose_coupling
 
     rc = ESMF_FAILURE
@@ -497,8 +497,8 @@ CONTAINS
           ! isn't a good and obvious way of setting defaults that are 
           ! model-specific (i.e. can't be hard coded in FISOC_utils).
           SELECT CASE (ISM_ReqVarList(ii))
-          CASE ('OM_dBdt_l0')
-             EIname_dBdt_l0         = ISM_varNames(ii)
+          CASE ('OM_bmb')
+             EIname_bmb         = ISM_varNames(ii)
           CASE ('OM_temperature_l0')
              EIname_temperature_l0  = ISM_varNames(ii)
           CASE ('ISM_z_l0')   
@@ -655,11 +655,11 @@ CONTAINS
 
           SELECT CASE (TRIM(ADJUSTL(fieldName)))
               
-          CASE ('OM_dBdt_l0')
+          CASE ('OM_bmb')
 
              ! access the Elmer/Ice variable for the current field
              EI_field => VariableGet( CurrentModel % Mesh % Variables, &
-                  EIname_dBdt_l0, UnFoundFatal=.TRUE.)
+                  EIname_bmb, UnFoundFatal=.TRUE.)
              EI_fieldVals => EI_field % Values
              EI_fieldPerm => EI_field % Perm
 

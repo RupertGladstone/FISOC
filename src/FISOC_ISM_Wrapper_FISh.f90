@@ -160,15 +160,15 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL    :: rc
 
     INTEGER                      :: localPet
-    TYPE(ESMF_field)             :: OM_dBdt_l0
-    REAL(ESMF_KIND_R8),POINTER   :: OM_dBdt_l0_ptr(:)
+    TYPE(ESMF_field)             :: OM_bmb
+    REAL(ESMF_KIND_R8),POINTER   :: OM_bmb_ptr(:)
     LOGICAL                      :: verbose_coupling
 
 !    TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
 !    CHARACTER(len=ESMF_MAXSTR)            :: fieldName
 !    INTEGER                               :: ii, fieldCount
 
-    NULLIFY(OM_dBdt_l0_ptr)
+    NULLIFY(OM_bmb_ptr)
 
     ! query the FISOC config
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
@@ -195,20 +195,20 @@ CONTAINS
        
        ! get basal melt rate as an import field and use it to set the mb (mass balance) in 
        ! the FISh model
-       CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldName="OM_dBdt_l0", field=OM_dBdt_l0, rc=rc)
+       CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldName="OM_bmb", field=OM_bmb, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        
-       CALL ESMF_FieldGet(field=OM_dBdt_l0, localDe=0, farrayPtr=OM_dBdt_l0_ptr, rc=rc)
+       CALL ESMF_FieldGet(field=OM_bmb, localDe=0, farrayPtr=OM_bmb_ptr, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-       mb = OM_dBdt_l0_ptr(1:maxx)
+       mb = OM_bmb_ptr(1:maxx)
 !print*,"mb",mb
 
-       NULLIFY(OM_dBdt_l0_ptr)
+       NULLIFY(OM_bmb_ptr)
        
        ! now run the FISh model for one timestep
        CALL FISh_run()

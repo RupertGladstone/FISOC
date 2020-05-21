@@ -231,8 +231,8 @@ CONTAINS
 
     INTEGER                    :: localPet, rc
     LOGICAL                    :: verbose_coupling
-    TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_dBdt_l0
-    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)
+    TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_bmb
+    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_bmb_ptr(:,:)
     INTEGER                    :: OM_dt_sec
     REAL(ESMF_KIND_R8)         :: OM_dt_sec_float
     TYPE(ESMF_TimeInterval)    :: OM_dt
@@ -465,7 +465,7 @@ CONTAINS
              ptr(ii) = -zisf(ownedNodeIds(ii))
           END DO
           
-       CASE ('OM_dBdt_l0')
+       CASE ('OM_bmb')
           DO ii = 1,SIZE(ptr)
              ptr(ii) = melt_avg(ownedNodeIds(ii))
           END DO

@@ -30,10 +30,10 @@
   OM_NCfreq:          all
   output_dir:         output
 
-  FISOC_OM_ReqVars:   OM_dBdt_l0 
+  FISOC_OM_ReqVars:   OM_bmb 
 # OM_temperature_l0 OM_z_l0 OM_bed
 #  FISOC_OM_ReqVars:   
-  OM2ISM_vars:        OM_dBdt_l0
+  OM2ISM_vars:        OM_bmb
   OM_initCavityFromISM: .TRUE.
   OM_gridType:        ESMF_mesh
   OM2ISM_regrid:      ESMF_REGRIDMETHOD_NEAREST_STOD
