@@ -1,12 +1,13 @@
 
-\documentclass[12pt]{article}
+\documentclass[11pt]{article}
 %\documentclass[12pt,twocolumn]{article}
 
 \usepackage{listings}
 \usepackage{color}
 \usepackage{hyperref}
-\usepackage[margin=1.0in]{geometry}
+\usepackage[margin=0.6in]{geometry}
 \usepackage{graphicx}
+\usepackage{wrapfig}
 
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
@@ -32,8 +33,10 @@
 \begin{document}
 
 \title{Framework for Ice Sheet - Ocean Coupled modelling (FISOC) Manual}
-\author{Rupert Gladstone (RupertGladstone1972@gmail.com) \and Lenneke Jong \and Ben Galton-Fenzi \and David Gwyther}
+\author{Rupert Gladstone (fisoc\_dev@googlegroups.com)}
+%\and Lenneke Jong \and Ben Galton-Fenzi \and David Gwyther}
 %\date{Version 0.2, April 2016}
+
 \maketitle
 
 \newpage 
@@ -76,6 +79,23 @@ into the FISOC framework (Section~\ref{sec:FISOC_SDG}).
 A number of web links are given at various points in this document.  
 The links were correct at the time they were added. 
 Please contact the developers if any of these are found to be out of date. 
+
+\subsection{FISOC community and contact}
+
+Three email groups exist within the FISOC project.
+
+\textbf{fisoc@googlegroups.com} is for news and updates. 
+It has low traffic. 
+Anyone may apply to join this group. 
+
+\textbf{fisoc\_tech@googlegroups.com} is for active users and developers to
+share technical issues and troubleshooting.
+It is higher traffic.
+Anyone may apply to join this group. 
+
+\textbf{fisoc\_dev@googlegroups.com} is the contact address to get in touch
+with the FISOC developers.
+Membership is by invitation only, but anyone may post to, and read, this group's contents.
 
 
 
@@ -136,78 +156,60 @@ development.
 \subsection{FISOC Environment Variables}
 \label{sec:EnvVars}
 
-Several environment variables may be used in the build process. 
+A number of  environment variables, summarised in Table~\ref{tab:envvars}
+may be used in the build process.
 Some of these are mandatory. 
-Variables listed as optional here may be mandatory for some configuratons 
+Variables listed as optional in Table~\ref{tab:envvars}
+may be mandatory for some configuratons 
 other than ``dummy''.
 These environment variables are not used at run time, only during 
 the compilation/installation of FISOC.
 
+\begin{table}
+  \begin{center}
+    \begin{tabular}{ l|l|l|l }
+      \textbf{Environment  variable}    &                    & \textbf{Description}                    & \textbf{Default} \\
+      \hline
+      \textbf{ESMFMKFILE}          & Required           & Tells FISOC where to find ESMF          & None   \\
+      \textbf{FISOC\_INSTALL\_DIR} & Optional           & Determines where FISOC executable       & \$HOME/bin \\ 
+                                   &                    & will be installed (should be in \$PATH) & \\
+      \textbf{FISOC\_EXE}          & Optional           & Name of the FISOC executable            & FISOC\_caller. \\
+      \textbf{CPPFLAGS}            & Optional           & Preprocessor directives                 & None \\
+      \hline
+      \textbf{FISOC\_ISM}          & Required           & Determines ISM component                  & None \\
+                                   &                    & (``dummy'', ``Elmer'' or ``FOOL''         &      \\
+      \textbf{FISOC\_ISM\_INCLUDE} & Optional           & Location of ISM header files              & None    \\
+      \textbf{FISOC\_ISM\_LIBPATH} & Optional           & Location of ISM library files             & None    \\
+      \textbf{FISOC\_ISM\_LIBS}    & Optional           & Linker directives for ISM library         & None    \\
+      \textbf{FISOC\_ISM\_GEOM}    & Optional           & ESMF geometry object for ISM              & FISOC\_ISM\_MESH \\
+                                   &                    & (FISOC\_ISM\_GRID or                      & \\
+                                   &                    & FISOC\_ISM\_MESH)                         & \\
+      \hline
+      \textbf{FISOC\_OM}           & Required           & Determines OM component                   & None    \\
+                                   &                    & (``dummy'', ``ROMS'' or ``FVCOM'')        &         \\
+      \textbf{FISOC\_OM\_INCLUDE}  & Optional           & Location of OM header files               & None    \\
+      \textbf{FISOC\_OM\_LIBPATH}  & Optional           & Location of OM library files              & None    \\
+      \textbf{FISOC\_OM\_LIBS}     & Optional           & Linker directives for OM library          & None    \\
+      \textbf{FISOC\_OM\_GEOM}     & Optional           & ESMF geometry object for OM               & FISOC\_OM\_GRID \\
+                                   &                    & (FISOC\_OM\_GRID or                       & \\
+                                   &                    & FISOC\_OM\_MESH)                          & \\
+    \end{tabular}
+  \end{center}
+  \caption{
+    Environment variables that are used in the FISOC build process.
+    Note that \textbf{CPPFLAGS} should include \textbf{FISOC\_MPI} for parallel runs. 
+  }
+  \label{tab:envvars}
+\end{table}
 
-\begin{flushleft}
-\textbf{ESMFMKFILE}                                \\ 
-Required.                                          \\
-Tells FISOC where to find key ESMF information.    \\
-\vspace{6pt}
-\textbf{FISOC\_INSTALL\_DIR}                       \\ 
-Optional.                                          \\
-Determines where the FISOC executable will be installed. Defaults to \$HOME/bin. 
-The user should also ensure this location is in their \$PATH. \\
-\vspace{6pt}
-\textbf{FISOC\_EXE}                                \\ 
-Optional.                                          \\
-Name of the FISOC executable.  Defaults to FISOC\_caller. \\
-\vspace{6pt}
+%\vspace{6pt}
 % now set through cpp flags
 %\textbf{FISOC\_MPI}                                \\ 
 %Optional. Possible value ``yes''.                  \\
 %Sets preprocessor flag to tell FISOC whether this is a parallel compilation.
 %Defaults to serial.                                \\
-%\vspace{6pt}
-\textbf{FISOC\_OM}                                 \\ 
-Required. Possible values ``dummy'', ``ROMS''.     \\
-Determines which OM component will be used.        \\
-\vspace{6pt}
-\textbf{FISOC\_OM\_INCLUDE}                         \\ 
-Optional.                                           \\
-Specifies the path where the OM header files are located.\\
-\vspace{6pt}
-\textbf{FISOC\_OM\_LIBPATH}                         \\
-Optional.                                           \\
-Specifies the path where the OM library files are located.\\
-\vspace{6pt}
-\textbf{FISOC\_OM\_LIBS}                            \\
-Optional.                                           \\
-Specifies the linker directives needed to link the OM library to FISOC. \\
-\vspace{6pt}
-\textbf{FISOC\_ISM}                                 \\
-Required. Possible values ``dummy'', ``Elmer'', ``FISh'', ``FOOL''.     \\
-Determines which ISM component will be used.        \\
-\vspace{6pt}
-\textbf{FISOC\_ISM\_INCLUDE}                        \\ 
-Optional.                                           \\
-Specifies the path where the ISM header files are located.\\
-\vspace{6pt}
-\textbf{FISOC\_ISM\_LIBPATH}                        \\
-Optional.                                           \\
-Specifies the path where the ISM library files are located.\\
-\vspace{6pt}
-\textbf{FISOC\_ISM\_LIBS}                           \\
-Optional.                                           \\
-Specifies the linker directives needed to link the ISM library to FISOC. \\
-\vspace{6pt}
-\textbf{CPPFLAGS}                                   \\
-Optional.                                           \\
-Preprocessor directives may be specified here.  
-Preprocessor directives used by FISOC:              \\
-\textbf{FISOC\_MPI}                                 \\ 
-Should be defined for parallel compilation but not for 
-serial compilation.  Activates code sections specific to parallel simulations. 
-At time of writing (5/12/2017) serial compilation has not been recently tested
-and may or may not work.                            \\
-%\vspace{6pt}
+
 See also Section~\ref{sec:PreReqROMS} for ROMS-specific preprocessor directives.
-\end{flushleft}
 
 
 
@@ -248,7 +250,7 @@ The Elmer repository is here:
 \url{https://github.com/ElmerCSC/elmerfem/}.
 The standard branch used by glaciologists is the elmerice branch. 
 The branch needed for FISOC is the elmerice\_FISOC branch. 
-It is intended to merge the changes in 2018.
+It is intended to merge the changes during 2020.
 You can checkout the relevant branch with a command like this:
 \begin{lstlisting}
 git clone git://www.github.com/ElmerCSC/elmerfem -b elmerice_FISOC MyLocalName
@@ -291,14 +293,14 @@ can be found at \url{https://www.myroms.org/}.
 Development of the ice shelf enabled version  is currently ongoing 
 in a private repository 
 (please contact the developers if you need access to this).
-A public version of the ice shelf enabled version is also available 
-through github: 
-\url{https://github.com/bkgf/romsIceShelf}.  
-Please use the ``FISOC\_friendly'' branch.
-At time of writing (5/12/2017) the public version is out of date and 
-the private version should be used. 
-It is intended to push changes to the public version at the time of 
-submission of the FISOC GMD paper, during 2018.
+%A public version of the ice shelf enabled version is also available 
+%through github: 
+%\url{https://github.com/bkgf/romsIceShelf}.  
+%Please use the ``FISOC\_friendly'' branch.
+%At time of writing (5/12/2017) the public version is out of date and 
+%the private version should be used. 
+%It is intended to push changes to the public version at the time of 
+%submission of the FISOC GMD paper, during 2018.
 
 Example build scripts can be found in the ROMS/Bin subdirectory of a git clone 
 from the repository mentioned above.
@@ -1178,15 +1180,45 @@ With some python scripting this could perhaps be done using paraview.
 
 
 
-\section{FISOC development}
+\section{FISOC design and development}
 \label{sec:FISOC_SDG}
 
-An overview of FISOC code structures is summarised 
-in Figure~\ref{fig:codeStruct}.  
-Structural changes would be needed to introduce a new type 
-of component, e.g. an atmosphere model.
-Implementing an alternative ISM or OM should require no changes 
-to existing FISOC code, just an additional model-specific wrapper.
+This section describes aspects of FISOC design/development that an end user
+would typically not need to know.
+An overview of FISOC code modules is summarised
+in Table~\ref{tab:modules} and this information is presented visually 
+in Figure~\ref{fig:codeStruct}.
+FISOC is intended to be flexible from top down and bottom up:
+FISOC could be called as part of a larger ESMF coupled model by interfacing to FISOC\_parent
+as a shared library (as of May 2020 the code is not correctly distributed between caller and parent;
+please contact the developers if you wish to be able to call FISOC as an ESMF component and we
+can address this issue).
+FISOC calls independent ice or ocean components through model specific wrappers. 
+
+\begin{table}
+  \begin{center}
+    \begin{tabular}{ l|l }
+      \textbf{Generic module} &  \textbf{Role}                              \\
+      \hline
+      FISOC\_caller.f90     &  The FISOC calling program \\
+      FISOC\_parent.f90     &  FISOC's top level ESMF gridded component \\
+      FISOC\_coupler.f90    &  ESMF coupler component, handles regridding \\
+      FISOC\_ISM.f90        &  ESMF gridded component, top level control for ISM \\
+      FISOC\_OM.f90         &  ESMF gridded component, top level control for OM  \\
+      FISOC\_Utils.f90      &  Assorted FISOC utilities, available to all modules \\
+      \\ 
+      \textbf{Component-specific module} &                       \\
+      \hline
+      FISOC\_OM\_Wrapper\_XXX.f90  & Model-specific wrapper for OM XXX \\
+      FISOC\_ISM\_Wrapper\_XXX.f90 & Model-specific wrapper for ISM XXX \\
+    \end{tabular}
+  \end{center}
+  \caption{
+    Summary of the role of key FISOC code modules.
+    ISM is short for Ice Sheet Model and OM is short for Ocean Model.
+  }
+  \label{tab:modules}
+\end{table}
 
 \begin{figure}[t]
   \vspace*{2mm}
@@ -1198,56 +1230,43 @@ to existing FISOC code, just an additional model-specific wrapper.
   \label{fig:codeStruct}
 \end{figure}
 
+The FISOC\_ISM and FISOC\_OM modules provide top level control and processing for ice and ocean
+components.
+These are not model-specific.
+The model specific code, which exchanges fields between 
+ESMF structures and structures used by the individual models, is in the FISOC\_(O/IS)M\_Wrapper modules.
+The main ISM or OM call structure must be made to be compatible with ESMF, which essentially means 
+having seperate initialise, run and finalise calls.  See the ESMF documentation.
+
+
+
 
 
 \subsection{Incorporating new OM or ISM components}
 
-FISOC is designed such that the only code developments for new components should be the creation 
-of model-specific wrappers: \\
-FISOC\_OM\_Wrapper\_XXX.f90 \\
- FISOC\_ISM\_Wrapper\_XXX.f90 \\
-where XXX should be replaced by the component's name.
+Structural changes to FISOC would be needed to introduce a new type 
+of component, e.g. an atmosphere model.
+Implementing an alternative ISM or OM should require no changes 
+to existing FISOC code, just an additional model-specific wrapper.
 
-The new wrapper must contain a Fortran module with a fixed name 
-and fixed interface for the key init, run and finalise methods. 
+Any new OM or ISM component to be used with FISOC must first be ESMF compliant.  This basically 
+means that it should have an initialise, run and finalise routine, and that the developer can 
+provide the component's grid and variables in ESMF compatible structures at run
+time through the new wrapper.
+The ESMF web site provides further documentation.
+\url{https://www.earthsystemcog.org/projects/esmf/}
+
+
+The new wrapper must contain a Fortran module with restrictions on the module name 
+and on the  interface for the initialise, run and finalise methods. 
 The precise requirements are not documented here as they may evolve 
 during continued development.  
 It is recommended to view an existing wrapper, especially the 
 PUBLIC routines.
 
-The following copy from the OM dummy wrapper (7/12/2017) gives 
-an example:
-
-\begin{lstlisting}
-MODULE FISOC_OM_Wrapper
-
-  USE ESMF
-  USE FISOC_utils_MOD
-
-  IMPLICIT NONE
-
-  PRIVATE
-
-  PUBLIC :: FISOC_OM_Wrapper_Init_Phase1,  FISOC_OM_Wrapper_Init_Phase2,  &
-       FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize, OM_HandleCavity
-
-CONTAINS
-
-...
-\end{lstlisting}
-
-
-Any new OM or ISM component to be used with FISOC must first be ESMF compliant.  This basically 
-means that it should have an initialise, run and finalise routine, and that the developer can 
-provide the component's grid and variables in ESMF compatible formats through the new wrapper.
-The ESMF web site provides further documentation.
-\url{https://www.earthsystemcog.org/projects/esmf/}
-
 If it is found that changes to other aspects of the FISOC code are required, this should be 
 implemented in collaboration with the FISOC core developers.
 
-Please implement your developments in a new branch in the FISOC repository. 
-Request a merge to master when you are happy that it is stable. 
 
 
 
@@ -1263,6 +1282,12 @@ made public.
 New model-specific wrapper modules should ensure that the initialise, run and finalise 
 subroutines are public. 
 
+Please implement your developments in a new branch in the FISOC repository. 
+Request a merge to master when you are happy that it is stable. 
+
+Adding new ISM or OM components should not require changes to the Makefile.
+If you feel that changes to the Makefile are needed, please first contact the developers
+to discuss whether this can be achieved through 
 
 
 \subsubsection{Error handling}
@@ -1279,13 +1304,20 @@ this should be checked by the component wrapper.
 
 Note that many FISOC subroutines contain a return code, but these are mostly not used in 
 practice.  Since errors are generally considered instantly fatal in FISOC, execution will 
-generaly not get as far as returning a failure code. 
+generally not get as far as returning a failure code. 
 If a more defensive rather than fail-fast approach is adopted in the future these return 
 codes can be used.
 
 
 
 \subsection{Configuration options}
+
+Compile time choices include which ISM or OM component to run, the type of ESMF
+geometry object for each component (mesh or grid), and paths to find
+component libraries.
+These are set through environment variables during the build process.
+Other options are mostly run time options, determined by paramters in the FISOC
+configuration file. 
 
 The configuration file must be named ``FISOC\_config.rc''.  
 It is compatible with ESMF config methods.  
@@ -1322,12 +1354,63 @@ Using the derived attribute subroutines as a wrapper in which to hard
 code a default value has the benefit of entering the hard coded value 
 only at one location rather than each time the attribute is accessed 
 from the config object.
+It has the disadvantage that the utils module is not the most intuitive
+place to store hard coded defaults.
+Where defaults are set by the utils module an info statement should be written
+to the PET logs. 
 
 %\subsection{ISM wrapper}
 
 %\subsection{OM wrapper}
 
 %\section{Future developments}
+
+
+
+\subsection{Sequential parallelism}
+
+ESMF supports sequential and concurrent parallel coupling, and any combination of these. 
+FISOC currently (May 2020) supports only sequential coupling, and requries that
+the ISM and OM alternate use of the same set of processors.
+This is implemented by duplicating the MPI context from the ESMF virtual machine (VM)
+and passing this to each component. 
+This can be made more flexible in the future if needed. 
+
+
+\begin{wraptable}{r}{6cm}
+  \begin{tabular}{|l}
+    \textbf{Event order}  \\
+    \hline
+    OM intialisation phase 1 \\
+    ISM intialisation phase 1 \\
+    OM intialisation phase 2 \\
+    ISM intialisation phase 2 \\
+    OM run \\
+    ISM run \\
+    OM finalise \\
+    ISM finalise \\
+  \end{tabular}
+%  \caption{
+%  }
+  \label{tab:order}
+\end{wraptable}
+
+%Table~\ref{tab:order}
+The Table to the right summarises the order of events within this sequential coupling paradigm.
+This ordering is hard coded, but again, this could be made more flexible in the future
+if needed.
+Note that there are two initialisation phases so that the ISM and OM components have the chance
+to modify their initial state based on the initial state of the other component
+(e.g. the OM may wish to update its ice shelf cavity geometry directly from the initialised
+ISM during OM intialisation phase 2).
+Note that the run phases are repeated as many times as are required to complet the simulation.
+The coupler component also has initialisation, run and finalise routines that are called,
+including two run phases, one for the regridding in each direction (ice to ocean and ocean to ice).
+See the code for full details. 
+ESMF places no limitation on the number of initialisation or run phases for each component. 
+FISOC can be expanded to allow additoinal  phases if it becomes necessary. 
+The ordering of component phases is hard coded into FISOC\_parent.
+
 
 
 
