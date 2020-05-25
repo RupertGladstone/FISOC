@@ -461,6 +461,10 @@ CONTAINS
 
     rc = ESMF_FAILURE
 
+    msg = "Ocean cavity reset.  Masks may be needed (NYI)"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+         line=__LINE__, file=__FILE__, rc=rc)
+
     IF (Ngrids.GT.1) THEN
        msg = "ERROR: ROMS has nested grids, FISOC cannot yet handle this"
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
@@ -483,6 +487,9 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
 # ifdef ROMS_DSDT
+    msg = "Ocean cavity reset: resetting ice upper surface"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+         line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_FieldBundleGet(OM_ImpFB, fieldname='ISM_z_lts', field=ISM_z_lts, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -491,6 +498,10 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+# else
+    msg = "Ocean cavity reset: ice upper surface not included"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+         line=__LINE__, file=__FILE__, rc=rc)
 # endif
 
     IstrR=BOUNDS(Ngrids)%IstrR(localPet)
@@ -533,9 +544,6 @@ CONTAINS
        NULLIFY(ISM_z_l0_ptr)
     END IF
     
-    msg = "Ocean cavity reset.  Masks may be needed (NYI)"
-    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
-         line=__LINE__, file=__FILE__, rc=rc)
 
     rc = ESMF_SUCCESS
 
