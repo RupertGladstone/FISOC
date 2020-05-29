@@ -693,7 +693,7 @@ CONTAINS
          END DO
          
        CASE DEFAULT
-         msg = "ERROR: unknown variable"
+         msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
               line=__LINE__, file=__FILE__, rc=rc)
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)

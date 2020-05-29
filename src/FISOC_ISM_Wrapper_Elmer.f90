@@ -672,10 +672,12 @@ CONTAINS
 
           CASE ('OM_temperature_l0')
 ! TODO:
-print*,"Hang on, need to get temperature exchange going too..."
 !             EI_field => VariableGet( CurrentModel % Mesh % Variables, &
 !                  EIname_temperature_l0, UnFoundFatal=.TRUE.)
-
+            msg = "WARNING: temperature exchange not tested... "//TRIM(ADJUSTL(fieldName))
+            CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+                 line=__LINE__, file=__FILE__, rc=rc)          
+            
           CASE ('OM_turnips')
              msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
              CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
