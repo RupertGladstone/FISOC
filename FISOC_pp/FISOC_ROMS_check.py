@@ -28,11 +28,11 @@ FISOC_grp = Dataset(FISOC_ncdfName, "r")
 
 print ROMS_grp.variables
 
-FISOC_dBdt_l0 = FISOC_grp.variables["OM_dBdt_l0"]
+FISOC_bmb = FISOC_grp.variables["OM_bmb"]
 FISOC_temperature_l0 = FISOC_grp.variables["OM_temperature_l0"]
 
-ROMS_dBdt_l0 = ROMS_grp.variables["m"]
-ROMS_dBdt_l0 = ROMS_dBdt_l0[timestep,:,:]
+ROMS_bmb = ROMS_grp.variables["m"]
+ROMS_bmb = ROMS_bmb[timestep,:,:]
 
 ROMS_z_l0 = ROMS_grp.variables["draft"]
 ROMS_z_l0 = ROMS_z_l0[timestep,:,:]
@@ -47,12 +47,12 @@ ROMS_temperature_lz0 = ROMS_temperature_lz[timestep,0,:,:]
 
 
 plt.subplot(1, 7, 1)
-plt.imshow(ROMS_dBdt_l0,vmin=0.0,vmax=0.000001)
+plt.imshow(ROMS_bmb,vmin=0.0,vmax=0.000001)
 plt.colorbar()
 plt.axis('off')  
 
 plt.subplot(1, 7, 2)
-plt.imshow(FISOC_dBdt_l0,vmin=0.0,vmax=0.000001)
+plt.imshow(FISOC_bmb,vmin=0.0,vmax=0.000001)
 plt.colorbar()
 plt.axis('off')  
 

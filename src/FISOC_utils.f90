@@ -999,6 +999,7 @@ CONTAINS
            line=__LINE__, file=__FILE__, rcToReturn=rc)) &
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
       derivedAttribute = OM_dt_sec * dt_ratio
+
     CASE('OM_outputInterval')
       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_outputInterval:', rc=rc)
       IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
@@ -1011,6 +1012,20 @@ CONTAINS
              line=__LINE__, file=__FILE__, rcToReturn=rc)) &
              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
       END IF
+
+    CASE('EntriesPerFile')
+      CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='EntriesPerFile:', rc=rc)
+      IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+        derivedAttribute = 1
+        msg = "WARNING: EntriesPerFile not found, setting to 1."
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__)
+      ELSE
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      END IF
+
     CASE('OM_cum_steps')
        CALL ESMF_ConfigGetAttribute(FISOC_config, dt_ratio, label='dt_ratio:', rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -1021,7 +1036,8 @@ CONTAINS
             line=__LINE__, file=__FILE__, rcToReturn=rc)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        derivedAttribute = dt_ratio / OM_outputInterval
-    CASE DEFAULT
+
+     CASE DEFAULT
        msg = 'ERROR: unrecognised derived config attribute label '//label
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
@@ -1348,6 +1364,20 @@ CONTAINS
 
     SELECT CASE(label)
 
+    CASE("FileStyle")
+       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='FileStyle:', rc=rc)
+       IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+          derivedAttribute = "None"
+          msg = "FileStyle not found, setting to None"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+
+       
     CASE("IceDraft")
        CALL ESMF_ConfigGetAttribute(FISOC_config, OM_cavityUpdate, label='OM_cavityUpdate:', rc=rc)
 print*,'catch error and set default if missing att'
@@ -2012,7 +2042,7 @@ print*,'catch error and set default if missing att'
     END DO
 
     IF ( numIgnores .GE. SIZE(arrayIn) ) THEN
-       msg= "FATAL: too many ignored vals in FISOC_shrinkInt"
+       msg= "FATAL: too many ignored vals in FISOC_shrinkReal"
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)

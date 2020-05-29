@@ -12,7 +12,7 @@
   OM_configFile:      ocean_iceshelf2d.in
   OM_stdoutFile:      ROMS_stdout.asc
   OM_writeNetcdf:     .TRUE.
-  FISOC_OM_ReqVars:   OM_dBdt_l0 OM_temperature_l0
+  FISOC_OM_ReqVars:   OM_bmb OM_temperature_l0
   OM_ReqVars_stagger: CENTER CENTER
   OM2ISM_vars:        
   OM_initCavityFromISM: .FALSE.

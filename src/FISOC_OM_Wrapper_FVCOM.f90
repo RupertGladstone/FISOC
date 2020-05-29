@@ -231,8 +231,8 @@ CONTAINS
 
     INTEGER                    :: localPet, rc
     LOGICAL                    :: verbose_coupling
-    TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_dBdt_l0
-    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)
+    TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_bmb
+    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_bmb_ptr(:,:)
     INTEGER                    :: OM_dt_sec
     REAL(ESMF_KIND_R8)         :: OM_dt_sec_float
     TYPE(ESMF_TimeInterval)    :: OM_dt
@@ -459,19 +459,19 @@ CONTAINS
        ptr = FISOC_missingData
        
        SELECT CASE (TRIM(ADJUSTL(fieldName)))
-       
+         
        CASE ('OM_z_l0')
-          DO ii = 1,SIZE(ptr)
-             ptr(ii) = -zisf(ownedNodeIds(ii))
-          END DO
-          
-       CASE ('OM_dBdt_l0')
-          DO ii = 1,SIZE(ptr)
-             ptr(ii) = melt_avg(ownedNodeIds(ii))
-          END DO
-       
+         DO ii = 1,SIZE(ptr)
+           ptr(ii) = -zisf(ownedNodeIds(ii))
+         END DO
+         
+       CASE ('OM_bmb')
+         DO ii = 1,SIZE(ptr)
+           ptr(ii) = melt_avg(ownedNodeIds(ii))
+         END DO
+         
        CASE DEFAULT
-         msg = "ERROR: unknown variable"
+         msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
               line=__LINE__, file=__FILE__, rc=rc)
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -602,43 +602,43 @@ CONTAINS
     PRINT*,'fieldCount is', fieldCount 
 
     fieldLoop: DO nn = 1,fieldCount
-       
-       CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       
-       CALL FISOC_ArrayRedistFromField(RH_ESMF2FVCOM,fieldList(nn),distgridFVCOM,ptr)
-
-       SELECT CASE (TRIM(ADJUSTL(fieldName)))
-         
-       CASE ('ISM_dddt')
-          DO ii = 1,SIZE(ptr)
-             ISF_DDDT(ii) = ptr(ii)
-          END DO
-          PRINT*, 'Maximum of ISF_DDDT is',MAXVAL(ABS(ptr))
-          
-       CASE ('ISM_dsdt')
-          DO ii = 1,SIZE(ptr)
-             ISF_DSDT(ii) = ptr(ii)
-          END DO
-          PRINT*, 'Maximum of ISF_DSDT is',MAXVAL(ABS(ptr))
-          
-       CASE ('ISM_thick','ISM_z_l0','ISM_z_l0_previous','ISM_z_lts','ISM_z_lts_previous')
-          
-          
-       CASE DEFAULT
-         msg = "ERROR: unknown variable"
-         CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-              line=__LINE__, file=__FILE__, rc=rc)
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-         
-       END SELECT
-       
-       IF (ASSOCIATED(ptr)) THEN
-         NULLIFY(ptr)
-       END IF
-       
+      
+      CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      CALL FISOC_ArrayRedistFromField(RH_ESMF2FVCOM,fieldList(nn),distgridFVCOM,ptr)
+      
+      SELECT CASE (TRIM(ADJUSTL(fieldName)))
+        
+      CASE ('ISM_dddt')
+        DO ii = 1,SIZE(ptr)
+          ISF_DDDT(ii) = ptr(ii)
+        END DO
+        
+      CASE ('ISM_dsdt')
+        DO ii = 1,SIZE(ptr)
+          ISF_DSDT(ii) = ptr(ii)
+        END DO
+        
+      CASE ('ISM_thick','ISM_z_l0','ISM_z_l0_previous','ISM_z_lts','ISM_z_lts_previous')
+        msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__, rc=rc)          
+        
+      CASE DEFAULT
+        msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+             line=__LINE__, file=__FILE__, rc=rc)
+        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+      END SELECT
+      
+      IF (ASSOCIATED(ptr)) THEN
+        NULLIFY(ptr)
+      END IF
+      
     END DO fieldLoop
     
     rc = ESMF_SUCCESS

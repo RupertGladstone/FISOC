@@ -147,8 +147,8 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL                  :: rc
 
     INTEGER                      :: localPet
-    TYPE(ESMF_field)             :: OM_dBdt_l0, ISM_z_l0, ISM_z_l1
-    REAL(ESMF_KIND_R8),POINTER   :: OM_dBdt_l0_ptr(:),ISM_z_l0_ptr(:),ISM_z_l1_ptr(:)
+    TYPE(ESMF_field)             :: OM_bmb, ISM_z_l0, ISM_z_l1
+    REAL(ESMF_KIND_R8),POINTER   :: OM_bmb_ptr(:),ISM_z_l0_ptr(:),ISM_z_l1_ptr(:)
     LOGICAL                      :: verbose_coupling
 
     rc = ESMF_FAILURE
@@ -175,12 +175,12 @@ CONTAINS
     END IF
 
     ! get import and export fields and do something with them.
-    CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldName="OM_dBdt_l0", field=OM_dBdt_l0, rc=rc)
+    CALL ESMF_FieldBundleGet(ISM_ImpFB, fieldName="OM_bmb", field=OM_bmb, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    CALL ESMF_FieldGet(field=OM_dBdt_l0, localDe=0, farrayPtr=OM_dBdt_l0_ptr, rc=rc)
+    CALL ESMF_FieldGet(field=OM_bmb, localDe=0, farrayPtr=OM_bmb_ptr, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)

@@ -135,8 +135,8 @@ CONTAINS
 
     INTEGER                    :: localPet, rc
     LOGICAL                    :: verbose_coupling
-    TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_dBdt_l0
-    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_dBdt_l0_ptr(:,:)
+    TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_bmb
+    REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_bmb_ptr(:,:)
 
     rc_local = ESMF_FAILURE
 

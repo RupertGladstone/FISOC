@@ -8,7 +8,7 @@ ROMS_grp  = Dataset("../ocean_his.nc", "r")
 
 #print ROMS_grp.variables
 
-ROMS_dBdt_l0 = ROMS_grp.variables["m"]
+ROMS_bmb = ROMS_grp.variables["m"]
 xl = ROMS_grp.variables["xl"]
 el = ROMS_grp.variables["el"]
 

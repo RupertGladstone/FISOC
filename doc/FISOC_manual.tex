@@ -1,12 +1,13 @@
 
-\documentclass[12pt]{article}
+\documentclass[11pt]{article}
 %\documentclass[12pt,twocolumn]{article}
 
 \usepackage{listings}
 \usepackage{color}
 \usepackage{hyperref}
-\usepackage[margin=1.0in]{geometry}
+\usepackage[margin=0.6in]{geometry}
 \usepackage{graphicx}
+\usepackage{wrapfig}
 
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
@@ -32,8 +33,10 @@
 \begin{document}
 
 \title{Framework for Ice Sheet - Ocean Coupled modelling (FISOC) Manual}
-\author{Rupert Gladstone (RupertGladstone1972@gmail.com) \and Lenneke Jong \and Ben Galton-Fenzi \and David Gwyther}
+\author{Rupert Gladstone (fisoc\_dev@googlegroups.com)}
+%\and Lenneke Jong \and Ben Galton-Fenzi \and David Gwyther}
 %\date{Version 0.2, April 2016}
+
 \maketitle
 
 \newpage 
@@ -46,7 +49,7 @@ The ``Framework for Ice Sheet - Ocean model Coupling" (FISOC) has been written t
 (ISMs) and Ocean Models (OMs) to be run as a single executable to address the co-evolution of ice and ocean 
 properties.  
 It is primarily designed to handle exchange of variables between ice and ocean at the underside of a floating ice shelf.
-At time of writing (5/12/2017) exchange of variables at an ice cliff is 
+At time of writing (May 2020) exchange of variables at an ice cliff is 
 not supported, though this is a planned development.
 
 In this context an ISM simulates (part of) a marine ice sheet, including both grounded and floating parts, 
@@ -57,16 +60,16 @@ a wider ocean domain.
 
 FISOC comprises a set of code modules and driver built using the Earth System Modelling Framework (ESMF, 
 \url{https://www.earthsystemcog.org/projects/esmf/}), and written in Fortran 90. 
-Some knowledge of the ESMF is essentially in order to fully understand the FISOC code.  It should 
-be possible to run FISOC without knowledge of ESMF.
+Some knowledge of the ESMF is essential in order to fully understand the FISOC code.  It should 
+be possible to run FISOC as an end-user without knowledge of ESMF.
 FISOC is intended to be flexible: the additional development effort required to 
 couple a different ocean or ice component into the framework is minimal, so 
 long as the new component is ESMF-compatible. 
 
 FISOC initially couples the ISM Elmer/Ice to the OM ``Regional Ocean Modelling System'' (ROMS).
 A full description of the physical processes represented in FISOC in its 
-initial configuration will be described in a GMD paper (this is in 
-preparation as of 5/12/2017).
+initial configuration is given in a model description paper (to be submitted
+to Geoscientific Model Development, GMD, during 2020).
 
 This manual describes how to use FISOC with an ISM and OM for which it has been 
 developed (Section~\ref{sec:FISOC_SUG}) and also how to integrate 
@@ -77,35 +80,54 @@ A number of web links are given at various points in this document.
 The links were correct at the time they were added. 
 Please contact the developers if any of these are found to be out of date. 
 
+\subsection{FISOC community and contact}
+
+Three email groups exist within the FISOC project.
+
+\textbf{fisoc@googlegroups.com} is for news and updates. 
+It has low traffic. 
+Anyone may apply to join this group. 
+
+\textbf{fisoc\_tech@googlegroups.com} is for active users and developers to
+share technical issues and troubleshooting.
+It is higher traffic.
+Anyone may apply to join this group. 
+
+\textbf{fisoc\_dev@googlegroups.com} is the contact address to get in touch
+with the FISOC developers.
+Membership is by invitation only, but anyone may post to, and read, this group's contents.
+
 
 
 
 \section{Installing FISOC with established components}
 \label{sec:FISOC_install}
 
-FISOC can be obtained by emailing a request to the developers.  
-At the time of writing (5/12/2017) it is maintained and developed in a 
-private GitHub repository.  
-This will go public when the GMD description paper is 
-submitted (inteded in 2018).
+FISOC can be obtained directly from a public github repository: \\
+\url{https://github.com/RupertGladstone/FISOC}
+
+The most active branch is devel, and master is updated from this infrequently. 
 
 FISOC has a simple build process.  The Makefile in the top level FISOC directory contains the 
-hard coded dependencies needed to build FISOC code.  The Makefile refers to certain 
+hard coded dependencies needed to build FISOC code.
+The Makefile refers to certain 
 environment variables to determine paths and component choices (Section~\ref{sec:EnvVars}). 
-
-Having installed the pre-requisites (Section~\ref{sec:PreReq}), simply run at the command line, 
-in the top level FISOC directory:
-\begin{lstlisting}
-make install
-\end{lstlisting}
-
 An example script to build and install FISOC, ``buildFISOCexample.sh'', is available in the top 
 level FISOC directory.
+The script simply sets appropriate environment variables then calls the Make process. 
+The pre-requisites (Section~\ref{sec:PreReq}) must already be installed. 
+
+%Having installed the pre-requisites (Section~\ref{sec:PreReq}), simply run at the command line, 
+%in the top level FISOC directory:
+%\begin{lstlisting}
+%make install
+%\end{lstlisting}
 
 FISOC has been built and used with GNU and with Intel compilers. 
-This has been carried out on different flavours of Linux. 
-The Message Passing Interface (MPI) implementation is OpenMPI. 
-In principal it should also work with MPICH, but this has not been tested at time of writing (5/12/2017). 
+This has been carried out on different flavours of Linux.
+Automated testing to validate an install is planned for the future. 
+%The Message Passing Interface (MPI) implementation is OpenMPI. 
+%In principal it should also work with MPICH, but this has not been tested at time of writing (5/12/2017). 
 
 
 
@@ -117,98 +139,87 @@ by choice of model-specific wrapper.
 This is determined by environment variables FISOC\_OM and FISOC\_ISM 
 (Section~\ref{sec:EnvVars}). 
 
-In order to test the build the dummy wrappers may be used. 
+In order to test the build process the dummy wrappers may be used. 
 Libraries are not needed for dummy wrappers, and the corresponding 
 environment variables can be set to any value.
 See  ``buildFISOCexample.sh'' for examples. 
 
 In addition to the dummy wrappers, undocumented ISM components 
-(as of 5/12/2017) include: 
+ include: 
 ``FOrcing OffLine'' (FOOL), which acts as a wrapper for netcdf files 
 containing time evolving geometry forcing we want to use to force the 
 OM; 
 ``Frank's Ice Shelf model'' (FISh), a very simple flowline SSA 
 ice shelf model from Frank Pattyn, used for simple testing during 
 development.
+There is also an undocumented OM component, FVCOM, which is newly coupled through
+FISOC and will be documented soon (May 2020). 
 
 
 
 \subsection{FISOC Environment Variables}
 \label{sec:EnvVars}
 
-Several environment variables may be used in the build process. 
+A number of  environment variables, summarised in Table~\ref{tab:envvars}
+may be used in the build process.
 Some of these are mandatory. 
-Variables listed as optional here may be mandatory for some configuratons 
+Variables listed as optional in Table~\ref{tab:envvars}
+may be mandatory for some configuratons 
 other than ``dummy''.
 These environment variables are not used at run time, only during 
 the compilation/installation of FISOC.
 
+\begin{table}
+  \begin{center}
+    \begin{tabular}{ l|l|l|l }
+      \textbf{Environment  variable}    &                    & \textbf{Description}                    & \textbf{Default} \\
+      \hline
+      \textbf{ESMFMKFILE}          & Required           & Tells FISOC where to find ESMF          & None   \\
+      \textbf{FISOC\_INSTALL\_DIR} & Optional           & Determines where FISOC executable       & \$HOME/bin \\ 
+                                   &                    & will be installed (should be in \$PATH) & \\
+      \textbf{FISOC\_EXE}          & Optional           & Name of the FISOC executable            & FISOC\_caller. \\
+      \textbf{CPPFLAGS}            & Optional           & Preprocessor directives                 & None \\
+      \hline
+      \textbf{FISOC\_ISM}          & Required           & Determines ISM component                  & None \\
+                                   &                    & (``dummy'', ``Elmer'' or ``FOOL'')        &      \\
+      \textbf{FISOC\_ISM\_INCLUDE} & Optional           & Location of ISM header files              & None    \\
+      \textbf{FISOC\_ISM\_LIBPATH} & Optional           & Location of ISM library files             & None    \\
+      \textbf{FISOC\_ISM\_LIBS}    & Optional           & Linker directives for ISM library         & None    \\
+      \textbf{FISOC\_ISM\_GEOM}    & Optional           & ESMF geometry object for ISM              & FISOC\_ISM\_MESH \\
+                                   &                    & (FISOC\_ISM\_GRID or                      & \\
+                                   &                    & FISOC\_ISM\_MESH)                         & \\
+      \hline
+      \textbf{FISOC\_OM}           & Required           & Determines OM component                   & None    \\
+                                   &                    & (``dummy'', ``ROMS'' or ``FVCOM'')        &         \\
+      \textbf{FISOC\_OM\_INCLUDE}  & Optional           & Location of OM header files               & None    \\
+      \textbf{FISOC\_OM\_LIBPATH}  & Optional           & Location of OM library files              & None    \\
+      \textbf{FISOC\_OM\_LIBS}     & Optional           & Linker directives for OM library          & None    \\
+      \textbf{FISOC\_OM\_GEOM}     & Optional           & ESMF geometry object for OM               & FISOC\_OM\_GRID \\
+                                   &                    & (FISOC\_OM\_GRID or                       & \\
+                                   &                    & FISOC\_OM\_MESH)                          & \\
+    \end{tabular}
+  \end{center}
+  \caption{
+    Environment variables that are used in the FISOC build process.
+    Note that \textbf{CPPFLAGS} should include \textbf{FISOC\_MPI} for parallel runs. 
+  }
+  \label{tab:envvars}
+\end{table}
 
-\begin{flushleft}
-\textbf{ESMFMKFILE}                                \\ 
-Required.                                          \\
-Tells FISOC where to find key ESMF information.    \\
-\vspace{6pt}
-\textbf{FISOC\_INSTALL\_DIR}                       \\ 
-Optional.                                          \\
-Determines where the FISOC executable will be installed. Defaults to \$HOME/bin. 
-The user should also ensure this location is in their \$PATH. \\
-\vspace{6pt}
-\textbf{FISOC\_EXE}                                \\ 
-Optional.                                          \\
-Name of the FISOC executable.  Defaults to FISOC\_caller. \\
-\vspace{6pt}
+%\vspace{6pt}
 % now set through cpp flags
 %\textbf{FISOC\_MPI}                                \\ 
 %Optional. Possible value ``yes''.                  \\
 %Sets preprocessor flag to tell FISOC whether this is a parallel compilation.
 %Defaults to serial.                                \\
-%\vspace{6pt}
-\textbf{FISOC\_OM}                                 \\ 
-Required. Possible values ``dummy'', ``ROMS''.     \\
-Determines which OM component will be used.        \\
-\vspace{6pt}
-\textbf{FISOC\_OM\_INCLUDE}                         \\ 
-Optional.                                           \\
-Specifies the path where the OM header files are located.\\
-\vspace{6pt}
-\textbf{FISOC\_OM\_LIBPATH}                         \\
-Optional.                                           \\
-Specifies the path where the OM library files are located.\\
-\vspace{6pt}
-\textbf{FISOC\_OM\_LIBS}                            \\
-Optional.                                           \\
-Specifies the linker directives needed to link the OM library to FISOC. \\
-\vspace{6pt}
-\textbf{FISOC\_ISM}                                 \\
-Required. Possible values ``dummy'', ``Elmer'', ``FISh'', ``FOOL''.     \\
-Determines which ISM component will be used.        \\
-\vspace{6pt}
-\textbf{FISOC\_ISM\_INCLUDE}                        \\ 
-Optional.                                           \\
-Specifies the path where the ISM header files are located.\\
-\vspace{6pt}
-\textbf{FISOC\_ISM\_LIBPATH}                        \\
-Optional.                                           \\
-Specifies the path where the ISM library files are located.\\
-\vspace{6pt}
-\textbf{FISOC\_ISM\_LIBS}                           \\
-Optional.                                           \\
-Specifies the linker directives needed to link the ISM library to FISOC. \\
-\vspace{6pt}
-\textbf{CPPFLAGS}                                   \\
-Optional.                                           \\
-Preprocessor directives may be specified here.  
-Preprocessor directives used by FISOC:              \\
-\textbf{FISOC\_MPI}                                 \\ 
-Should be defined for parallel compilation but not for 
-serial compilation.  Activates code sections specific to parallel simulations. 
-At time of writing (5/12/2017) serial compilation has not been recently tested
-and may or may not work.                            \\
-%\vspace{6pt}
-See also Section~\ref{sec:PreReqROMS} for ROMS-specific preprocessor directives.
-\end{flushleft}
 
+See also Section~\ref{sec:PreReqROMS} for ROMS-specific preprocessor directives.
+
+%\subsubsection{Grids and meshes}
+%OM\_gridType and ISM\_gridType refer to the type of ESMF object to be used for holding information about 
+%the model grid.  Typically models utilising unstructured meshes (e.g. Elmer/Ice) would use an 
+%ESMF\_mesh object for holding mesh information in FISOC and models utilising structured grids 
+%(e.g. ROMS) would use an ESMF\_grid object for holding grid information in FISOC.
 
 
 \subsection{Pre-requisites}
@@ -242,13 +253,13 @@ See Sections~\ref{sec:PreReqElmer} and \ref{sec:PreReqROMS}.
 \label{sec:PreReqElmer}
 
 \textbf{Compiling Elmer/Ice for FISOC} \\
-At time of writing (5/12/2017) FISOC requires a non-standard Elmer/Ice 
-code branch. 
+At time of writing (May 2020) FISOC requires a non-standard Elmer/Ice 
+code branch. A merge is planned during 2020.
 The Elmer repository is here:
 \url{https://github.com/ElmerCSC/elmerfem/}.
 The standard branch used by glaciologists is the elmerice branch. 
 The branch needed for FISOC is the elmerice\_FISOC branch. 
-It is intended to merge the changes in 2018.
+It is intended to merge the changes during 2020.
 You can checkout the relevant branch with a command like this:
 \begin{lstlisting}
 git clone git://www.github.com/ElmerCSC/elmerfem -b elmerice_FISOC MyLocalName
@@ -291,14 +302,14 @@ can be found at \url{https://www.myroms.org/}.
 Development of the ice shelf enabled version  is currently ongoing 
 in a private repository 
 (please contact the developers if you need access to this).
-A public version of the ice shelf enabled version is also available 
-through github: 
-\url{https://github.com/bkgf/romsIceShelf}.  
-Please use the ``FISOC\_friendly'' branch.
-At time of writing (5/12/2017) the public version is out of date and 
-the private version should be used. 
-It is intended to push changes to the public version at the time of 
-submission of the FISOC GMD paper, during 2018.
+%A public version of the ice shelf enabled version is also available 
+%through github: 
+%\url{https://github.com/bkgf/romsIceShelf}.  
+%Please use the ``FISOC\_friendly'' branch.
+%At time of writing (5/12/2017) the public version is out of date and 
+%the private version should be used. 
+%It is intended to push changes to the public version at the time of 
+%submission of the FISOC GMD paper, during 2018.
 
 Example build scripts can be found in the ROMS/Bin subdirectory of a git clone 
 from the repository mentioned above.
@@ -356,11 +367,11 @@ choice of ROMS application.
 To tell ROMS to expect FISOC to provide a cavity change rate:\\
 FISOC\_DDDT\\
 To tell ROMS to expect FISOC to provide an upper ice surface change rate
-(at time of writing, 5/12/2017, this is required for grounding line migration 
+(required for grounding line migration 
 and is used to update the wet/dry masks based on floatation):\\
 FISOC\_DSDT\\
 To tell ROMS to expect FISOC to directly overwrite the iceshelf draft 
-(this and FISOC\_DDT are mutually exclusive):\\
+(this and FISOC\_DDDT are mutually exclusive):\\
 FISOC\_DRAFT\\
 To tell ROMS to expect to receive a vertical temperature gradient 
 at the ice base from FISOC: \\
@@ -405,7 +416,7 @@ compilation process.
 These can be set for a FISOC build using the CPPFLAGS environment variable.
 For example (see also the example FISOC build script):
 \begin{lstlisting}
-export CPPFLAGS="$CPPFLAGS -D ROMS_DRAFT"
+export CPPFLAGS="$CPPFLAGS -D ROMS_DDDT"
 \end{lstlisting}
 At the time of writing, the relevant values are ROMS\_MASKING, ROMS\_SPHERICAL, 
 ROMS\_DDDT, ROMS\_DSDT, ROMS\_DRAFT and ROMS\_AVERAGES. Use of the averaged melt rate from ROMS is activated in FISOC by the ROMS\_AVERAGES cpp. The general rule is that any of these directives that 
@@ -440,7 +451,7 @@ compilation.
 The FISOC executable is by default called FISOC\_caller, and should be located in your 
 path after installation. 
 The installation is specific to the choice of component (you need to re-compile if you switch, for 
-example, from one ISM to another).  
+example, from one OM to another).  
 Beyond choice of components, all run time choices are made in the FISOC\_config.rc file
 (Section~\ref{sec:config}), 
 or through component specific initialisation.
@@ -459,41 +470,10 @@ FISOC\_OM to ``dummy'' at compile time.  This can help to test the compilation, 
 but performs no meaningful science.  
 
 In verbose mode (Section~\ref{sec:config}) some run time information may be printed to the screen.  
-Independently of this, log files are always written (see below). 
+Independently of this, log files are always written (see Section~\ref{sec:output}). 
 
 
 
-
-
-
-\subsection{FISOC output files}
-
-
-The outputs from FISOC include: \\
-1. Standard out from the job.  In interactive runs it is written to the screen. \\
-2. Standard out from the ice model.  This is redirected to a file named in the FISOC\_config file. \\
-3. Standard out from the ocean model.  This is redirected to a file named in the FISOC\_config file. \\
-4. ESMF log files (usually named PET*.log). 
-
-FISOC can output basic netcdf files from the OM generic wrapper 
-on the OM grid. 
-FISOC can do this for both ISM and OM variables.
-This capability is mainly recommended just for sanity checking.
-
-%The ISM and OM have their standard out directed to files named in the 
-%FISOC\_config.rc file. 
-%At time of writing (5/12/2017) ROMS stdout is not correctly implemented and sometimes 
-%writes to fort.31.
-
-FISOC log files have default filenames of ``PET\#.FISOC.Log'', where ``\#'' is a number from 0 upwards 
-indicating the ``Persistent Execution Thread'' (PET). 
-These logs are created by FISOC/ESMF and contain run time messages and errors that can 
-be helpful with troubleshooting.
-Note that by default FISOC appends to the logs rather than over-writing at run time, so you may wish to delete 
-old logs periodically. 
-
-Aside: PET is an ESMF abstraction designed to be general over differing parallel implementations. 
-In FISOC, there is always a 1:1 relationship between PETs and MPI processes. 
 
 
 
@@ -557,13 +537,13 @@ Determines whether the ISM\_maskOMvars should be turned on or not. The generic
 pre-requisite for this is that ISM\_gmask must be present, i.e. it must be a 
 member of either FISOC\_ISM\_ReqVars or FISOC\_ISM\_DerVars.
 The Elmer-specific pre-requisite is that the Elmer variable GroundedMask must
-exist according to the .sif.
+exist according to the .sif.                                               \\
 \vspace{6pt}
-\textbf{ISM\_gridType:}        [STRING] [required]                          \\
-Which ESMF object to use.  Valid values are ESMF\_mesh (typically used 
-o describe unstructured meshes) and ESMF\_grid (typically used to 
-describe structured grids, supports stagered grids).                       \\
-\vspace{6pt}
+%\textbf{ISM\_gridType:}        [STRING] [required]                         \\
+%Which ESMF object to use.  Valid values are ESMF\_mesh (typically used 
+%to describe unstructured meshes) and ESMF\_grid (typically used to 
+%describe structured grids, supports stagered grids).                       \\
+%\vspace{6pt}
 \textbf{ISM2OM\_vars:}        [STRING] [optional]                          \\
 List of variables to be passed from the ISM to the OM. Defaults to 
 all ISM variables (union of required and derived variables). If an empty 
@@ -578,9 +558,14 @@ second phase of OM initialisation.   Default is .TRUE.                     \\
 The ESM regridding method to use.  If not set, the default will be 
 written to the log files.  Possible values are given in the ESMF 
 documentation. 
-\url{http://www.earthsystemmodeling.org/esmf_releases/public/last/ESMF_refdoc/node9.html#SECTION090146000000000000000}
+\url{http://www.earthsystemmodeling.org/esmf_releases/public/last/ESMF_refdoc/node9.html#SECTION090146000000000000000} \\
+\vspace{6pt}
+\textbf{ISM2OM\_extrap:}       [STRING] [optional]                         \\
+Some ESMF regridding methods may be supplemented with an extrapolation
+method for target points outside the source domain.
+\vspace{6pt}
 
-\vspace{22pt}
+\vspace{16pt}
 
 \textbf{\underline{OM options}} \\
 \vspace{6pt}
@@ -602,9 +587,9 @@ grid stagger for each variable.                                            \\
 List of variables derived by FISOC from the OM vars.  
 To be calculated from OM vars by hard coded routines in FISOC\_OM.        \\
 \vspace{6pt}
-\textbf{OM\_gridType:}        [STRING] [required]                           \\
-Which ESMF object to use.  Valid values are ESMF\_mesh and ESMF\_grid.     \\
-\vspace{6pt}
+%\textbf{OM\_gridType:}        [STRING] [required]                           \\
+%Which ESMF object to use.  Valid values are ESMF\_mesh and ESMF\_grid.     \\
+%\vspace{6pt}
 \textbf{OM2ISM\_vars:}        [STRING] [optional]                          \\
 List of variables to be passed from the OM to the ISM. Defaults to 
 all OM variables (union of required and derived variables). If an empty 
@@ -614,12 +599,6 @@ can be useful for unit testing.                                            \\
 \textbf{OM2ISM\_init\_vars:}  [LOGICAL] [optional]                         \\
 Determines whether the OM2ISM\_vars should be passed to the ISM during the 
 second phase of ISM initialisation.   Default is .TRUE.                    \\ 
-\vspace{6pt}
-\textbf{OM2ISM\_regrid:}       [STRING] [optional]                         \\
-The ESMF regridding method to use.  If not set, the default will be 
-written to the log files.  Possible values are given in the ESMF 
-documentation. 
-\url{http://www.earthsystemmodeling.org/esmf_releases/public/last/ESMF_refdoc/node9.html#SECTION090146000000000000000}                                        \\
 \vspace{6pt}
 \textbf{OM\_initCavityFromISM:}  [LOGICAL] [optional]                      \\
 Switch to allow the OM to overwrite its cavity geometry with ISM\_z\_l0 
@@ -644,13 +623,26 @@ CorrectedRate.                                                             \\
 \textbf{OM\_outputInterval:} [INTEGER][optional]                           \\
 FISOC collects OM output once every OM\_outputInterval OM timesteps. 
 Defaults to 1.  dt\_ratio/OM\_outputInterval must be integer.              \\
-\vspace{22pt}
+\vspace{6pt}
+\textbf{OM2ISM\_regrid:}       [STRING] [optional]                         \\
+The ESMF regridding method to use.  If not set, the default will be 
+written to the log files.  Possible values are given in the ESMF 
+documentation. 
+\url{http://www.earthsystemmodeling.org/esmf_releases/public/last/ESMF_refdoc/node9.html#SECTION090146000000000000000}                                        \\
+\vspace{6pt}
+\textbf{OM2ISM\_extrap:}       [STRING] [optional]                         \\
+Some ESMF regridding methods may be supplemented with an extrapolation
+method for target points outside the source domain.                        \\
+\vspace{6pt}
+
+\vspace{16pt}
 
 
 \textbf{\underline{Netcdf output options}}                                 \\
 Note: these are considered OM options because the output writing occurs 
 from the OM generic wrapper.  The OM import state here contains the 
 ISM variables regridded to the OM grid.                                    \\
+\vspace{6pt}
 \textbf{OM\_writeNetcdf:}   [LOGICAL] [optional]                           \\
 Switch for dumping the OM import and export variables to NetCDF files.
 Defaults to .TRUE.                                                         \\
@@ -713,10 +705,6 @@ Note that the units given in Table~\ref{tab:vars} are suggested units.  FISOC do
 the user must ensure unit consistency.  There may be hard coded unit assumptions in the model specific 
 wrappers.
 
-Note: dBdt is probably not a suitable choice for ice shelf basal melt rate.  
-Simply m (i.e. full name OM\_m) would probably be better, to avoid confusion with dddt 
-(rate of change of ice draft).
-
 \begin{table}
   \begin{center}
     \begin{tabular}{ l|l|l }
@@ -745,15 +733,29 @@ Simply m (i.e. full name OM\_m) would probably be better, to avoid confusion wit
       ISM\_velocity\_l0     & Ice flow velocity at the ice base            & m/a \\
       ISM\_maskOMvars       & Mask the fields being passed from OM         &   \\
                             & to the ISM                                   &   \\
-      OM\_dBdt\_l0          & Ice shelf basal melt rate.                   & m/a \\
+      OM\_bmb               & Ice shelf basal melt rate.                   & m/a \\
       OM\_temperature\_l0   & Ocean temperature at the ice ocean           &   \\
                             & interface.                                   &   \\
+      OM\_z\_l0             & Height relative to sea level of the ice      & m \\
+                            & base.                                        &   \\
+      OM\_bed               & Ocean bathymetry                             &   \\
+      OM\_z\_lts            & Height relative to sea level of the ice      & m \\
+                            & top surface.                                 &   \\
     \end{tabular}
   \end{center}
   \caption{FISOC standard variables and typical units.  
-    Note that heights relative to sea level are always positive upward.}
+    Note that heights relative to sea level are always positive upward.
+    Some variables in this table differ only in their prefix (ISM or OM).
+    The only differnce is that they are defined on the geometry object
+    (grid or mesh)  of their respective component.
+    For example ISM\_z\_lts is needed to pass the ice upper surface from the ISM
+    to the OM, and OM\_z\_lts is needed in order to derive a drift correction if
+    the correctedRate cavity option is used.
+  }
   \label{tab:vars}
 \end{table}
+
+
 
 As a naming convention, ``z'' refers to the vertical coordinate, and ``l0'' and ``l1'' refer to the 
 model level at the ice-ocean interface (this would typically be the lowest level of the ISM or 
@@ -795,7 +797,7 @@ in a given simulation.  An empty list can be used to avoid any variables
 being passed between components.  This can be useful during testing and 
 troubleshooting.
 
-A note on efficiency (relevant on 5/12/2017): 
+A note on efficiency (May 2020): 
 All the ISM and OM variables are currently being regridded and passed 
 to the wrapper for the opposite component.  It is at the model-specific 
 wrapper level that ISM2OM\_vars and OM2ISM\_vars are checked.  If regridding 
@@ -841,7 +843,7 @@ are calculated is ISM\_z\_l0.
     Cavity update options.  Note that of the possible ISM cavity variables 
     (ISM\_z\_l0, ISM\_z\_l0\_linterp, ISM\_dddt) only the required variable 
     (third column) should be passed to the OM (constrained using ISM2OM\_vars).
-    At time of writing (5/12/2017) the Rate and CorrectedRate are giving 
+    At time of writing (May 2020) the Rate and CorrectedRate are giving 
     the most reliable outcomes and are recommended.
   }
   \label{tab:cavity}
@@ -855,11 +857,6 @@ drying scheme used for grounding line migration.
 
 
 
-\subsubsection{Grids and meshes}
-OM\_gridType and ISM\_gridType refer to the type of ESMF object to be used for holding information about 
-the model grid.  Typically models utilising unstructured meshes (e.g. Elmer/Ice) would use an 
-ESMF\_mesh object for holding mesh information in FISOC and models utilising structured grids 
-(e.g. ROMS) would use an ESMF\_grid object for holding grid information in FISOC.
 
 
 
@@ -871,16 +868,16 @@ ESMF\_mesh object for holding mesh information in FISOC and models utilising str
 \subsection{Timestepping}
 
 Different asynchronous timestepping options are planned.
-Currently recommended (6/12/2017) is to set dt\_ratio = 1 and use the 
+Currently recommended (May 2020) is to set dt\_ratio = 1 and use the 
 ISM timestep for both the ISM and OM components. 
-ROMS will run as many timesteps as it needs to (see DT in the ROMS .in file) 
-for each call to the ROMS run method. 
+ROMS or FVCOM will run as many timesteps as needed  (see also  DT in the ROMS .in file) 
+for each call to their run method. 
 With this approach the Rate or CorrectedRate methods for cavity evolution 
 are recommended. 
 FISOC can pass the ROMS melt rate to the ISM after the call to the 
 ROMS run method. 
-It might be preferable to get ROMS to provide an average rather than a final 
-snapshot for the melt rate. This should be straightforward but is NYI.
+%It might be preferable to get ROMS to provide an average rather than a final 
+%snapshot for the melt rate. This should be straightforward but is NYI.
 
 %***fill in this section we've implemented both tight coupling (ice and ocean both running 
 %on the same timescale) and loose coupling (for longer time scales where the ocean is run 
@@ -889,13 +886,12 @@ snapshot for the melt rate. This should be straightforward but is NYI.
 
 
 
-\subsection{Parallelism}
-
-ESMF supports any combination of concurrent and or sequantial parallelisation. 
-FISOC is currently (6/12/2017) set up for sequential coupling, where the 
-full set of processors are used first for the ISM call then for the OM call. 
-It should not be too hard to implement something more flexible if needed 
-in the future.
+%\subsection{Parallelism}
+%ESMF supports any combination of concurrent and or sequantial parallelisation. 
+%FISOC is currently (6/12/2017) set up for sequential coupling, where the 
+%full set of processors are used first for the ISM call then for the OM call. 
+%It should not be too hard to implement something more flexible if needed 
+%in the future.
 
 
 
@@ -911,7 +907,7 @@ export LD_LIBRARY_PATH="$FISOC_ISM_LIBPATH/:$LD_LIBRARY_PATH"
 
 As with a normal Elmer/Ice simulation, the mesh should be partitioned into the 
 same number of partitions as the number of processors (which is the same as the number of 
-ESMF PETs and DEs, but don't worry if you don't know what those things are). 
+ESMF PETs and DEs). 
 
 More information about Elmer, and especially Elmer/Ice, can be found on several sources 
 on the internet.
@@ -938,10 +934,10 @@ Typically this will be the lower surface, defined as a boundary in the
 Elmer/Ice mesh file and as a body in the boundary condition section of   
 the .sif.                                                                \\
 \vspace{6pt}
-\textbf{ISM\_ProjVector:} [INTEGER LIST] [optional]                      \\
-3D vector describing the view direction for use in node ordering of      
-elements.  Default down.  NYI                                            \\
-\vspace{6pt}
+%\textbf{ISM\_ProjVector:} [INTEGER LIST] [optional]                      \\
+%3D vector describing the view direction for use in node ordering of      
+%elements.  Default down.  NYI                                            \\
+%\vspace{6pt}
 \end{flushleft}
 
 
@@ -964,7 +960,7 @@ which must be provided in the FISOC config file
 whenever ROMS is used.
 
 The number of processes to launch FISOC with must be consistent with the number of 
-partitions in the ROMS grid.  This is set in the \textbf{OM\_configFile} by the 
+partitions in the ROMS grid.  This is set in the \textbf{OM\_configFile} (i.e. the ROMS .in file) by the 
 Ntile parameters.  For example, the following gives 4 partitions
 \begin{lstlisting}
       NtileI == 1                               ! I-direction partition
@@ -1015,11 +1011,49 @@ given in the .in file.
 
 
 
+
+\subsection{FISOC output files}
+\label{sec:output}
+
+The text file  outputs from FISOC comprise: \\
+1. Standard out from the job.  In interactive runs it is written to the screen. \\
+2. Standard out from the ice model.  This is redirected to a file named in the FISOC\_config file. \\
+3. Standard out from the ocean model.  This is redirected to a file named in the FISOC\_config file. \\
+4. FISOC/ESMF log files (usually named PET*.log). 
+
+FISOC can output basic netcdf files from the OM generic wrapper 
+on the OM grid. 
+FISOC can do this for both ISM and OM variables.
+This capability is mainly recommended just for sanity checking.
+
+%The ISM and OM have their standard out directed to files named in the 
+%FISOC\_config.rc file. 
+%At time of writing (5/12/2017) ROMS stdout is not correctly implemented and sometimes 
+%writes to fort.31.
+
+FISOC/ESMF log files have default filenames of ``PET\#.FISOC.Log'', where ``\#'' is a number from 0 upwards 
+indicating the ``Persistent Execution Thread'' (PET). 
+These logs are created by FISOC/ESMF and contain run time messages and errors that can 
+be helpful with troubleshooting.
+Note that by default FISOC appends to the logs rather than over-writing at run time, so you may wish to delete 
+old logs periodically. 
+
+Aside: PET is an ESMF abstraction designed to be general over differing parallel implementations. 
+In FISOC, there is always a 1:1 relationship between PETs and MPI processes. 
+
+
+
+
+
 \subsection{Troubleshooting}
 
 If the error messages to the screen are not helpful, remember to check whether useful 
-information has been logged.  By default this will be in files in the current directory 
-with names like PETX.FISOC.Log (where X is a process number).
+information has been logged in any of the text file outputs (Section~\ref{sec:output}).
+%By default this will be in files in the current directory 
+%with names like PETX.FISOC.Log (where X is a process number).
+FISOC aims to provide sufficient troubleshooting information in these files.
+However, not all problems are neatly reported at time of writing (May 2020).
+Some examples of other errors are given below.
 
 A segmentation fault has been known to occurr in the case of an incorrect path to the ROMS 
 configuration file (the .in file). 
@@ -1073,8 +1107,8 @@ In general it will be necessary to recompile ROMS and FISOC
 when switching between different examples, but it will not be necessary 
 to recompile Elmer/Ice.
 
-Some of these examples (probably 4 and 5) will be 
-described further in the FISOC GMD paper, 
+Examples  4 and 5 are described further in the FISOC GMD paper,
+where they are referred to as Verifications Experiments 1 and 2 (VE1 and VE2), 
 along with presentation of outputs.
 % 4 and 5 I think?
 
@@ -1100,8 +1134,9 @@ The corresponding ROMS header file is ROMS/Include/isomip\_plus.h,
 the application is ISOMIP\_PLUS, 
 and the input file is ROMS/External/ocean\_isomip\_plus\_ocn3.in.
 Processed netcdf files based on those available through MISOMIP 
-are also required.  These are not currently (7/12/2017) 
-included.  Contact the developers if you want to run this example. 
+are also required.
+The netcdf files are not included in the FISOC repository.
+
 
 \subsubsection{Example 4: Simple floating only test}
 A FISOC example using Elmer/Ice and ROMS. No grounding line is included. 
@@ -1109,6 +1144,8 @@ The Elmer/Ice setup is provided with the example in the subdirectory.
 The corresponding ROMS header file is ROMS/Include/iceshelf2d\_toy.h, 
 the application is ICESHELF2D\_TOY, 
 and the input file is ROMS/External/ocean\_iceshelf2d\_toy.in.
+This example is used in the FISOC GMD model description paper where it is
+referred to as Verification Experiment 1 (VE1).
 
 \subsubsection{Example 5: Simple grounding line migration test}
 A FISOC example using Elmer/Ice and ROMS. Similar domain to 
@@ -1117,19 +1154,102 @@ The Elmer/Ice setup is provided with the example in the subdirectory.
 The corresponding ROMS header file is ROMS/Include/iceshelf2d\_toy\_gl, 
 the application is ICESHELF2D\_TOY\_GL, 
 and the input file is ROMS/External/ocean\_iceshelf2d\_toy\_gl.in.
-
+This example is used in the FISOC GMD model description paper where it is
+referred to as Verification Experiment 2 (VE2).
 
 
 
 \section{Post processing}
 
-The default expectation is that standard approaches to visualising and 
+OM and ISM components should be able to provide their usual output formats,  
+and the default expectation is that standard approaches to visualising and 
 processing outputs will be used for OM and ISM components separately. 
 
+The FISOC repository provides some limited functionality for output processing and
+visualisation. 
+The scripts provided are not robust, and are provided more as examples than as a
+post processing or visualisation framework. 
+These processing scripts are not supported by FISOC developers. 
+A future intention  is to provide more robust and documented post processing
+utilities. 
 
-Options for jointly visualising/processing outputs from both components 
-will be considered in the future. 
-With some python scripting this could perhaps be done using paraview.
+Elmer/Ice provides .vtu files that are viewable in Paraview.
+ROMS provides netcdf files that can be made viewable in Paraview with a small amount
+of manipulation.
+The ROMS outputs need to be provided at rho points, and the vertical coords need to be processed to
+express variables on depth levels instead of sigma coordinates. 
+This way it is possible to view both ROMS and Elmer/Ice outputs together interactively through Paraview. 
+This approach uses Netcdf Operators (NCO) and Matlab. 
+
+ROMS Matlab repository information is available here:
+https://www.myroms.org/wiki/Matlab\_Scripts
+You will need a ROMS account to access the matlab scripts in their subversion repository.
+In particular set\_depth.m is needed if using the ROMS2para.m function provided
+here (and set\_depth calls another ROMS matlab function...).
+
+An example ncrcat command for processing ROMS output files is given here.
+This command concatenates a subset of the ROMS output data into one netcdf file.
+For example 5:
+\begin{lstlisting} %[language=bash]
+
+  ncrcat -O -p . -d ocean_time,,,2 -n 72,2,1 ocean_his_0001.nc ocean_his_select.nc -v ocean_time,x_rho,y_rho,Sb,Tb,draft,zeta,m,ubar_eastward,vbar_northward,w,u_eastward,v_northward,temp,salt,h,wetdry_mask_rho,Vtransform,Vstretching,theta_s,theta_b,hc
+
+\end{lstlisting}
+
+%For example 4 (without wet dry mask):
+%\begin{lstlisting} %[language=bash]
+%ncrcat -O -p . -d ocean_time,,,2 -n 72,2,1 ocean_his_0001.nc ocean_his_select.nc -v ocean_time,x_rho,y_rho,Sb,Tb,draft,zeta,m,ubar_eastward,vbar_northward,w,u_eastward,v_northward,temp,salt,h,Vtransform,Vstretching,theta_s,theta_b,hc
+%\end{lstlisting}
+
+%From NCO manual re "-n" option (we use this to determine which files to include):
+%NCO decodes lists of such filenames encoded using the ‘-n’ syntax.  The simpler (three-argument) ‘-n’ usage takes the form -n file_number, digit_number, numeric_increment where file number is the number of files, digit number is the fixed number of numeric digits  comprising the numeric suffix,  and numeric increment is  the  constant,  integer-valued difference between the numeric suffix of any two consecutive files.
+
+%From NCO manual re "-d" option (we use this to skip output steps for example if we want the same number of output steps in both ice and ocean):
+%The stride is specified as the optional fourth argument to the ‘-d’ hyperslab specification: -d dim,[min][,[max][,[stride]]].  Specify stride as an integer (i.e., no decimal point) following the third comma in the ‘-d’ argument.
+
+
+The concatenated file should be suitable for processing through the matlab scripts
+that prepare for reading ROMS netcdf files into Paraview.
+
+The ROMS2Para Matlab function is provided in the FISOC\_pp directory of the FISOC repository. 
+This works for FISOC example 5, but may not work for other ROMS domains depending on the
+coordinate system. 
+
+\begin{table}
+  \begin{center}
+    \begin{tabular}{ l|l|l }
+      \textbf{Script name}    & \textbf{Dependencies}       & \textbf{Function} \\
+      \hline
+      griddata\_fvcom.m       & Matlab                      & Regrid FVCOM output to regular grid. \\
+      q\_read\_fvcom\_var.m   & Matlab, griddata\_fvcom.m   & Wrapper for griddata\_fvcom.m. \\
+      ROMSvolume.py           & Python, Netcdf4 module      & Calculate ROMS total ocean volume. \\
+      plotVols.m              & Matlab, ROMSvolume.py       & Line plots of Elmer, ROMS and FVCOM \\
+                              &                             & volume or mass. \\
+      read\_from\_roms.m      & Matlab                      & Read ROMS gridded data. \\
+      velPlots.m              & Matlab, read\_from\_roms.m, & Comparative ocean velocity plot.  \\
+                              & q\_read\_fvcom\_var.m       &  \\
+      ROMS2Para.m             & Matlab                      & Prepare ROMS netcdf file for Paraview. \\
+      ElmerGroundedArea.py    & Python, Paraview module     & Calculate Elmer/Ice total grounded   \\
+                              &                             & area over time. \\
+      IntegrateMelt.py        & Python, Paraview module     & Integrated Elmer/Ice total basal melt \\
+                              &                             & over time.  \\
+      ROMSgroundedArea.py     & Python, Paraview module     & Calculate ROMS total dry cell area  \\
+                              &                             & over time. \\ \\
+    \end{tabular}
+  \end{center}
+  \caption{
+    Summary of example output processing scripts.
+    These are not intended to be robust and are not documented.
+    They are provided only as examples. 
+  }
+  \label{tab:ppscripts}
+\end{table}
+
+There are also some example scripts using either Matlab or the Paraview.simple module or the Netcdf4 module
+for Python to perform certain specific postprocessing tasks.
+These are not documented but are summarised in Table~\ref{tab:ppscripts}. 
+
+
 
 %It is expected that the OM and ISM components will output data in their usual formats, 
 %and that this will form the basis for most output visualisation and post-processing.
@@ -1178,15 +1298,45 @@ With some python scripting this could perhaps be done using paraview.
 
 
 
-\section{FISOC development}
+\section{FISOC design and development}
 \label{sec:FISOC_SDG}
 
-An overview of FISOC code structures is summarised 
-in Figure~\ref{fig:codeStruct}.  
-Structural changes would be needed to introduce a new type 
-of component, e.g. an atmosphere model.
-Implementing an alternative ISM or OM should require no changes 
-to existing FISOC code, just an additional model-specific wrapper.
+This section describes aspects of FISOC design/development that an end user
+would typically not need to know.
+An overview of FISOC code modules is summarised
+in Table~\ref{tab:modules} and this information is presented visually 
+in Figure~\ref{fig:codeStruct}.
+FISOC is intended to be flexible from top down and bottom up:
+FISOC could be called as part of a larger ESMF coupled model by interfacing to FISOC\_parent
+as a shared library (as of May 2020 the code is not correctly distributed between caller and parent;
+please contact the developers if you wish to be able to call FISOC as an ESMF component and we
+can address this issue).
+FISOC calls independent ice or ocean components through model specific wrappers. 
+
+\begin{table}
+  \begin{center}
+    \begin{tabular}{ l|l }
+      \textbf{Generic module} &  \textbf{Role}                              \\
+      \hline
+      FISOC\_caller.f90     &  The FISOC calling program \\
+      FISOC\_parent.f90     &  FISOC's top level ESMF gridded component \\
+      FISOC\_coupler.f90    &  ESMF coupler component, handles regridding \\
+      FISOC\_ISM.f90        &  ESMF gridded component, top level control for ISM \\
+      FISOC\_OM.f90         &  ESMF gridded component, top level control for OM  \\
+      FISOC\_Utils.f90      &  Assorted FISOC utilities, available to all modules \\
+      \\ 
+      \textbf{Component-specific module} &                       \\
+      \hline
+      FISOC\_OM\_Wrapper\_XXX.f90  & Model-specific wrapper for OM XXX \\
+      FISOC\_ISM\_Wrapper\_XXX.f90 & Model-specific wrapper for ISM XXX \\
+    \end{tabular}
+  \end{center}
+  \caption{
+    Summary of the role of key FISOC code modules.
+    ISM is short for Ice Sheet Model and OM is short for Ocean Model.
+  }
+  \label{tab:modules}
+\end{table}
 
 \begin{figure}[t]
   \vspace*{2mm}
@@ -1198,56 +1348,80 @@ to existing FISOC code, just an additional model-specific wrapper.
   \label{fig:codeStruct}
 \end{figure}
 
+The FISOC\_ISM and FISOC\_OM modules provide top level control and processing for ice and ocean
+components.
+These are not model-specific.
+The model specific code, which exchanges fields between 
+ESMF structures and structures used by the individual models, is in the FISOC\_(O/IS)M\_Wrapper modules.
+The main ISM or OM call structure must be made to be compatible with ESMF, which essentially means 
+having seperate initialise, run and finalise calls.  See the ESMF documentation.
+
+
+
+
+
+\subsection{ESMF run time objects}
+
+FISOC maps component grids or meshes to ESMF\_grid or ESMF\_mesh objects within the model
+specific wrappers. 
+FISOC also maps component ``variables''  or ``fields'' to ESMF\_field objects
+in the model specific wrappers.
+These objects contain pointers to the ESMF\_grid or ESMF\_mesh objects. 
+Multiple  ESMF\_field objects are wrapped in ESMF\_fieldbundle objects.
+
+ESMF\_state objects store all data for a gridded component.
+The model-specific wrappers do not use this level of ESMF code abstraction.
+Instead the field bundles are packed/unpacked to/from state objects
+within the non model-specific wrappers
+(i.e. FISOC\_OM and FISOC\_ISM modules).
+
+The ESMF\_routeHandle objects are used to store weights and all information
+needed for regridding
+operations. 
+The coupler component within FISOC sets these up during initialisation using
+ESMF\_mesh or ESMF\_grid objects obtained from the OM and ISM components. 
+
+The ESMF virtual machine (ESMF\_VM) object provides a generic parallel context
+and can contain information for multiple possible parallelism paradigms.
+ESMF persistent execution threads (PETs) are also generic objects, representing
+individual threads within the parallel context.
+FISOC does not aim for this level of generality.
+FISOC is intended to use only the message passing interface (MPI), and
+requires a one to one mapping between MPI processes, PETs and domain partitions
+within geometry objects. 
+FISOC uses ESMF methods to intialise the parallel context.
+FISOC then extracts an MPI communicator from the ESMF\_VM object and passes this to the
+ISM and OM components to use in their initialisation phases.
+
+FISOC also uses EMSF objects for time keeping, but these are not discussed here.
+
 
 
 \subsection{Incorporating new OM or ISM components}
 
-FISOC is designed such that the only code developments for new components should be the creation 
-of model-specific wrappers: \\
-FISOC\_OM\_Wrapper\_XXX.f90 \\
- FISOC\_ISM\_Wrapper\_XXX.f90 \\
-where XXX should be replaced by the component's name.
+Structural changes to FISOC would be needed to introduce a new type 
+of component, e.g. an atmosphere model.
+Implementing an alternative ISM or OM should require no changes 
+to existing FISOC code, just an additional model-specific wrapper.
 
-The new wrapper must contain a Fortran module with a fixed name 
-and fixed interface for the key init, run and finalise methods. 
+Any new OM or ISM component to be used with FISOC must first be ESMF compliant.  This basically 
+means that it should have an initialise, run and finalise routine, and that the developer can 
+provide the component's grid and variables in ESMF compatible structures at run
+time through the new wrapper.
+The ESMF web site provides further documentation.
+\url{https://www.earthsystemcog.org/projects/esmf/}
+
+
+The new wrapper must contain a Fortran module with restrictions on the module name 
+and on the  interface for the initialise, run and finalise methods. 
 The precise requirements are not documented here as they may evolve 
 during continued development.  
 It is recommended to view an existing wrapper, especially the 
 PUBLIC routines.
 
-The following copy from the OM dummy wrapper (7/12/2017) gives 
-an example:
-
-\begin{lstlisting}
-MODULE FISOC_OM_Wrapper
-
-  USE ESMF
-  USE FISOC_utils_MOD
-
-  IMPLICIT NONE
-
-  PRIVATE
-
-  PUBLIC :: FISOC_OM_Wrapper_Init_Phase1,  FISOC_OM_Wrapper_Init_Phase2,  &
-       FISOC_OM_Wrapper_Run, FISOC_OM_Wrapper_Finalize, OM_HandleCavity
-
-CONTAINS
-
-...
-\end{lstlisting}
-
-
-Any new OM or ISM component to be used with FISOC must first be ESMF compliant.  This basically 
-means that it should have an initialise, run and finalise routine, and that the developer can 
-provide the component's grid and variables in ESMF compatible formats through the new wrapper.
-The ESMF web site provides further documentation.
-\url{https://www.earthsystemcog.org/projects/esmf/}
-
 If it is found that changes to other aspects of the FISOC code are required, this should be 
 implemented in collaboration with the FISOC core developers.
 
-Please implement your developments in a new branch in the FISOC repository. 
-Request a merge to master when you are happy that it is stable. 
 
 
 
@@ -1263,6 +1437,12 @@ made public.
 New model-specific wrapper modules should ensure that the initialise, run and finalise 
 subroutines are public. 
 
+Please implement your developments in a new branch in the FISOC repository. 
+Request a merge to master when you are happy that it is stable. 
+
+Adding new ISM or OM components should not require changes to the Makefile.
+If you feel that changes to the Makefile are needed, please first contact the developers
+to discuss whether this can be achieved through 
 
 
 \subsubsection{Error handling}
@@ -1279,13 +1459,20 @@ this should be checked by the component wrapper.
 
 Note that many FISOC subroutines contain a return code, but these are mostly not used in 
 practice.  Since errors are generally considered instantly fatal in FISOC, execution will 
-generaly not get as far as returning a failure code. 
+generally not get as far as returning a failure code. 
 If a more defensive rather than fail-fast approach is adopted in the future these return 
 codes can be used.
 
 
 
 \subsection{Configuration options}
+
+Compile time choices include which ISM or OM component to run, the type of ESMF
+geometry object for each component (mesh or grid), and paths to find
+component libraries.
+These are set through environment variables during the build process.
+Other options are mostly run time options, determined by paramters in the FISOC
+configuration file. 
 
 The configuration file must be named ``FISOC\_config.rc''.  
 It is compatible with ESMF config methods.  
@@ -1322,12 +1509,65 @@ Using the derived attribute subroutines as a wrapper in which to hard
 code a default value has the benefit of entering the hard coded value 
 only at one location rather than each time the attribute is accessed 
 from the config object.
+It has the disadvantage that the utils module is not the most intuitive
+place to store hard coded defaults.
+Where defaults are set by the utils module an info statement should be written
+to the PET logs. 
 
 %\subsection{ISM wrapper}
 
 %\subsection{OM wrapper}
 
 %\section{Future developments}
+
+
+
+\subsection{Sequential parallelism}
+
+\begin{wraptable}{r}{6cm}
+  \begin{tabular}{|l}
+    \textbf{FISOC component event order}  \\
+    \hline
+    OM intialisation phase 1 \\
+    ISM intialisation phase 1 \\
+    Coupler intialisation phase 1 \\
+    OM intialisation phase 2 \\
+    Coupler intialisation phase 2 \\
+    ISM intialisation phase 2 \\
+    OM run \\
+    Coupler run phase 1 \\
+    ISM run \\
+    Coupler run phase 2 \\
+    OM finalise \\
+    ISM finalise \\
+    Coupler finalise \\
+  \end{tabular}
+%  \caption{
+%  }
+  \label{tab:order}
+\end{wraptable}
+
+ESMF supports sequential and concurrent parallel coupling, and any combination of these. 
+FISOC currently (May 2020) supports only sequential coupling, and requries that
+the ISM and OM alternate use of the same set of processors.
+This is implemented by duplicating the MPI context from the ESMF virtual machine (VM)
+and passing this to each component. 
+This can be made more flexible in the future if needed. 
+
+%Table~\ref{tab:order}
+The Table to the right summarises the order of events within this sequential coupling paradigm.
+This ordering is hard coded, but again, this could be made more flexible in the future
+if needed.
+Note that there are two initialisation phases so that the ISM and OM components have the chance
+to modify their initial state based on the initial state of the other component
+(e.g. the OM may wish to update its ice shelf cavity geometry directly from the initialised
+ISM during OM intialisation phase 2).
+Note that the run phases are repeated as many times as are required to complete the simulation.
+The coupler component  has multiple phases in order to separately handle
+the regridding in each direction (ice to ocean and ocean to ice).
+ESMF places no limitation on the number of initialisation or run phases for each component,
+although FISOC currently imposes this fixed ordering, hard coded into FISOC\_parent.
+
 
 
 
@@ -1341,7 +1581,7 @@ The following commands worked to install NetCDF and ESMF on a Linux Mint system 
 in a suitable configuration for use with FISOC. 
 Some pre-requisites for netcdf were also installed.
 The system already had a working OpenMPI installation.
-
+The following is just an example, it is not intended as a usable script. 
 
 
 \begin{lstlisting}[language=bash]
