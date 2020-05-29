@@ -528,15 +528,15 @@ CONTAINS
 !            line=__LINE__, file=__FILE__)) &
 !           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-       IF (TRIM(ADJUSTL(fieldName)).EQ.'ISM_thick') THEN
+       IF (TRIM(ADJUSTL(fieldName)).EQ.'ISM_z_l0') THEN
 
           CALL FISOC_ArrayRedistFromField(RH_ESMF2FVCOM,fieldList(nn),distgridFVCOM,ptr)
 
-          PRINT*,"find the thickness for reset cavity"
-          ! TODO: converting ice draft from ice thickness from FISOC, needs to be updated to a more advanced formula
-!Rupert's comment: why not just use the ice lower surface instead of applying floatation to thickness? (see ROMS wrapper)
+          msg = "FVCOM: use ISM_z_l0 to set ZISF (reset cavity)"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
           DO ii  =  1, MT
-             ZISF(ii)     =   ptr(ii)*RHO_isf/RHO_on
+             ZISF(ii)     =   -ptr(ii)
           END DO
           CALL     ISF_JUDGE
           CALL     WET_JUDGE
