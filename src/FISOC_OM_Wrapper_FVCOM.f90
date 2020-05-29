@@ -608,37 +608,41 @@ CONTAINS
            line=__LINE__, file=__FILE__)) &
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
       
-      CALL FISOC_ArrayRedistFromField(RH_ESMF2FVCOM,fieldList(nn),distgridFVCOM,ptr)
+      IF (FISOC_ISM2OM(fieldName,FISOC_config,rc=rc)) THEN
+
+        CALL FISOC_ArrayRedistFromField(RH_ESMF2FVCOM,fieldList(nn),distgridFVCOM,ptr)
       
-      SELECT CASE (TRIM(ADJUSTL(fieldName)))
+        SELECT CASE (TRIM(ADJUSTL(fieldName)))
         
-      CASE ('ISM_dddt')
-        DO ii = 1,SIZE(ptr)
-          ISF_DDDT(ii) = ptr(ii)
-        END DO
-        
-      CASE ('ISM_dsdt')
-        DO ii = 1,SIZE(ptr)
-          ISF_DSDT(ii) = ptr(ii)
-        END DO
-        
-      CASE ('ISM_thick','ISM_z_l0','ISM_z_l0_previous','ISM_z_lts','ISM_z_lts_previous')
-        msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
-        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
-             line=__LINE__, file=__FILE__, rc=rc)          
-        
-      CASE DEFAULT
-        msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
-        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-             line=__LINE__, file=__FILE__, rc=rc)
-        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-        
-      END SELECT
+        CASE ('ISM_dddt')
+          DO ii = 1,SIZE(ptr)
+            ISF_DDDT(ii) = ptr(ii)
+          END DO
+          
+        CASE ('ISM_dsdt')
+          DO ii = 1,SIZE(ptr)
+            ISF_DSDT(ii) = ptr(ii)
+          END DO
+          
+        CASE ('ISM_thick','ISM_z_l0','ISM_z_l0_previous','ISM_z_lts','ISM_z_lts_previous')
+          msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__, rc=rc)          
+          
+        CASE DEFAULT
+          msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          
+        END SELECT
       
-      IF (ASSOCIATED(ptr)) THEN
-        NULLIFY(ptr)
+        IF (ASSOCIATED(ptr)) THEN
+          NULLIFY(ptr)
+        END IF
+
       END IF
-      
+        
     END DO fieldLoop
     
     rc = ESMF_SUCCESS

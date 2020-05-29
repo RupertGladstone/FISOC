@@ -806,79 +806,80 @@ CONTAINS
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        IF (FISOC_ISM2OM(fieldName,FISOC_config,rc=rc)) THEN
-
-          SELECT CASE (TRIM(ADJUSTL(fieldName)))
-             
-          CASE ('ISM_dddt')
+         
+         CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+         IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+              line=__LINE__, file=__FILE__)) &
+              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+         
+         SELECT CASE (TRIM(ADJUSTL(fieldName)))
+           
+         CASE ('ISM_dddt')
 # ifdef ROMS_DDDT
-             DO jj = JstrR, JendR
-                DO ii = IstrR, IendR
-                   ICESHELFVAR(1) % iceshelf_dddt(ii,jj) = ptr(ii,jj)
-                END DO
+           DO jj = JstrR, JendR
+             DO ii = IstrR, IendR
+               ICESHELFVAR(1) % iceshelf_dddt(ii,jj) = ptr(ii,jj)
              END DO
+           END DO
 # else
-             msg = "Trying to pass DDDT to ROMS but incompatible cpp"
-             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-                  line=__LINE__, file=__FILE__, rc=rc)          
-             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+           msg = "Trying to pass DDDT to ROMS but incompatible cpp"
+           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+                line=__LINE__, file=__FILE__, rc=rc)          
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 # endif
- 
-          CASE ('ISM_dsdt')
+           
+         CASE ('ISM_dsdt')
 # ifdef ROMS_DSDT
-             DO jj = JstrR, JendR
-                DO ii = IstrR, IendR
-                   ICESHELFVAR(1) % iceshelf_dsdt(ii,jj) = ptr(ii,jj)
-                END DO
+           DO jj = JstrR, JendR
+             DO ii = IstrR, IendR
+               ICESHELFVAR(1) % iceshelf_dsdt(ii,jj) = ptr(ii,jj)
              END DO
+           END DO
 # else
-             msg = "Trying to pass DSDT to ROMS but incompatible cpp"
-             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-                  line=__LINE__, file=__FILE__, rc=rc)          
-             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+           msg = "Trying to pass DSDT to ROMS but incompatible cpp"
+           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+                line=__LINE__, file=__FILE__, rc=rc)          
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 # endif
-             
-          CASE ('ISM_z_l0','ISM_z_l0_linterp')
+           
+         CASE ('ISM_z_l0','ISM_z_l0_linterp')
 # ifdef ROMS_DRAFT
-             ! A note on the OM ICESHELFVAR(1) % iceshelf_draft:
-             ! iceshelf_draft(:,:,nstp) is the previous draft and iceshelf_draft(:,:,nnew) is 
-             ! the current draft.  We only update the new draft from the ISM.
-             ! The OM var zice will be set internally by the OM based on the iceshelf_draft.
-             CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
-             DO jj = JstrR, JendR
-                DO ii = IstrR, IendR
-                   ICESHELFVAR(1) % iceshelf_draft(ii,jj,nnew) = ptr(ii,jj)
-!                   GRID(1) % zice (ii, jj) = ptr (ii, jj)
-                END DO
+           ! A note on the OM ICESHELFVAR(1) % iceshelf_draft:
+           ! iceshelf_draft(:,:,nstp) is the previous draft and iceshelf_draft(:,:,nnew) is 
+           ! the current draft.  We only update the new draft from the ISM.
+           ! The OM var zice will be set internally by the OM based on the iceshelf_draft.
+           CALL cp2bdry(ptr,JstrR,JendR,IstrR,IendR)
+           DO jj = JstrR, JendR
+             DO ii = IstrR, IendR
+               ICESHELFVAR(1) % iceshelf_draft(ii,jj,nnew) = ptr(ii,jj)
+               !                   GRID(1) % zice (ii, jj) = ptr (ii, jj)
              END DO
+           END DO
 # else
-             msg = "Trying to pass draft to ROMS but incompatible cpp"
-             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-                  line=__LINE__, file=__FILE__, rc=rc)          
-             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+           msg = "Trying to pass draft to ROMS but incompatible cpp"
+           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+                line=__LINE__, file=__FILE__, rc=rc)          
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 # endif
              
-          CASE('ISM_temperature_l0', 'ISM_temperature_l1', 'ISM_z_l1', 'ISM_velocity_l0', 'ISM_z_l0_previous', 'ISM_dTdz_l0')
-             msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
-             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
-                  line=__LINE__, file=__FILE__, rc=rc)          
-             
-          CASE DEFAULT
-             msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
-             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-                  line=__LINE__, file=__FILE__, rc=rc)
-             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-          END SELECT
-          
-          IF (ASSOCIATED(ptr)) THEN
-             NULLIFY(ptr)
-          END IF
+         CASE('ISM_temperature_l0', 'ISM_temperature_l1', 'ISM_z_l1', 'ISM_velocity_l0', 'ISM_z_l0_previous', 'ISM_dTdz_l0')
+           msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
+           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+                line=__LINE__, file=__FILE__, rc=rc)          
+           
+         CASE DEFAULT
+           msg = "ERROR: unknown variable: "//TRIM(ADJUSTL(fieldName))
+           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+                line=__LINE__, file=__FILE__, rc=rc)
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+           
+         END SELECT
+         
+         IF (ASSOCIATED(ptr)) THEN
+           NULLIFY(ptr)
+         END IF
 
        END IF
 
