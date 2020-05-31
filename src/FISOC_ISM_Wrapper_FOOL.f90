@@ -337,7 +337,7 @@ CONTAINS
     TYPE(ESMF_Field),ALLOCATABLE   :: fieldList(:)
     TYPE(ESMF_Field)               :: field
     CHARACTER(len=ESMF_MAXSTR)     :: fieldName, fileName, label
-    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM_varNames(:), ISM_reqVars(:)
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE:: ISM_varNames(:), ISM_ReqVars(:)
 
     CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt_sec, 'ISM_dt_sec',rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -427,14 +427,14 @@ CONTAINS
     ! If var names are defined we don't need to use hard coded values.
     ! Here we just loop over required vars.
     ELSE
-      label = 'ISM_reqVars:'
-      CALL FISOC_getListFromConfig(FISOC_config, label, ISM_reqVars,rc=rc)
+      label = 'ISM_ReqVars:'
+      CALL FISOC_getListFromConfig(FISOC_config, label, ISM_ReqVars,rc=rc)
       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
            line=__LINE__, file=__FILE__)) THEN
         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
       END IF
       DO nn = 1,SIZE(ISM_ReqVars)
-        field = FISOC_FieldListGetField(FieldList,ISM_reqVars(nn),rc)
+        field = FISOC_FieldListGetField(FieldList,ISM_ReqVars(nn),rc)
         IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
              line=__LINE__, file=__FILE__)) &
              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
