@@ -427,7 +427,7 @@ CONTAINS
     ! If var names are defined we don't need to use hard coded values.
     ! Here we just loop over required vars.
     ELSE
-      label = 'ISM_ReqVars:'
+      label = 'FISOC_ISM_ReqVars:'
       CALL FISOC_getListFromConfig(FISOC_config, label, ISM_ReqVars,rc=rc)
       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
            line=__LINE__, file=__FILE__)) THEN
