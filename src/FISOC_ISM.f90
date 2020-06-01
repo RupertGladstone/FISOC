@@ -492,9 +492,12 @@ CONTAINS
 
     ! Get grounded mask from ISM export fields
     CALL ESMF_FieldBundleGet(ISM_ExpFB, "ISM_gmask", field=ISM_gmask, rc=rc)
-    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+      msg = "ERROR: ISM_maskOMvars set to true but ISM_gmask not available"
+    ELSE IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) THEN
+      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
     CALL ESMF_FieldGet(ISM_gmask, farrayPtr=mask_ptr, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
