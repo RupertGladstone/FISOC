@@ -32,8 +32,8 @@
 
 \begin{document}
 
-\title{Framework for Ice Sheet - Ocean Coupled modelling (FISOC) Manual}
-\author{Rupert Gladstone (fisoc\_dev@googlegroups.com)}
+\title{Framework for Ice Sheet - Ocean Coupled modelling (FISOC) Manual, V1.0}
+\author{Rupert Gladstone and other FISOC contributors  (fisoc\_dev@googlegroups.com)}
 %\and Lenneke Jong \and Ben Galton-Fenzi \and David Gwyther}
 %\date{Version 0.2, April 2016}
 
@@ -152,19 +152,19 @@ OM;
 ``Frank's Ice Shelf model'' (FISh), a very simple flowline SSA 
 ice shelf model from Frank Pattyn, used for simple testing during 
 development.
-There is also an undocumented OM component, FVCOM, which is newly coupled through
-FISOC and will be documented soon (May 2020). 
+There is also an undocumented OM component, the Finite Volume Community Ocean Model (FVCOM), which is newly coupled through
+FISOC and will be documented soon (intended during 2020). 
 
 
 
 \subsection{FISOC Environment Variables}
 \label{sec:EnvVars}
 
-A number of  environment variables, summarised in Table~\ref{tab:envvars}
+A number of  environment variables, summarised in Table~\ref{tab:envvars},
 may be used in the build process.
 Some of these are mandatory. 
 Variables listed as optional in Table~\ref{tab:envvars}
-may be mandatory for some configuratons 
+may be mandatory for some configurations 
 other than ``dummy''.
 These environment variables are not used at run time, only during 
 the compilation/installation of FISOC.
@@ -254,7 +254,7 @@ See Sections~\ref{sec:PreReqElmer} and \ref{sec:PreReqROMS}.
 
 \textbf{Compiling Elmer/Ice for FISOC} \\
 At time of writing (May 2020) FISOC requires a non-standard Elmer/Ice 
-code branch. A merge is planned during 2020.
+code branch.
 The Elmer repository is here:
 \url{https://github.com/ElmerCSC/elmerfem/}.
 The standard branch used by glaciologists is the elmerice branch. 
@@ -419,7 +419,8 @@ For example (see also the example FISOC build script):
 export CPPFLAGS="$CPPFLAGS -D ROMS_DDDT"
 \end{lstlisting}
 At the time of writing, the relevant values are ROMS\_MASKING, ROMS\_SPHERICAL, 
-ROMS\_DDDT, ROMS\_DSDT, ROMS\_DRAFT and ROMS\_AVERAGES. Use of the averaged melt rate from ROMS is activated in FISOC by the ROMS\_AVERAGES cpp. The general rule is that any of these directives that 
+ROMS\_DDDT, \\
+ROMS\_DSDT, ROMS\_DRAFT and ROMS\_AVERAGES. Use of the averaged melt rate from ROMS is activated in FISOC by the ROMS\_AVERAGES cpp. The general rule is that any of these directives that 
 are defined for the ROMS compilation need to be defined also for the FISOC 
 compilation. 
 
@@ -441,6 +442,73 @@ compilation.
 
 
 
+\subsubsection{FVCOM}
+\label{sec:PreReqFVCOM}
+
+\textbf{Compiling FVCOM for FISOC} \\
+FISOC has also been developed and tested with an ice shelf enabled version of unstructured grid Finite Volume Community Ocean Model as described in \url{https://doi.org/10.1016/j.ocemod.2019.101536}. General information about FVCOM can be found at \url{http://fvcom.smast.umassd.edu/fvcom/}. Note that this website contains a registration form which must be completed to download the model source code. The module for ice shelf cavity dynamics is available via a static patch (\url{https://doi.org/10.17632/m6g4c3hm9m.1}) that can be used to augment the standard version of the model, or via the development branch \url{https://source.coderefinery.org/apn/fvcom4_fisoc} (please contact the authors of the above work for access).
+
+
+Example build scripts can be found in the directory of a git clone 
+from the repository mentioned above (fvcom4\_fisoc). It is assumed that users are familiar with a standard FVCOM build process.  buildFVCOM\_FX4.sh is the build script for FISOC Example 4 and it calls buildFVCOM\_FX4.py that installs required libraries and compiles FVCOM. Any hard coded paths in buildFVCOM\_FX4.py should be replaced with corresponding paths to compile FVCOM for use with the Example 4.  
+The build is specific to the machine on which 
+FVCOM/FISOC was developed and tested.
+
+The cpp options for building FVCOM are described in /fvcom4\_fisoc/FVCOM\_source/make.inc. The FISOC specific options are:
+\begin{lstlisting}
+ CPP_MISC ?= -DICESHELF -DICEDRAFTMORPHY -DFVCOM_API -DFISOC_DDDT  -DFISOC_DRAFT
+\end{lstlisting}
+
+Detailed description of the FISOC specific options is given below. \begin{flushleft}
+To tell FVCOM to expect FISOC to provide the iceshelf change rate:\\
+FISOC\_DRAFT\\
+To tell FVCOM to expect FISOC to provide a cavity change rate:\\
+FISOC\_DDDT\\
+To tell FVCOM to expect FISOC to provide an upper ice surface change rate
+(required for grounding line migration 
+and is used to update the wet/dry masks based on floatation):\\
+FISOC\_DSDT\\
+To tell FVCOM to calculate the averages of the variables provided to FISOC at 
+the end of each FVCOM run call:\\
+FVCOM\_API\\
+If ice shelf geometry evolution is required in FVCOM this options must be 
+defined:\\
+ICEDRAFTMORPHY\\
+If grounding line movement is required in ROMS the following cpp options 
+must be defined:\\
+WET\_DRY
+\end{flushleft}
+
+\vspace{10pt}
+\textbf{Compiling FISOC with FVCOM}\\
+When compiling FISOC with FVCOM, FISOC needs to know where to 
+find the relevant FVCOM libraries.  
+This can be done at FISOC compile time through the 
+\$FISOC\_OM
+environment variables.  For example:
+
+\begin{lstlisting}
+export FISOC_OM="FVCOM"
+export FISOC_OM_LIBS="-lfvcom_api -lmetis -ljulian"
+export FISOC_OM_INCLUDE="${MY_FVCOM_DIR}/FVCOM_source"
+export FISOC_OM_LIBPATH="/usr/local/lib"
+\end{lstlisting}
+
+
+% put this in GMD paper?
+
+%Setting FISOC\_DSDT activates the following in ROMS:
+
+%In the same way that zice is added to the GRID type and used to indicate height of the lower surface of the iceshelf relative to sea level (i.e. iceshelf draft), sice is added to the GRID type to indicate height of the upper surface of the ice sheet/shelf. sice can be read from netcdf in the same was as zice.
+
+%In the same way that iceshelf\_dddt is added to the ICESHELFVAR type and accessed from FISOC to set the rate of change of iceshelf draft wrt time, iceshelf\_dsdt is added to ICESHELFVAR to set the rate of change of sice with time.  If FISOC does not update iceshelf\_dsdt then the upper ice surface will remain static.
+
+% The value for ice density (and a couple other things?) defined in iceshelf\_mod.h is used (overwrite these from FISOC?)
+
+
+%\subsection{Troubleshooting}
+
+
 
 
 
@@ -451,7 +519,8 @@ compilation.
 The FISOC executable is by default called FISOC\_caller, and should be located in your 
 path after installation. 
 The installation is specific to the choice of component (you need to re-compile if you switch, for 
-example, from one OM to another).  
+example, from one OM to another). 
+%Unlike ROMS, you can compile FISOC with different choices in the same FISOC code folder as long as you define the FISOC executable with different names at each installation.  
 Beyond choice of components, all run time choices are made in the FISOC\_config.rc file
 (Section~\ref{sec:config}), 
 or through component specific initialisation.
@@ -465,7 +534,7 @@ You can run FISOC in parallel like this (depending on your system):
 mpirun -np 4 FISOC_caller
 \end{lstlisting}
 
-In the first instance a dummy coupler can be run be setting both environment variables FISOC\_ISM and 
+In the first instance a dummy coupler can be run by setting both environment variables FISOC\_ISM and 
 FISOC\_OM to ``dummy'' at compile time.  This can help to test the compilation, and was used during development, 
 but performs no meaningful science.  
 
@@ -483,7 +552,7 @@ Independently of this, log files are always written (see Section~\ref{sec:output
 \subsection{FISOC runtime configuration}
 \label{sec:config}
 
-The FISOC config file is named FISOC\_config.rc, and is expected to be present 
+The FISOC configuration file is named FISOC\_config.rc, and is expected to be present 
 in the current directory when running FISOC.  
 This is a resource file, as described by the 
 ESMF documentation.  It supports different types and also lists. 
@@ -611,13 +680,13 @@ How to process ISM ice draft for use in OM.  Valid values are RecentIce    \\
 \vspace{6pt}
 \textbf{OM\_WCmin:}  [REAL] [optional]                                     \\
 Minimum water column thickness imposed by OM.  Defaults to zero.  When 
-using ROMS, this corresponds to the ROMS DCRIT (in the ,in file) and 
+using ROMS, this corresponds to the ROMS DCRIT (in the .in file) and 
 should be set to the same value.  Only used with CorrectedRate to 
 preserve a ``dry'' water column under grounded ice.                        \\
 \vspace{6pt}
 \textbf{OM\_CavCorr:}  [REAL] [optional]                                   \\
-The proportion of the OM - ISM cavity discrepancy to correct for in one 
-FISOC call to the  OM run method.  Defaults to 0.2.  Only used with 
+The proportion of the OM - ISM cavity discrepancy to correct in one 
+FISOC call to the  OM run method. This cavity correction factor can take values from  0 to 1. Defaults to 0.2.  Only used with 
 CorrectedRate.                                                             \\
 \vspace{6pt}
 \textbf{OM\_outputInterval:} [INTEGER][optional]                           \\
@@ -972,9 +1041,7 @@ Ntile parameters.  For example, the following gives 4 partitions
 %\end{lstlisting}
 
 Some of the ROMS configuration information is in a .dat file.
-The name of this file is given in the ROMS configuration file, the .in file.
-When running ROMS through FISOC, the full path of the .dat file must be 
-given in the .in file.
+When running ROMS through FISOC, the name and full path of this file must be given to VARNAME in the ROMS .in file.
 
 
 % this stuff should now be covered by earlier sections:
@@ -1019,7 +1086,7 @@ The text file  outputs from FISOC comprise: \\
 1. Standard out from the job.  In interactive runs it is written to the screen. \\
 2. Standard out from the ice model.  This is redirected to a file named in the FISOC\_config file. \\
 3. Standard out from the ocean model.  This is redirected to a file named in the FISOC\_config file. \\
-4. FISOC/ESMF log files (usually named PET*.log). 
+4. FISOC/ESMF log files (usually named PET*.log). These provide line numbers on which errors occurred.
 
 FISOC can output basic netcdf files from the OM generic wrapper 
 on the OM grid. 
@@ -1049,6 +1116,9 @@ In FISOC, there is always a 1:1 relationship between PETs and MPI processes.
 
 If the error messages to the screen are not helpful, remember to check whether useful 
 information has been logged in any of the text file outputs (Section~\ref{sec:output}).
+In particular, the ESMF/FISOC log files contain line numbers in the 
+code for all logged entries, including errors. 
+These can be used to identify which code segment caused errors. 
 %By default this will be in files in the current directory 
 %with names like PETX.FISOC.Log (where X is a process number).
 FISOC aims to provide sufficient troubleshooting information in these files.
@@ -1090,8 +1160,8 @@ required variables in the FISOC config file (Section~\ref{sec:config})
 
 \subsection{FISOC examples}
 
-Example FISOC configurations can be found in the repository in the 
-examples subdirectory. 
+Example FISOC configurations can be found in the 
+examples subdirectory of the repository. 
 
 The ROMS setup for these examples is defined in the ROMS repository, not in the 
 FISOC repository.  This is because some aspects of the ROMS setup are defined at 
@@ -1108,7 +1178,7 @@ when switching between different examples, but it will not be necessary
 to recompile Elmer/Ice.
 
 Examples  4 and 5 are described further in the FISOC GMD paper,
-where they are referred to as Verifications Experiments 1 and 2 (VE1 and VE2), 
+where they are referred to as Verification Experiments 1 and 2 (VE1 and VE2), 
 along with presentation of outputs.
 % 4 and 5 I think?
 
@@ -1145,7 +1215,7 @@ The corresponding ROMS header file is ROMS/Include/iceshelf2d\_toy.h,
 the application is ICESHELF2D\_TOY, 
 and the input file is ROMS/External/ocean\_iceshelf2d\_toy.in.
 This example is used in the FISOC GMD model description paper where it is
-referred to as Verification Experiment 1 (VE1).
+referred to as Verification Experiment 1 (VE1\_ER).
 
 \subsubsection{Example 5: Simple grounding line migration test}
 A FISOC example using Elmer/Ice and ROMS. Similar domain to 
@@ -1155,7 +1225,7 @@ The corresponding ROMS header file is ROMS/Include/iceshelf2d\_toy\_gl,
 the application is ICESHELF2D\_TOY\_GL, 
 and the input file is ROMS/External/ocean\_iceshelf2d\_toy\_gl.in.
 This example is used in the FISOC GMD model description paper where it is
-referred to as Verification Experiment 2 (VE2).
+referred to as Verification Experiment 2 (VE2\_ER).
 
 
 
@@ -1182,7 +1252,7 @@ This way it is possible to view both ROMS and Elmer/Ice outputs together interac
 This approach uses Netcdf Operators (NCO) and Matlab. 
 
 ROMS Matlab repository information is available here:
-https://www.myroms.org/wiki/Matlab\_Scripts
+https://www.myroms.org/wiki/Matlab\_Scripts.
 You will need a ROMS account to access the matlab scripts in their subversion repository.
 In particular set\_depth.m is needed if using the ROMS2para.m function provided
 here (and set\_depth calls another ROMS matlab function...).
@@ -1245,7 +1315,7 @@ coordinate system.
   \label{tab:ppscripts}
 \end{table}
 
-There are also some example scripts using either Matlab or the Paraview.simple module or the Netcdf4 module
+There are also some example scripts using either Matlab or the Paraview simple module or the Netcdf4 module
 for Python to perform certain specific postprocessing tasks.
 These are not documented but are summarised in Table~\ref{tab:ppscripts}. 
 
@@ -1442,7 +1512,8 @@ Request a merge to master when you are happy that it is stable.
 
 Adding new ISM or OM components should not require changes to the Makefile.
 If you feel that changes to the Makefile are needed, please first contact the developers
-to discuss whether this can be achieved through 
+to discuss whether this can be achieved through a 
+build script.
 
 
 \subsubsection{Error handling}
@@ -1471,7 +1542,7 @@ Compile time choices include which ISM or OM component to run, the type of ESMF
 geometry object for each component (mesh or grid), and paths to find
 component libraries.
 These are set through environment variables during the build process.
-Other options are mostly run time options, determined by paramters in the FISOC
+Other options are mostly run time options, determined by parameters in the FISOC
 configuration file. 
 
 The configuration file must be named ``FISOC\_config.rc''.  
@@ -1511,8 +1582,22 @@ only at one location rather than each time the attribute is accessed
 from the config object.
 It has the disadvantage that the utils module is not the most intuitive
 place to store hard coded defaults.
-Where defaults are set by the utils module an info statement should be written
+Where defaults are set by the utils module, an info statement should be written
 to the PET logs. 
+
+The derived attributes and default values are not fully documented here due to the
+dynamic nature of the code base; the code base should be considered to contain the definitive
+list.
+Some indication can be obtained by searching the code.
+This command, for example, shows the lines surrounding where FISOC catches a ``not found''
+error from ESMF: 
+\begin{lstlisting}[language=bash]
+ grep -i -C 3 ESMF_RC_NOT_FOUND FISOC_utils.f90
+\end{lstlisting}
+Note that it is not intended for physical parameters to have hard coded defaults given
+using this mechanism.
+It is dangerous to provide values for physical parameters in more than one location.
+Use of derived attributes to set defaults is aimed at safe parameters e.g. output frequency.
 
 %\subsection{ISM wrapper}
 
