@@ -1056,47 +1056,70 @@ CONTAINS
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     REAL(ESMF_KIND_R8),INTENT(OUT)        :: derivedAttribute
     INTEGER,OPTIONAL,INTENT(OUT)          :: rc
+
+    LOGICAL              :: APPLY_OM_AFF
+    REAL(ESMF_KIND_R8)   :: OM_AFF
     
     rc = ESMF_FAILURE
 
     SELECT CASE(label)
 
-    CASE('OM_WCmin') ! OM water column minimum thickness
-       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_WCmin:', rc=rc)
-       IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
-          derivedAttribute = 0.0
-          msg = "WARNING: OM_WCmin not found, setting to zero."
-          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
-               line=__LINE__, file=__FILE__)
-       ELSE
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__, rcToReturn=rc)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       END IF
-       
-    CASE('OM_CavCorr') ! cavity drift corrrection factor
-       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_CavCorr:', rc=rc)
-       IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
-          derivedAttribute = 0.2
-          msg = "WARNING: OM_CavCorr not found, setting to 0.2."
-          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
-               line=__LINE__, file=__FILE__)
-       ELSE
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__, rcToReturn=rc)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       END IF
-
+    CASE('OM_dt_sec','OM_dt_sec:') ! OM run interval (this is "derived" when using accelerated forcing).
+      CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_dt_sec:', rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      CALL FISOC_ConfigDerivedAttribute(FISOC_config, APPLY_OM_AFF, 'APPLY_OM_AFF:',rc=rc) 
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      IF (APPLY_OM_AFF) THEN
+        CALL ESMF_ConfigGetAttribute(FISOC_config, OM_AFF, label='OM_AFF:', rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+        derivedAttribute = derivedAttribute / OM_AFF
+      END IF
+      
+    CASE('OM_WCmin','OM_WCmin:') ! OM water column minimum thickness
+      CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_WCmin:', rc=rc)
+      IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+        derivedAttribute = 0.0
+        msg = "WARNING: OM_WCmin not found, setting to zero."
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__)
+      ELSE
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      END IF
+      
+    CASE('OM_CavCorr','OM_CavCorr:') ! cavity drift corrrection factor
+      CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_CavCorr:', rc=rc)
+      IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+        derivedAttribute = 0.2
+        msg = "WARNING: OM_CavCorr not found, setting to 0.2."
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__)
+      ELSE
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      END IF
+      
     CASE DEFAULT
-       msg = 'ERROR: unrecognised derived config attribute label '
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
+      msg = 'ERROR: unrecognised derived config real attribute label '//label
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
     END SELECT
     
     rc = ESMF_SUCCESS
-
+    
   END SUBROUTINE FISOC_ConfigDerivedAttributeReal
 
 
@@ -1266,12 +1289,42 @@ CONTAINS
     LOGICAL,INTENT(OUT)                   :: derivedAttribute
     INTEGER,OPTIONAL,INTENT(OUT)          :: rc
 
-    INTEGER :: rc_local
+    INTEGER            :: rc_local
+    REAL(ESMF_KIND_R8) :: realAttribute
     
     rc = ESMF_FAILURE
-
+    
     SELECT CASE(label)
-
+      
+      ! Apply accelerated ocean forcing only if OM_AFF is given and is a positive number other than 1.0
+    CASE('APPLY_OM_AFF','APPLY_OM_AFF:')
+      CALL ESMF_ConfigGetAttribute(FISOC_config, realAttribute, label='OM_AFF:', rc=rc_local)
+      IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+        derivedAttribute = .FALSE.
+        msg = "WARNING: OM_AFF not found, not applying accelerated forcing"
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__)
+      ELSE
+        IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        IF ( realAttribute.GT.0.0) THEN
+          IF ( realAttribute.EQ.1.0 ) THEN
+            derivedAttribute = .FALSE.
+            msg = "WARNING: OM_AFF set to 1.0, not applying accelerated forcing"
+            CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+                 line=__LINE__, file=__FILE__)
+          ELSE
+            derivedAttribute = .TRUE.
+          END IF
+        ELSE
+          msg = "ERROR: OM_AFF must be positive or omitted"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        END IF
+      END IF
+      
     CASE('profiling','profiling:')
        CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='profiling:', rc=rc_local)
        IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN

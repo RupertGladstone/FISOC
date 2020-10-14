@@ -728,9 +728,10 @@ netcdf outputs after an ISM timestep).
 
 \textbf{\underline{Timestepping options}}                                  \\
 \textbf{OM\_dt\_sec:}         [INTEGER][required]                          \\
-OM timestep length in seconds.  When using ROMS, this may be a multiple 
-of the ROMS timestep length, in which case each FISOC call to the ROMS 
-run method will run multiple ROMS timesteps.                               \\
+OM timestep length in seconds, from a FISOC perspective.  This is the time \\
+period for which FISOC calls the OM.  This may be a multiple of the OM     \\
+timestep length, in which case each FISOC call to the OM run method will   \\
+run multiple OM timesteps.                                                 \\
 \vspace{6pt}
 \textbf{dt\_ratio:}          [INTEGER][required]                           \\
 ISM/OM timestep ratio.                                                     \\
@@ -748,6 +749,12 @@ End year and month define the finish time of the coupled simulation.       \\
 \textbf{runLength\_ISM\_steps:} [INTEGER][optional]                        \\
 As an alternative to specifying an end time, the run length in terms of 
 ISM timesteps may be specified.                                            \\
+\vspace{6pt}
+\textbf{OM\_AFF:}            [INTEGER][optional]                           \\
+OM asymmetric accelerated forcing factor.  This causes the ocean to recieve\\
+accelerated rates of geometry change (these are multiplied by OM\_AAF) and \\
+to run for a shorter period (OM\_dt\_sec is divided by OM\_AAF). Default   \\
+is 1.                                                                      \\
 \vspace{22pt}
 
 %after adding atmos model...

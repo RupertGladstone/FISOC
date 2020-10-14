@@ -176,6 +176,8 @@ CONTAINS
     TYPE(ESMF_config)      :: FISOC_config
     TYPE(ESMF_fieldbundle) :: OM_ImpFB, OM_ExpFB
 
+    LOGICAL                :: APPLY_OM_AFF
+    
     rc = ESMF_FAILURE
 
     CALL ESMF_GridCompGet(FISOC_OM, config=FISOC_config, vm=vm, rc=rc)
@@ -192,7 +194,16 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
-    
+
+    ! If accelerated forcing is active, scale selected OM import fields
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, APPLY_OM_AFF, 'APPLY_OM_AFF:',rc=rc) 
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (APPLY_OM_AFF) THEN
+      CALL OM_AcceleratedForcing(FISOC_config, OM_ImpFB, rc)
+    END IF
+      
     CALL FISOC_OM_Wrapper_Init_Phase2(FISOC_config,vm,OM_ImpFB,OM_ExpFB,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -223,7 +234,7 @@ CONTAINS
     TYPE(ESMF_fieldbundle)     :: OM_ImpFB, OM_ExpFB, OM_ExpFBcum
     TYPE(ESMF_config)          :: FISOC_config
     TYPE(ESMF_Alarm)           :: alarm_OM_output, alarm_ISM, alarm_ISM_exportAvailable
-    LOGICAL                    :: verbose_coupling, OM_writeNetcdf
+    LOGICAL                    :: verbose_coupling, OM_writeNetcdf, APPLY_OM_AFF
 
     rc = ESMF_FAILURE
    
@@ -301,6 +312,15 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+    ! If accelerated forcing is active, scale selected OM import fields
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, APPLY_OM_AFF, 'APPLY_OM_AFF:',rc=rc) 
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    IF (APPLY_OM_AFF) THEN
+      CALL OM_AcceleratedForcing(FISOC_config, OM_ImpFB, rc)
+    END IF
     
     ! The ocean cavity might need temporal linear interpolation at this point.
     CALL OM_HandleCavity(FISOC_config, FISOC_clock, OM_ImpFB, OM_ExpFB, localPet, rc=rc)
@@ -529,6 +549,76 @@ CONTAINS
 
   END SUBROUTINE FISOC_OM_finalise  
 
+
+  !------------------------------------------------------------------------------
+  ! Apply an ocean accelerated forcing factor to the geometry change rates to be
+  ! passed from ISM to OM.  This routine should only be called when required, so
+  ! imposes no internal validity checks on OM_AFF.  The fields to be scaled are
+  ! hard coded in this routine.
+  SUBROUTINE OM_AcceleratedForcing(FISOC_config, OM_ImpFB, rc)
+
+    TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: OM_ImpFB
+    INTEGER,INTENT(OUT),OPTIONAL             :: rc
+
+    INTEGER                      :: nn, fieldCount
+    REAL(ESMF_KIND_R8),POINTER   :: ptr(:)
+    REAL(ESMF_KIND_R8)           :: OM_AFF
+    TYPE(ESMF_field),ALLOCATABLE :: FieldList(:)
+    CHARACTER(len=ESMF_MAXSTR)   :: FieldName
+     
+    ! Get the OM acceleration factor
+    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_AFF, label='OM_AFF:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! get a list of fields and their names from the OM import field bundle
+    fieldCount = 0
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldCount=fieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(fieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldList=fieldList, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+    fieldLoop: DO nn = 1,fieldCount
+      
+      CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      SELECT CASE (TRIM(ADJUSTL(fieldName)))
+        
+      CASE ('ISM_dddt','ISM_dsdt')
+        CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        ptr = ptr * OM_AFF
+        IF (ASSOCIATED(ptr)) THEN
+          NULLIFY(ptr)
+        END IF
+        
+      CASE('ISM_z_l0','ISM_z_lts','ISM_z_lts_previous','ISM_z_l0_previous')
+
+      CASE DEFAULT         
+        msg = "ERROR: OM_AFF behaviour not specified for variable: "//TRIM(ADJUSTL(fieldName))
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+             line=__LINE__, file=__FILE__, rc=rc)
+        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+      END SELECT
+      
+    END DO fieldLoop
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE OM_AcceleratedForcing
 
   !------------------------------------------------------------------------------
   SUBROUTINE OM_HandleCavity(FISOC_config, FISOC_clock, OM_ImpFB, OM_ExpFB, localPet, rc)

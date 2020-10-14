@@ -259,7 +259,7 @@ CONTAINS
     END IF
 
     ! Get OM time interval (how long to run OM for) in seconds...
-    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_dt_sec, label='OM_dt_sec:', rc=rc)
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_dt_sec, label='OM_dt_sec:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
