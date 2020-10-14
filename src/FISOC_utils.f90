@@ -984,6 +984,9 @@ CONTAINS
     INTEGER,OPTIONAL,INTENT(OUT)          :: rc
     
     INTEGER                               :: OM_dt_sec, dt_ratio, OM_outputInterval
+    LOGICAL                               :: APPLY_OM_AFF
+    REAL(ESMF_KIND_R8)                    :: OM_AFF
+    
 
     rc = ESMF_FAILURE
 
@@ -1036,8 +1039,28 @@ CONTAINS
             line=__LINE__, file=__FILE__, rcToReturn=rc)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        derivedAttribute = dt_ratio / OM_outputInterval
-
-     CASE DEFAULT
+       
+    CASE('OM_dt_sec','OM_dt_sec:') ! OM run interval (this is "derived" when using accelerated forcing).
+       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_dt_sec:', rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       CALL FISOC_ConfigDerivedAttribute(FISOC_config, APPLY_OM_AFF, 'APPLY_OM_AFF:',rc=rc) 
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       
+       IF (APPLY_OM_AFF) THEN
+          CALL ESMF_ConfigGetAttribute(FISOC_config, OM_AFF, label='OM_AFF:', rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          
+          derivedAttribute = derivedAttribute / OM_AFF
+       END IF
+       
+    CASE DEFAULT
        msg = 'ERROR: unrecognised derived config attribute label '//label
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
@@ -1045,7 +1068,7 @@ CONTAINS
     END SELECT
     
     rc = ESMF_SUCCESS
-
+    
   END SUBROUTINE FISOC_ConfigDerivedAttributeInteger
 
 
