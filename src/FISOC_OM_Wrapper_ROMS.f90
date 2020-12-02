@@ -42,7 +42,6 @@ MODULE FISOC_OM_Wrapper
 
   TYPE(ESMF_RouteHandle) :: OM_haloRouteHandle
 
-
   ! These switches correspond to ROMS preprocessor directives.  See also 
   ! ROMS/Include/iceshelf2d.h in ROMS repository.
 !  LOGICAL, PARAMETER :: ROMS_MASKING = .FALSE.
@@ -187,6 +186,10 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+#ifdef ROMS_MASKING
+    CALL FISOC_ROMS_WET2DRY(FISOC_config,OM_grid,localpet,rc=rc)
+#endif
     
     RETURN
     
@@ -284,7 +287,7 @@ CONTAINS
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_bmb_ptr(:,:)
     INTEGER                    :: OM_dt_sec
     REAL(ESMF_KIND_R8)         :: OM_dt_sec_float
-
+    TYPE(ESMF_grid)            :: OM_grid
 
     rc_local = ESMF_FAILURE
     
@@ -327,13 +330,22 @@ CONTAINS
     END IF
 
     IF (exit_flag.NE.NoError) THEN
-       WRITE (msg, "(A,I0,A)") "ERROR: ROMS has returned non-safe exit_flag=", &
-            exit_flag,", see ROMS mod_scalars.f90 for exit flag meanings."
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       RETURN
+      WRITE (msg, "(A,I0,A)") "ERROR: ROMS has returned non-safe exit_flag=", &
+           exit_flag,", see ROMS mod_scalars.f90 for exit flag meanings."
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      RETURN
     END IF
     
+    CALL FISOC_getGridFromFB(OM_expFB,OM_grid,rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    
+#ifdef ROMS_MASKING
+    CALL FISOC_ROMS_WET2DRY(FISOC_config,OM_grid,localpet,rc=rc)
+#endif
+
     IF (PRESENT(OM_ExpFB)) THEN
        CALL getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -432,6 +444,190 @@ CONTAINS
   END SUBROUTINE FISOC_OM_Wrapper_Finalize
 
 
+#ifdef ROMS_MASKING
+  !--------------------------------------------------------------------------------------
+  ! Map wet cell tracer values to the nearest dry cells.
+  !--------------------------------------------------------------------------------------
+  ! Copied from ROMS code comments:
+  !  Notice that at input the tracer arrays have:
+  !  t(:,:,:,nnew,:)   m Tunits  n+1     horizontal/vertical diffusion
+  !                                      terms plus source/sink terms
+  !                                      (biology, sediment), if any
+  !
+  ! First three indices are spatial: i, j, vertical.
+  ! Last index is tracer number (use itemp and isalt from mod_scalars).
+  !
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE FISOC_ROMS_WET2DRY(FISOC_config,OM_grid,localpet,rc)
+  
+    USE mod_param, ONLY       : BOUNDS, Ngrids
+    USE mod_stepping, ONLY    : nnew, nstp
+    USE mod_grid , ONLY       : GRID
+    USE mod_ocean, ONLY       : OCEAN
+    USE mod_scalars, ONLY     : itemp, isalt
+
+    TYPE(ESMF_config),INTENT(INOUT):: FISOC_config
+    TYPE(ESMF_grid),INTENT(IN)     :: OM_grid
+    INTEGER,INTENT(IN)             :: localPet
+    INTEGER,INTENT(OUT),OPTIONAL   :: rc
+    
+    INTEGER                        :: nTracers, nLevels, ng, ii, jj, kk, tt
+    INTEGER                        :: IstrR, IendR, JstrR, JendR ! tile start and end rho coords
+    INTEGER(ESMF_KIND_I4), POINTER :: mask_ptr(:,:)
+    REAL(ESMF_KIND_R8),POINTER     :: src_field_ptr(:,:), dest_field_ptr(:,:)
+    LOGICAL                        :: WET2DRY, firstTime
+    CHARACTER(len=ESMF_MAXSTR)     :: listName, tracerName
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: WET2DRY_vars(:)
+    TYPE(ESMF_field)               :: src_field, dest_field
+    TYPE(ESMF_RouteHandle)         :: WET2DRY_RouteHandle
+    
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, WET2DRY, 'WET2DRY:',rc=rc) 
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT) 
+    IF (.NOT. WET2DRY) THEN
+      msg = "INFO: WET2DRY is set to false."
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      RETURN
+    END IF
+    
+    listName = "WET2DRY_vars:"
+    CALL FISOC_getListFromConfig(FISOC_config, listName, WET2DRY_vars,rc=rc, returnCount=nTracers)
+    
+    IF (Ngrids > 1) THEN
+      msg = 'number of nested grid is greater than 1.'//        &
+           'Coupling only interacts with outermost one!'
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      ng = 1
+    ELSE
+      ng = Ngrids
+    END IF    
+    
+    msg = "INFO: mapping ROMS WET tracers values to nearest DRY cells"
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+         line=__LINE__, file=__FILE__, rc=rc)
+    
+    ! get the tile position from the OM (a tile is a rectangular domain decomposition element)
+    IstrR=BOUNDS(Ngrids)%IstrR(localPet)
+    IendR=BOUNDS(Ngrids)%IendR(localPet)
+    JstrR=BOUNDS(Ngrids)%JstrR(localPet)
+    JendR=BOUNDS(Ngrids)%JendR(localPet)
+
+!    print*, OCEAN(ng)%t(:,:,1,nnew(ng),itemp)
+
+    ! firstly update the mask in the ESMF grid object to the current ROMS wet/dry mask
+    CALL ESMF_GridGetItem (OM_grid,                 &
+         staggerLoc=ESMF_STAGGERLOC_CENTER,         &
+         itemflag=ESMF_GRIDITEM_MASK,               &
+         farrayPtr=mask_ptr,                        &
+         rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    DO jj = JstrR, JendR
+      DO ii = IstrR, IendR
+        mask_ptr(ii,jj) = GRID(ng)%rmask_wet(ii,jj)
+      END DO
+    END DO
+
+
+    ! We re-use the same source field and destination field for each level of each tracer
+    src_field = ESMF_FieldCreate(OM_grid, typekind=ESMF_TYPEKIND_R8, name="tracer", rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=src_field, farrayPtr=src_field_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    dest_field = ESMF_FieldCreate(OM_grid, typekind=ESMF_TYPEKIND_R8, name="dest_tracer", rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_FieldGet(field=dest_field, farrayPtr=dest_field_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    
+    ! loop over tracers and regrid level by level    
+    nLevels = SIZE(OCEAN(ng)%t(1,1,:,nnew(ng),itemp))
+    firstTime = .TRUE.
+    tracer: DO tt = 1, nTracers
+      tracerName = WET2DRY_vars(tt)
+      level: DO kk = 1, nLevels
+
+        ! Create regridding routehandle first time through
+        IF (firstTime) THEN
+          CALL ESMF_FieldRegridStore(srcField=src_field, srcMaskValues=(/0/), &
+               dstField=dest_field,                                           &
+               regridmethod=ESMF_REGRIDMETHOD_NEAREST_STOD,                   &
+               routehandle=WET2DRY_RouteHandle, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,      &
+               line=__LINE__, file=__FILE__))                                 &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          firstTime = .FALSE.
+        END IF
+        
+        ! read the ROMS tracer values into the source and destination fields
+        ! (technically reading into the destination field is not needed)
+        jj_loop: DO jj = JstrR, JendR
+          ii_loop: DO ii = IstrR, IendR
+            SELECT CASE(tracerName)
+            CASE('temp')
+              src_field_ptr(ii,jj)  = OCEAN(ng)%t(ii,jj,kk,nnew(ng),itemp)
+              dest_field_ptr(ii,jj) = OCEAN(ng)%t(ii,jj,kk,nnew(ng),itemp)
+            CASE('salt')
+              src_field_ptr(ii,jj)  = OCEAN(ng)%t(ii,jj,kk,nnew(ng),isalt)
+              dest_field_ptr(ii,jj) = OCEAN(ng)%t(ii,jj,kk,nnew(ng),isalt)
+            CASE DEFAULT
+              msg = 'ERROR: unrecognised tracer name '//tracerName
+              CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+                   line=__LINE__, file=__FILE__, rc=rc)
+              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+            END SELECT
+          END DO ii_loop
+        END DO jj_loop
+    
+        ! the actual regrid operation
+        CALL ESMF_FieldRegrid(src_field,dest_field, &
+             routehandle=WET2DRY_RouteHandle, zeroregion= ESMF_REGION_TOTAL, &
+             checkflag=.TRUE.,rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+        ! write the remapped tracer field back to the ROMS variables
+        DO jj = JstrR, JendR
+          DO ii = IstrR, IendR
+            SELECT CASE(tracerName)
+            CASE('temp')
+              OCEAN(ng)%t(ii,jj,kk,nnew(ng),itemp) = dest_field_ptr(ii,jj)
+            CASE('salt')
+              OCEAN(ng)%t(ii,jj,kk,nnew(ng),isalt) = dest_field_ptr(ii,jj)
+            CASE DEFAULT
+              msg = 'ERROR: unrecognised tracer name '//tracerName
+              CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+                   line=__LINE__, file=__FILE__, rc=rc)
+              CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+            END SELECT
+          END DO 
+        END DO 
+
+      END DO level
+    END DO tracer
+
+!    print*, OCEAN(ng)%t(:,:,1,nnew(ng),itemp)
+    
+    NULLIFY(dest_field_ptr)
+    NULLIFY(src_field_ptr)
+    
+  END SUBROUTINE FISOC_ROMS_WET2DRY
+#endif
+  
+  
   !--------------------------------------------------------------------------------------
   ! Use the cavity from the ISM first stage initialisation to set the OM cavity
   !--------------------------------------------------------------------------------------
