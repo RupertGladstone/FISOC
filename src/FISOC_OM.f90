@@ -562,7 +562,11 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL             :: rc
 
     INTEGER                      :: nn, fieldCount
+# if defined(FISOC_OM_GRID)
+    REAL(ESMF_KIND_R8),POINTER   :: ptr(:,:)
+# elif defined(FISOC_OM_MESH)
     REAL(ESMF_KIND_R8),POINTER   :: ptr(:)
+# endif
     REAL(ESMF_KIND_R8)           :: OM_AFF
     TYPE(ESMF_field),ALLOCATABLE :: FieldList(:)
     CHARACTER(len=ESMF_MAXSTR)   :: FieldName
@@ -604,7 +608,7 @@ CONTAINS
           NULLIFY(ptr)
         END IF
         
-      CASE('ISM_z_l0','ISM_z_lts','ISM_z_lts_previous','ISM_z_l0_previous','ISM_gmask', 'ISM_thick')
+      CASE('ISM_z_l0','ISM_z_lts','ISM_z_lts_previous','ISM_z_l0_previous','ISM_gmask','ISM_thick')
 
       CASE DEFAULT         
         msg = "ERROR: OM_AFF behaviour not specified for variable: "//TRIM(ADJUSTL(fieldName))
@@ -641,19 +645,23 @@ CONTAINS
     TYPE(ESMF_field)            :: ISM_z_l0_field, OM_z_l0_field, dddt_field
     TYPE(ESMF_field)            :: OM_bed_field
     TYPE(ESMF_field)            :: OM_z_lts_field,ISM_z_lts_field,ISM_dsdt_field
+# if defined(FISOC_OM_GRID)
+    TYPE(ESMF_grid)             :: OM_grid
     REAL(ESMF_KIND_R8),POINTER  :: ptr_curr(:,:),ptr_prev(:,:),ptr_linterp(:,:)
     REAL(ESMF_KIND_R8),POINTER  :: ISM_z_l0(:,:), OM_z_l0(:,:), dddt(:,:)
     REAL(ESMF_KIND_R8),POINTER  :: OM_bed(:,:)
     REAL(ESMF_KIND_R8),POINTER  :: OM_z_lts(:,:),ISM_z_lts(:,:),ISM_dsdt(:,:)
-    INTEGER                     :: ii,jj,arrShape(2)
-    INTEGER                     :: IendR, IstrR, JendR, JstrR
-
     REAL(ESMF_KIND_R8), POINTER :: ptrX(:,:), ptrY(:,:)
-# if defined(FISOC_OM_GRID)
-    TYPE(ESMF_grid)             :: OM_grid
 # elif defined(FISOC_OM_MESH)
     TYPE(ESMF_mesh)             :: OM_mesh
+    REAL(ESMF_KIND_R8),POINTER  :: ptr_curr(:),ptr_prev(:),ptr_linterp(:)
+    REAL(ESMF_KIND_R8),POINTER  :: ISM_z_l0(:), OM_z_l0(:), dddt(:)
+    REAL(ESMF_KIND_R8),POINTER  :: OM_bed(:)
+    REAL(ESMF_KIND_R8),POINTER  :: OM_z_lts(:),ISM_z_lts(:),ISM_dsdt(:)
+    REAL(ESMF_KIND_R8), POINTER :: ptrX(:), ptrY(:)
 # endif
+    INTEGER                     :: ii,jj,arrShape(2)
+    INTEGER                     :: IendR, IstrR, JendR, JstrR
     INTEGER                     :: exclusiveLBound(2),exclusiveUBound(2),exclusiveCount(2),computationalLBound(2)
     INTEGER                     :: computationalUBound(2),computationalCount(2),totalLBound(2),totalUBound(2)
 

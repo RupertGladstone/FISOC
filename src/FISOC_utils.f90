@@ -1289,13 +1289,15 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   SUBROUTINE FISOC_ConfigDerivedAttributeLogical(FISOC_config, derivedAttribute, label,rc)
     
-    CHARACTER(len=*),INTENT(IN)           :: label
-    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    LOGICAL,INTENT(OUT)                   :: derivedAttribute
-    INTEGER,OPTIONAL,INTENT(OUT)          :: rc
+    CHARACTER(len=*),INTENT(IN)            :: label
+    TYPE(ESMF_config),INTENT(INOUT)        :: FISOC_config
+    LOGICAL,INTENT(OUT)                    :: derivedAttribute
+    INTEGER,OPTIONAL,INTENT(OUT)           :: rc
 
-    INTEGER            :: rc_local
-    REAL(ESMF_KIND_R8) :: realAttribute
+    INTEGER                                :: rc_local, length
+    REAL(ESMF_KIND_R8)                     :: realAttribute
+    CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE :: stringList(:)
+    CHARACTER(len=ESMF_MAXSTR)             :: listName
     
     rc = ESMF_FAILURE
     
@@ -1328,6 +1330,26 @@ CONTAINS
                line=__LINE__, file=__FILE__)
           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
         END IF
+      END IF
+      
+    CASE('WET2DRY','WET2DRY:')
+      listName = "WET2DRY_vars:"
+      CALL FISOC_getStringListFromConfig(FISOC_config,listName,stringList,rc,returnCount=length)
+      IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+        msg = "WET2DRY_vars not found in FISOC config file, setting WET2DRY to false."
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__, rc=rc)          
+        derivedAttribute = .FALSE.
+      ELSE IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) THEN
+        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      ELSE IF (length.EQ.0) THEN
+        msg = "WET2DRY_vars has zero length, setting WET2DRY to false."
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__, rc=rc)          
+        derivedAttribute = .FALSE.
+      ELSE
+        derivedAttribute = .TRUE.
       END IF
       
     CASE('profiling','profiling:')
@@ -1708,15 +1730,14 @@ print*,'catch error and set default if missing att'
   
 
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_getStringListFromConfig(config,label,stringList,rc)
+  SUBROUTINE FISOC_getStringListFromConfig(config,label,stringList,rc,returnCount)
 
     CHARACTER(len=ESMF_MAXSTR),ALLOCATABLE,INTENT(INOUT) :: stringList(:)
-
     TYPE(ESMF_config),INTENT(INOUT)      :: config
-
     CHARACTER(len=ESMF_MAXSTR),INTENT(IN):: label
     INTEGER,INTENT(OUT)                  :: rc
-
+    INTEGER,INTENT(OUT),OPTIONAL         :: returnCount
+    
     CHARACTER(len=ESMF_MAXSTR)           :: dummyString
     INTEGER                              :: listCount,ii
 
@@ -1754,6 +1775,10 @@ print*,'catch error and set default if missing att'
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END DO
+
+    IF (PRESENT(returnCount)) THEN
+      returnCount = listCount
+    END IF
 
     rc = ESMF_SUCCESS
 
@@ -1891,7 +1916,7 @@ print*,'catch error and set default if missing att'
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
-
+ 
     filename = TRIM(output_dir)//'/'//TRIM(filename)
 
     IF (ESMF_IO_NETCDF_PRESENT) THEN
@@ -2005,10 +2030,12 @@ print*,'catch error and set default if missing att'
     ! create the routehandle for regridding
     CALL ESMF_FieldRegridStore(InField, OutField, regridmethod=regridmethod, &
          unmappedaction=unmappedaction, routehandle=routeHandle,             &
+         dstMaskValues=(/OMM_OPEN_OCEAN/),                                   &
          extrapMethod=extrapMethod, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     
     ! copy the field data back in, cleaning up as we go
     SELECT CASE(InDims)

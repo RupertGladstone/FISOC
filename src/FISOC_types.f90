@@ -13,6 +13,9 @@ MODULE FISOC_types_MOD
   INTEGER,PARAMETER            :: OM_outputUnit = 37, ISM_outputUnit = 32
   INTEGER,PARAMETER            :: CLOCKWISE=1, ANTI_CLOCKWISE=2
 
+  ! OMM = Ocean Model Mask value
+  INTEGER,PARAMETER            :: OMM_ICE=10, OMM_GROUNDED_ICE=11, OMM_FLOATING_ICE=12, OMM_OPEN_OCEAN=13
+
   ! This time information is set at run time.
   TYPE(ESMF_Time)              :: FISOC_time, FISOC_startTime, FISOC_endTime
 !  TYPE(ESMF_TimeInterval)      :: FISOC_OM_TI, FISOC_ISM_TI

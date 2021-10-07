@@ -663,6 +663,7 @@ CONTAINS
     CHARACTER(len=ESMF_MAXSTR)       :: subroutineName = "FVCOM2ESMF_mesh"
     INTEGER,ALLOCATABLE              :: elemTypes(:), elemIds(:),elemConn(:), localNodeIDs(:)
     INTEGER,ALLOCATABLE              :: nodeIds(:),nodeOwners(:),nodeOwnersGL(:),nodeOwnersGL_recv(:)
+    INTEGER,ALLOCATABLE              :: nodeMask(:)
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
     INTEGER                          :: localPet, petCount 
     INTEGER                          :: FVCOM_numNodes, FVCOM_numElems 
@@ -697,6 +698,7 @@ CONTAINS
     ALLOCATE(nodeIds(FVCOM_numNodes))
     ALLOCATE(nodeCoords(FVCOM_numNodes*2))
     ALLOCATE(nodeOwners(FVCOM_numNodes))
+    ALLOCATE(nodeMask(FVCOM_numNodes))
     
     ALLOCATE(elemIds(FVCOM_numElems))
     ALLOCATE(elemConn(FVCOM_numElems*3))
@@ -704,6 +706,10 @@ CONTAINS
 
     ALLOCATE(nodeOwnersGL(MGL)) 
     ALLOCATE(nodeOwnersGL_recv(MGL)) 
+
+    ! Setup mask to avoid regridding ice variables in the open ocean.
+    nodeMask = ICE
+    WHERE (ISISFN.EQ.0) nodeMask = OPEN_OCEAN
 
     ! Construct a global array of node owners in which an arbitrary decision is 
     ! taken about which partition boundary nodes should belong to.
@@ -755,9 +761,10 @@ CONTAINS
     !----------------------------------------------------------------!       
     ! Create Mesh structure in 1 step
     ESMF_FVCOMMesh = ESMF_MeshCreate(parametricDim=2,spatialDim=2, &
-         nodeIds=nodeIds, nodeCoords=nodeCoords,            &
-         nodeOwners=nodeOwners, elementIds=elemIds,      &
-         elementTypes=elemTypes, elementConn=elemConn,        &
+         nodeIds=nodeIds, nodeCoords=nodeCoords,                   &
+         nodeOwners=nodeOwners,                                    &
+         nodeMask=nodeMask, elementIds=elemIds,                    &
+         elementTypes=elemTypes, elementConn=elemConn,             &
          coordSys=ESMF_COORDSYS_CART,                              &
          rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -769,14 +776,15 @@ CONTAINS
     DEALLOCATE(nodeIds)
     DEALLOCATE(nodeCoords)
     DEALLOCATE(nodeOwners)
+    DEALLOCATE(nodeMask)
     
     DEALLOCATE(elemIds)
     DEALLOCATE(elemConn)
     DEALLOCATE(elemTypes)	
 
-!TODO: put this in PET logs
-print*,"FINISHED FVCOM MESH CREATION"
-    
+    !TODO: put this in PET logs
+    print*,"FINISHED FVCOM MESH CREATION"
+
   END SUBROUTINE FVCOM2ESMF_mesh
 
 
