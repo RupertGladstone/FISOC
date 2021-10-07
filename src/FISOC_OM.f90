@@ -604,7 +604,7 @@ CONTAINS
           NULLIFY(ptr)
         END IF
         
-      CASE('ISM_z_l0','ISM_z_lts','ISM_z_lts_previous','ISM_z_l0_previous')
+      CASE('ISM_z_l0','ISM_z_lts','ISM_z_lts_previous','ISM_z_l0_previous','ISM_gmask', 'ISM_thick')
 
       CASE DEFAULT         
         msg = "ERROR: OM_AFF behaviour not specified for variable: "//TRIM(ADJUSTL(fieldName))
