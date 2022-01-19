@@ -2030,7 +2030,7 @@ print*,'catch error and set default if missing att'
     ! create the routehandle for regridding
     CALL ESMF_FieldRegridStore(InField, OutField, regridmethod=regridmethod, &
          unmappedaction=unmappedaction, routehandle=routeHandle,             &
-         dstMaskValues=(/OMM_OPEN_OCEAN/),                                   &
+         dstMaskValues=(/MASK_OPEN_OCEAN/),                                   &
          extrapMethod=extrapMethod, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &

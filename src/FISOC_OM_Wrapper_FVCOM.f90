@@ -708,8 +708,8 @@ CONTAINS
     ALLOCATE(nodeOwnersGL_recv(MGL)) 
 
     ! Setup mask to avoid regridding ice variables in the open ocean.
-    nodeMask = OMM_ICE
-    WHERE (ISISFN.EQ.0) nodeMask = OMM_OPEN_OCEAN
+    nodeMask = MASK_ICE
+    WHERE (ISISFN.EQ.0) nodeMask = MASK_OPEN_OCEAN
 
     ! Construct a global array of node owners in which an arbitrary decision is 
     ! taken about which partition boundary nodes should belong to.

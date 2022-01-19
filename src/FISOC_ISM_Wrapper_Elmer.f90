@@ -47,7 +47,7 @@ MODULE FISOC_ISM_Wrapper
   ! For Elmer SSA runs, FISOC config should contain something like this:
   !  FISOC_ISM_ReqVars:  ISM_z_l0 ISM_z_lts 
   !  ISM_varNames:       'Zb' 'Zs'
-  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_gmask          = 'groundedmask'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_mask          = 'groundedmask'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_bmb        = 'meltRate'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_temperature_l0 = 'oceanTemperature'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_temperature_l1 = 'oceanTemperature'
@@ -505,8 +505,8 @@ CONTAINS
              EIname_z_l0            = ISM_varNames(ii)
           CASE ('ISM_z_lts')
              EIname_z_lts           = ISM_varNames(ii)
-          CASE ('ISM_gmask')
-             EIname_gmask           = ISM_varNames(ii)
+          CASE ('ISM_mask')
+             EIname_mask           = ISM_varNames(ii)
           CASE ('ISM_thick')
              EIname_thick           = ISM_varNames(ii)
           CASE DEFAULT
@@ -799,15 +799,16 @@ CONTAINS
              END IF
           END DO
           
-       CASE ('ISM_gmask')
+       CASE ('ISM_mask')
           EI_field => VariableGet( CurrentModel % Mesh % Variables, &
-               EIname_gmask, UnFoundFatal=.TRUE.)
+               EIname_mask, UnFoundFatal=.TRUE.)
           EI_fieldVals => EI_field % Values
           EI_fieldPerm => EI_field % Perm
           DO ii = 1,SIZE(ownedNodeIDs)
             ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
-            IF (ptr(ii).GE.0) ptr(ii) = 0
-            IF (ptr(ii).LT.0) ptr(ii) = 1
+            IF (ptr(ii).GT.0) ptr(ii) = MASK_GROUNDED_ICE
+            IF (ptr(ii).EQ.0) ptr(ii) = MASK_GL
+            IF (ptr(ii).LT.0) ptr(ii) = MASK_FLOATING_ICE
           END DO
            
        CASE ('ISM_temperature_l0','ISM_temperature_l1','ISM_velocity_l0','ISM_z_l1','ISM_z_l0_previous','ISM_z_lts_previous')

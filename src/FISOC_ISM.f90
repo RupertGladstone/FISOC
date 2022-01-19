@@ -3,6 +3,7 @@ MODULE FISOC_ISM_MOD
   USE ESMF
   USE FISOC_ISM_Wrapper
   USE FISOC_utils_MOD
+  USE FISOC_types_MOD
     
   IMPLICIT NONE
   
@@ -472,7 +473,7 @@ CONTAINS
     INTEGER, INTENT(OUT),OPTIONAL          :: rc
     
     LOGICAL                         :: ISM_maskOMvars
-    TYPE(ESMF_field)                :: ISM_gmask
+    TYPE(ESMF_field)                :: ISM_mask
     REAL(ESMF_KIND_R8),POINTER      :: mask_ptr(:),ptr(:)
     INTEGER                         :: fieldCount, ii
     TYPE(ESMF_Field),ALLOCATABLE    :: fieldList(:)
@@ -491,14 +492,14 @@ CONTAINS
     END IF
 
     ! Get grounded mask from ISM export fields
-    CALL ESMF_FieldBundleGet(ISM_ExpFB, "ISM_gmask", field=ISM_gmask, rc=rc)
+    CALL ESMF_FieldBundleGet(ISM_ExpFB, "ISM_mask", field=ISM_mask, rc=rc)
     IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
-      msg = "ERROR: ISM_maskOMvars set to true but ISM_gmask not available"
+      msg = "ERROR: ISM_maskOMvars set to true but ISM_mask not available"
     ELSE IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) THEN
       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
-    CALL ESMF_FieldGet(ISM_gmask, farrayPtr=mask_ptr, rc=rc)
+    CALL ESMF_FieldGet(ISM_mask, farrayPtr=mask_ptr, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -525,7 +526,11 @@ CONTAINS
 !            line=__LINE__, file=__FILE__)) &
 !            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-      ptr = ptr * mask_ptr
+      WHERE (mask_ptr==MASK_OPEN_OCEAN)
+         ptr = 0.0
+      END WHERE
+
+!      ptr = ptr * mask_ptr
       
       IF (ASSOCIATED(ptr)) THEN
         NULLIFY(ptr)

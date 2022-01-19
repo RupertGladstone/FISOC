@@ -12,10 +12,11 @@ MODULE FISOC_types_MOD
   INTEGER,PARAMETER            :: FISOC_mpic_missing = -99, FISOC_missing = -9999
   INTEGER,PARAMETER            :: OM_outputUnit = 37, ISM_outputUnit = 32
   INTEGER,PARAMETER            :: CLOCKWISE=1, ANTI_CLOCKWISE=2
-
-  ! OMM = Ocean Model Mask value
-  INTEGER,PARAMETER            :: OMM_ICE=10, OMM_GROUNDED_ICE=11, OMM_FLOATING_ICE=12, OMM_OPEN_OCEAN=13
-
+  
+  INTEGER,PARAMETER            :: MASK_ICE=10, MASK_GROUNDED_ICE=11
+  INTEGER,PARAMETER            :: MASK_FLOATING_ICE=12, MASK_OPEN_OCEAN=13
+  INTEGER,PARAMETER            :: MASK_GL=14 ! grounding line
+  
   ! This time information is set at run time.
   TYPE(ESMF_Time)              :: FISOC_time, FISOC_startTime, FISOC_endTime
 !  TYPE(ESMF_TimeInterval)      :: FISOC_OM_TI, FISOC_ISM_TI
