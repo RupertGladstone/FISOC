@@ -36,7 +36,7 @@ PROGRAM FISOC_main
 !       logkindflag=ESMF_LOGKIND_MULTI, rc=rc)
   CALL ESMF_Initialize(defaultCalKind=ESMF_CALKIND_360DAY, &
        defaultlogfilename="FISOC.Log", &
-       logkindflag=ESMF_LOGKIND_MULTI, rc=rc)
+       logkindflag=ESMF_LOGKIND_SINGLE, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) THEN
      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
