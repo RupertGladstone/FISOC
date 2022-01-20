@@ -209,7 +209,7 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
     TYPE(ESMF_VM),INTENT(IN)              :: vm
 
-    LOGICAL   :: verbose_coupling, OM_initCavityFromISM, ISM2OM_init_vars
+    LOGICAL   :: verbose_coupling, OM_initCavityFromISM, ISM2OM_init_vars, OM_initFrontFromISM
     INTEGER   :: localpet
 
     rc = ESMF_FAILURE
@@ -235,14 +235,24 @@ CONTAINS
        PRINT*,""
     END IF
 
-    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_initCavityFromISM, label='OM_initCavityFromISM:', rc=rc)
-    IF  (rc.EQ.ESMF_RC_NOT_FOUND) THEN
-       OM_initCavityFromISM = .FALSE.
-    ELSE
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END IF
+!    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_initCavityFromISM, label='OM_initCavityFromISM:', rc=rc)
+!    IF  (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+!       OM_initCavityFromISM = .FALSE.
+!    ELSE
+!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!            line=__LINE__, file=__FILE__)) &
+!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    END IF
+
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_initFrontFromISM, 'OM_initFrontFromISM:',rc=rc) 
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_initCavityFromISM, 'OM_initCavityFromISM:',rc=rc) 
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM2OM_init_vars, 'ISM2OM_init_vars',rc=rc) 
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -258,6 +268,13 @@ CONTAINS
 
     IF (OM_initCavityFromISM) THEN
        CALL CavityReset(OM_ImpFB,FISOC_config,localPet,rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) & 
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    IF (OM_initFrontFromISM) THEN
+       CALL IceFrontReset(OM_ImpFB,FISOC_config,localPet,rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) & 
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -744,6 +761,90 @@ CONTAINS
     rc = ESMF_SUCCESS
 
   END SUBROUTINE CavityReset
+
+
+  !--------------------------------------------------------------------------------------
+  ! Use the ice front position from the ISM first stage initialisation to remove 
+  ! inconsistent parts of the OM ice shelf
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE IceFrontReset(OM_ImpFB,FISOC_config,localPet,rc)
+
+    USE mod_iceshelfvar, ONLY : ICESHELFVAR
+    USE mod_param, ONLY : BOUNDS, Ngrids
+    USE mod_grid , ONLY : GRID
+    USE mod_stepping, ONLY : nnew, nstp
+!    USE set_depth_mod, ONLY : set_depth
+
+    INTEGER,INTENT(IN)                    :: localPet
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB 
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+
+    INTEGER                               :: ii, jj
+    INTEGER                               :: JstrR, JendR, IstrR, IendR
+!    INTEGER                               :: Jstr, Jend, Istr, Iend
+    TYPE(ESMF_FIELD)                      :: ISM_mask
+    REAL(ESMF_KIND_R8),POINTER            :: mask_ptr(:,:)
+
+    rc = ESMF_FAILURE
+
+    msg = "OM ice front reset. Using ISM masks."
+    CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+         line=__LINE__, file=__FILE__, rc=rc)
+
+    IF (Ngrids.GT.1) THEN
+       msg = "ERROR: ROMS has nested grids, FISOC cannot yet handle this"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    ! Get ISM mask from OM import fields
+    CALL ESMF_FieldBundleGet(OM_ImpFB, "ISM_mask", field=ISM_mask, rc=rc)
+    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+      msg = "ERROR: OM_IceFrontReset set to true but ISM_mask not available"
+    ELSE IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) THEN
+      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    CALL ESMF_FieldGet(ISM_mask, farrayPtr=mask_ptr, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IstrR=BOUNDS(Ngrids)%IstrR(localPet)
+    IendR=BOUNDS(Ngrids)%IendR(localPet)
+    JstrR=BOUNDS(Ngrids)%JstrR(localPet)
+    JendR=BOUNDS(Ngrids)%JendR(localPet)
+
+!    Istr =BOUNDS(Ngrids)%Istr (localPet)
+!    Iend =BOUNDS(Ngrids)%Iend (localPet)
+!    Jstr =BOUNDS(Ngrids)%Jstr (localPet) 
+!    Jend =BOUNDS(Ngrids)%Jend (localPet)
+
+    DO jj = JstrR, JendR
+       DO ii = IstrR, IendR
+          IF (mask_ptr(ii,jj).EQ.MASK_OPEN_OCEAN) THEN
+# ifdef ROMS_DSDT
+             GRID(1) % sice (ii, jj) = 0.0
+# endif
+             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nstp) = 0.0
+             ICESHELFVAR(1) % iceshelf_draft(ii, jj, nnew) = 0.0
+             GRID(1) % zice (ii, jj) = 0.0
+          END IF
+       END DO
+    END DO
+
+!    CALL set_depth(Ngrids,localPet)
+!check draft is not below bedrock
+
+    IF (ASSOCIATED(mask_ptr)) THEN
+       NULLIFY(mask_ptr)
+    END IF
+    
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE IceFrontReset
 
 
   !--------------------------------------------------------------------------------------

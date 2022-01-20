@@ -1364,6 +1364,32 @@ CONTAINS
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        END IF
+
+    CASE('OM_initCavityFromISM','OM_initCavityFromISM:')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_initCavityFromISM:', rc=rc_local)
+       IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+          derivedAttribute = .FALSE.
+          msg = "WARNING: OM_initCavityFromISM not found, setting to .FALSE."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+
+    CASE('OM_initFrontFromISM','OM_initFrontFromISM:')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_initFrontFromISM:', rc=rc_local)
+       IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+          derivedAttribute = .FALSE.
+          msg = "WARNING: OM_initFrontFromISM not found, setting to .FALSE."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
        
     CASE('ISM2OM_init_vars','ISM2OM_init_vars:')
        CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='ISM2OM_init_vars:', rc=rc_local)
