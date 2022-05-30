@@ -22,7 +22,7 @@ MODULE FISOC_utils_MOD
        FISOC_getGridFromFB, FISOC_getMeshFromFB,               &                
        FISOC_ConfigStringListContains, FISOC_locallyOwnedNodes,&
        FISOC_CreateOneToManyRouteHandle,                       & 
-       FISOC_ArrayRedistFromField
+       FISOC_ArrayRedistFromField, FISOC_MAPLL
 !         FISOC_getGridOrMeshFromFB, 
 
   INTERFACE Unique1DArray
@@ -2816,4 +2816,88 @@ print*,'catch error and set default if missing att'
     
   END SUBROUTINE FISOC_ArrayRedistFromField
 
+
+  !------------------------------------------------------------------------------
+  ! Routine copied from NSIDC, github repo here:
+  ! https://github.com/nsidc/polarstereo-latlon-convert-fortran
+  !
+  !    DESCRIPTION:                                                            *
+  !                                                                            *
+  !    This subroutine converts from geodetic latitude and longitude to Polar  *
+  !    Stereographic (X,Y) coordinates for the polar regions.  The equations   *
+  !    are from Snyder, J. P., 1982,  Map Projections Used by the U.S.         *
+  !    Geological Survey, Geological Survey Bulletin 1532, U.S. Government     *
+  !    Printing Office.  See JPL Technical Memorandum 3349-85-101 for further  *
+  !    details.                                                                *
+  !                                                                            *
+  !    ARGUMENTS:                                                              *
+  !                                                                            *
+  !    Variable    Type        I/O    Description                              *
+  !                                                                            *
+  !    ALAT       REAL*4        I     Geodetic Latitude (degrees, +90 to -90)  *
+  !    ALON       REAL*4        I     Geodetic Longitude (degrees, 0 to 360)   *
+  !    X          REAL*4        O     Polar Stereographic X Coordinate (km)    *
+  !    Y          REAL*4        O     Polar Stereographic Y Coordinate (km)    *
+  !                                                                            *
+  !                  Written by C. S. Morris - April 29, 1985                  *
+  !                  Revised by C. S. Morris - December 11, 1985               *
+  !                                                                     
+  !                  Revised by V. J. Troisi - January 1990                    *
+  !                  SGN - provides hemisphere dependency (+/- 1)              *
+  !		    Revised by Xiaoming Li - October 1996                      *
+  !		    Corrected equation for RHO                                 *
+  !*****************************************************************************
+  SUBROUTINE FISOC_MAPLL (X,Y,ALAT,ALON)
+
+    IMPLICIT NONE
+
+    REAL(ESMF_KIND_R8) :: X,Y,ALAT,ALON
+    REAL(ESMF_KIND_R8) :: SLAT,SGN,E,RE,RLAT,RLON ! "R" for radians
+    REAL(ESMF_KIND_R8) :: E2,PI,MC,RHO,SL,T,TC
+
+    !    REAL*4 X,Y,ALAT,ALONG,E,E2,CDR,PI,SLAT,MC
+    !    !    Conversion constant from degrees to radians 
+    !    CDR=57.29577951
+
+    !*****************************************************************************
+    !                                                                            *
+    !    DEFINITION OF CONSTANTS:                                                *
+    !                                                                            *
+    E2 = .006693883 ! Eccentricity of the Hughes ellipsoid
+    E =  sqrt(E2)
+    PI=3.141592654
+    SLAT=71.0       ! magnitude of latitude of equal area
+    SGN=-1.0        ! minus 1 for southern hemisphere
+    RE = 6378.273   ! Radius of the earth in kilometers.
+    !*****************************************************************************
+
+!    ! Convert longitude to positive degrees
+!    if (alon.le.0.0) alon=alon+360.
+!    if (alon.ge.360.0) alon=alon-360.
+
+    ! Transform degrees to radians
+    RLAT=ABS(ALAT)*PI/180.
+    RLON=(ALON)*PI/180.
+
+    ! Compute X and Y in grid coordinates.
+    IF (ABS(RLAT).LT.PI/2.) THEN
+       T=TAN(PI/4.-RLAT/2.)/((1.-E*SIN(RLAT))/(1.+E*SIN(RLAT)))**(E/2.)
+       IF (ABS(90.-SLAT).LT.1.E-5) THEN
+          RHO=2.*RE*T/((1.+E)**(1.+E)*(1.-E)**(1.-E))**(1/2.)
+       ELSE
+          SL=SLAT*PI/180.
+          TC=TAN(PI/4.-SL/2.)/((1.-E*SIN(SL))/(1.+E*SIN(SL)))**(E/2.)
+          MC=COS(SL)/SQRT(1.0-E2*(SIN(SL)**2))
+          RHO=RE*MC*T/TC
+       END IF
+       Y=-RHO*SGN*COS(SGN*RLON)*1000.0
+       X= RHO*SGN*SIN(SGN*RLON)*1000.0
+       ! RMG: added the *1000 to go from km to m.
+    ELSE
+       X=0.0
+       Y=0.0
+    END IF
+
+  END SUBROUTINE FISOC_MAPLL
+  
 END MODULE FISOC_utils_MOD

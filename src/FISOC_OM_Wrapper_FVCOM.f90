@@ -143,7 +143,7 @@ CONTAINS
     
     RETURN
     
-101 msg = "OM failed to open stdoutFile"
+101 msg = "OM failed to open stdoutFile "//OM_stdoutFile
     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
          line=__LINE__, file=__FILE__, rc=rc)
     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -660,7 +660,7 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL     :: rc
 
     INTEGER                          :: ii, nn, IERR
-    CHARACTER(len=ESMF_MAXSTR)       :: subroutineName = "FVCOM2ESMF_mesh"
+    CHARACTER(len=ESMF_MAXSTR)       :: subroutineName = "FVCOM2ESMF_mesh", OM_coords
     INTEGER,ALLOCATABLE              :: elemTypes(:), elemIds(:),elemConn(:), localNodeIDs(:)
     INTEGER,ALLOCATABLE              :: nodeIds(:),nodeOwners(:),nodeOwnersGL(:),nodeOwnersGL_recv(:)
     INTEGER,ALLOCATABLE              :: nodeMask(:)
@@ -675,6 +675,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_coords, label='OM_coords:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -735,15 +740,25 @@ CONTAINS
     END DO
     elemTypes         =  ESMF_MESHELEMTYPE_TRI
 
-    
     ! loop over to get nodeIds nodeCoords
     DO ii = 1, FVCOM_numNodes
+
        nn = (ii-1)*2
        nodeIds(ii)      = NGID_X(ii)
-       nodeCoords(nn+1) = XM(ii)
-       nodeCoords(nn+2) = YM(ii)
+       
+       SELECT CASE (OM_coords)
+
+       CASE("spherical","Spherical","SPHERICAL")
+          CALL FISOC_MAPLL(nodeCoords(nn+1),nodeCoords(nn+2),LAT(ii),LON(ii))
+
+       CASE DEFAULT
+          nodeCoords(nn+1) = XM(ii)
+          nodeCoords(nn+2) = YM(ii)
+
+       END SELECT
+
     END DO
-    
+
     ! loop over to get elemConn
     DO ii = 1, FVCOM_numElems
        nn = (ii-1)*3
