@@ -47,8 +47,8 @@ MODULE FISOC_ISM_Wrapper
   ! For Elmer SSA runs, FISOC config should contain something like this:
   !  FISOC_ISM_ReqVars:  ISM_z_l0 ISM_z_lts 
   !  ISM_varNames:       'Zb' 'Zs'
-  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_mask          = 'groundedmask'
-  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_bmb        = 'meltRate'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_mask           = 'groundedmask'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_bmb            = 'meltRate'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_temperature_l0 = 'oceanTemperature'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_temperature_l1 = 'oceanTemperature'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_velocity_l0    = 'Velocity'
@@ -498,7 +498,7 @@ CONTAINS
           ! model-specific (i.e. can't be hard coded in FISOC_utils).
           SELECT CASE (ISM_ReqVarList(ii))
           CASE ('OM_bmb')
-             EIname_bmb         = ISM_varNames(ii)
+             EIname_bmb             = ISM_varNames(ii)
           CASE ('OM_temperature_l0')
              EIname_temperature_l0  = ISM_varNames(ii)
           CASE ('ISM_z_l0')   
@@ -506,7 +506,7 @@ CONTAINS
           CASE ('ISM_z_lts')
              EIname_z_lts           = ISM_varNames(ii)
           CASE ('ISM_mask')
-             EIname_mask           = ISM_varNames(ii)
+             EIname_mask            = ISM_varNames(ii)
           CASE ('ISM_thick')
              EIname_thick           = ISM_varNames(ii)
           CASE DEFAULT
@@ -609,7 +609,6 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-
     fieldLoop: DO nn = 1,fieldCount
 
        ! access the FISOC version of the current field, and extract the array 
@@ -658,18 +657,19 @@ CONTAINS
           CASE ('OM_bmb')
 
              ! access the Elmer/Ice variable for the current field
+             msg = "Getting Elmer melt var, name: "//EIname_bmb
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+                  line=__LINE__, file=__FILE__, rc=rc)
              EI_field => VariableGet( CurrentModel % Mesh % Variables, &
                   EIname_bmb, UnFoundFatal=.TRUE.)
              EI_fieldVals => EI_field % Values
              EI_fieldPerm => EI_field % Perm
-
              ! copy the data from the Elmer array (ESMF object) to the Elmer 
-             ! variable (native Elmer object)
+             ! variable (native Elmer object), converting from m/sec to m/a.
              DO ii = 1,SIZE(ptr)
                 EI_fieldVals(EI_fieldPerm(EI_NodeIDs(ii))) = ptr(ii) * FISOC_secPerYear
              END DO
           
-
           CASE ('OM_temperature_l0')
 ! TODO:
 !             EI_field => VariableGet( CurrentModel % Mesh % Variables, &
@@ -1254,7 +1254,7 @@ CONTAINS
           END DO NodesThisElement
 !       END IF
     END DO AllElements
-print*,"node ordering to go here if needed..."
+!print*,"node ordering to go here if needed..."
 
   END SUBROUTINE buildElementConnectivity
 
