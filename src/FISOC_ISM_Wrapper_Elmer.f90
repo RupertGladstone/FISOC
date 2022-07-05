@@ -6,8 +6,9 @@ MODULE FISOC_ISM_Wrapper
   USE FISOC_types_MOD
   USE ElmerSolver_mod
   USE MainUtils
-  USE Messages, ONLY : MessageUnit
-
+!  USE Messages, ONLY : MessageUnit
+  USE Messages, ONLY : InfoOutUnit
+  
   IMPLICIT NONE
 
   PRIVATE
@@ -173,8 +174,9 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     OPEN(unit=ISM_outputUnit, file=ISM_stdoutFile, STATUS='REPLACE', ERR=101)
-    MessageUnit = ISM_outputUnit
-
+!    MessageUnit = ISM_outputUnit
+    InfoOutUnit = ISM_outputUnit
+    
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
        msg = "Initialising Elmer/Ice parallel environment"
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
