@@ -599,7 +599,7 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
 !TODO: remove or move print statements to ESMF logs
-    PRINT*,'fieldCount is', fieldCount 
+!    PRINT*,'fieldCount is', fieldCount 
 
     fieldLoop: DO nn = 1,fieldCount
       
@@ -617,7 +617,13 @@ CONTAINS
         CASE ('ISM_dddt')
           DO ii = 1,SIZE(ptr)
             ISF_DDDT(ii) = ptr(ii)
-          END DO
+         END DO
+!         WRITE(msg,*) "ISF_DDDT max ", MAXVAL(ISF_DDDT) ," min ", MINVAL(ISF_DDDT)
+!         CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+!              line=__LINE__, file=__FILE__, rc=rc)
+!         WRITE(msg,*) "ISF ptr max ", MAXVAL(ptr) ," min ", MINVAL(ptr)
+!         CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+!              line=__LINE__, file=__FILE__, rc=rc)
           
         CASE ('ISM_dsdt')
           DO ii = 1,SIZE(ptr)
@@ -666,7 +672,7 @@ CONTAINS
     INTEGER,ALLOCATABLE              :: nodeMask(:)
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:) 
     INTEGER                          :: localPet, petCount 
-    INTEGER                          :: FVCOM_numNodes, FVCOM_numElems 
+    INTEGER                          :: FVCOM_numNodes, FVCOM_numElems, OM_OPEN_OCEAN
     LOGICAL                          :: verbose_coupling
 	
     CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
@@ -680,6 +686,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, OM_coords, label='OM_coords:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_OPEN_OCEAN, label='OM_OPEN_OCEAN:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -714,7 +725,7 @@ CONTAINS
 
     ! Setup mask to avoid regridding ice variables in the open ocean.
     nodeMask = MASK_ICE
-    WHERE (ISISFN.EQ.0) nodeMask = MASK_OPEN_OCEAN
+    WHERE (ISISFN.EQ.OM_OPEN_OCEAN) nodeMask = MASK_OPEN_OCEAN
 
     ! Construct a global array of node owners in which an arbitrary decision is 
     ! taken about which partition boundary nodes should belong to.
