@@ -54,6 +54,7 @@ MODULE FISOC_ISM_Wrapper
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_temperature_l1 = 'oceanTemperature'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_velocity_l0    = 'Velocity'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_thick          = 'Depth'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_dddt           = 'dhdt'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_z_l0           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_z_l1           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_z_lts          = 'Coordinate 3'
@@ -511,6 +512,8 @@ CONTAINS
              EIname_mask            = ISM_varNames(ii)
           CASE ('ISM_thick')
              EIname_thick           = ISM_varNames(ii)
+          CASE ('ISM_dddt')
+             EIname_dddt            = ISM_varNames(ii)
           CASE DEFAULT
              msg = "unknown varName "//ISM_ReqVarList(ii)
              CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
@@ -788,6 +791,23 @@ CONTAINS
              END IF
           END DO
           
+       CASE ('ISM_dddt')
+          EI_field => VariableGet( CurrentModel % Mesh % Variables, &
+               EIname_dddt, UnFoundFatal=.TRUE.)
+          EI_fieldVals => EI_field % Values
+          EI_fieldPerm => EI_field % Perm ! don't need perm for coords
+          DO ii = 1,SIZE(ownedNodeIDs)
+             IF (ASSOCIATED(EI_fieldPerm)) THEN
+                ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
+             ELSE
+                ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
+             END IF
+          END DO
+          ptr = ptr / FISOC_secPerYear
+          WRITE(msg,*) "ISM_DDDT max ", MAXVAL(ptr) ," min ", MINVAL(ptr)
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          
        CASE ('ISM_z_lts')
           EI_field => VariableGet( CurrentModel % Mesh % Variables, &
                EIname_z_lts, UnFoundFatal=.TRUE.)
@@ -818,7 +838,7 @@ CONTAINS
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
                line=__LINE__, file=__FILE__, rc=rc)          
        
-       CASE ('ISM_dTdz_l0','ISM_dddt','ISM_dsdt','ISM_z_l0_linterp')
+       CASE ('ISM_dTdz_l0','ISM_dsdt','ISM_z_l0_linterp')
           msg = "INFO: not extracting derived variable: "//TRIM(ADJUSTL(fieldName))
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
                line=__LINE__, file=__FILE__, rc=rc) 
