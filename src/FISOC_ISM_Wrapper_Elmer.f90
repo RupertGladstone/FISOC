@@ -184,7 +184,7 @@ CONTAINS
             line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
-    CALL Initialise_Elmer_ParEnv(vm,rc=rc)
+    CALL Initialise_Elmer_ParEnv(vm,FISOC_config,rc=rc)
 
     ! initialise Elmer, and pull out the footprint before extrusion if we don't 
     ! have a bodyID defined.
@@ -531,14 +531,16 @@ CONTAINS
 
 
   !------------------------------------------------------------------------------
-  SUBROUTINE Initialise_Elmer_ParEnv(vm,rc)
+  SUBROUTINE Initialise_Elmer_ParEnv(vm,FISOC_config,rc)
 
     TYPE(ESMF_VM),INTENT(INOUT)      :: vm
     INTEGER,INTENT(OUT),OPTIONAL     :: rc
+    TYPE(ESMF_config),INTENT(INOUT)  :: FISOC_config
 
     INTEGER                          :: mpic, mpic_dup ! mpi comm, duplicate from the ISM VM
     INTEGER                          :: localPet, petCount, peCount, ierr
-
+    INTEGER                          :: MPI_COMM_new, sizeNew
+    
     rc = ESMF_FAILURE
 
     CALL ESMF_VMGet(vm, mpiCommunicator=mpic, localPet=localPet, &
@@ -554,9 +556,23 @@ CONTAINS
     ! The duplicate MPI communicator can be used in any MPI call in the user
     ! code. 
 
+    CALL ESMF_ConfigGetAttribute(FISOC_config, sizeNew, label='ISM_partitions:', rc=rc)
+    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+       msg = "INFO: ISM_partitions not found; using all procs."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+            line=__LINE__, file=__FILE__)
+       ELMER_COMM_WORLD = mpic_dup
+    ELSE
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
+       CALL FISOC_MPI_NewComm(mpic_dup, SizeNew, MPI_COMM_new)
+       ELMER_COMM_WORLD = MPI_COMM_new 
+    END IF
+       
     IF (peCount.NE.petCount) THEN
        msg = "FATAL: expected peCount = petCount"
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
@@ -564,9 +580,7 @@ CONTAINS
     ParEnv % MyPE = localPet
     OutputPE = ParEnv % MyPe
     ParEnv % PEs  = petCount
-    ELMER_COMM_WORLD = mpic_dup
     ParEnv % ActiveComm = ELMER_COMM_WORLD
-!    ParEnv % ActiveComm = MPI_COMM_WORLD ! or mpic_dup
     Parenv % NumOfNeighbours = 0
     ParEnv % Initialized = .TRUE.
 
@@ -792,22 +806,28 @@ CONTAINS
           END DO
           
        CASE ('ISM_dddt')
-          EI_field => VariableGet( CurrentModel % Mesh % Variables, &
-               EIname_dddt, UnFoundFatal=.TRUE.)
-          EI_fieldVals => EI_field % Values
-          EI_fieldPerm => EI_field % Perm ! don't need perm for coords
-          DO ii = 1,SIZE(ownedNodeIDs)
-             IF (ASSOCIATED(EI_fieldPerm)) THEN
-                ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
-             ELSE
-                ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
-             END IF
-          END DO
-          ptr = ptr / FISOC_secPerYear
-          WRITE(msg,*) "ISM_DDDT max ", MAXVAL(ptr) ," min ", MINVAL(ptr)
-          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-               line=__LINE__, file=__FILE__, rc=rc)
-          
+          IF (FISOC_IsDerived(fieldName,FISOC_config,rc)) THEN
+             msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
+             CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+                  line=__LINE__, file=__FILE__, rc=rc)          
+          ELSE
+             EI_field => VariableGet( CurrentModel % Mesh % Variables, &
+                  EIname_dddt, UnFoundFatal=.TRUE.)
+             EI_fieldVals => EI_field % Values
+             EI_fieldPerm => EI_field % Perm ! don't need perm for coords
+             DO ii = 1,SIZE(ownedNodeIDs)
+                IF (ASSOCIATED(EI_fieldPerm)) THEN
+                   ptr(ii) = EI_fieldVals(EI_fieldPerm(ownedNodeIds(ii)))
+                ELSE
+                   ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
+                END IF
+             END DO
+             ptr = ptr / FISOC_secPerYear
+!          WRITE(msg,*) "ISM_DDDT max ", MAXVAL(ptr) ," min ", MINVAL(ptr)
+!          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+!               line=__LINE__, file=__FILE__, rc=rc)
+          END IF
+             
        CASE ('ISM_z_lts')
           EI_field => VariableGet( CurrentModel % Mesh % Variables, &
                EIname_z_lts, UnFoundFatal=.TRUE.)
