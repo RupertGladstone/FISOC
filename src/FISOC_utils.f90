@@ -22,8 +22,13 @@ MODULE FISOC_utils_MOD
        FISOC_getGridFromFB, FISOC_getMeshFromFB,               &                
        FISOC_ConfigStringListContains, FISOC_locallyOwnedNodes,&
        FISOC_CreateOneToManyRouteHandle,                       & 
-       FISOC_ArrayRedistFromField, FISOC_MAPLL
+       FISOC_ArrayRedistFromField, FISOC_MAPLL,                &
+       FISOC_IsDerived, FISOC_MPI_NewComm
 !         FISOC_getGridOrMeshFromFB, 
+
+  INTERFACE FISOC_IsDerived
+     MODULE PROCEDURE FISOC_IsDerived_Real
+  END INTERFACE FISOC_IsDerived
 
   INTERFACE Unique1DArray
      MODULE PROCEDURE Unique1DArray_I4
@@ -67,6 +72,56 @@ CONTAINS
   
 
 
+  !------------------------------------------------------------------------------
+  SUBROUTINE FISOC_MPI_NewComm(MPI_COMM_in, SizeNew, MPI_COMM_new)
+
+    USE mpi
+
+    INTEGER,INTENT(IN)  :: MPI_COMM_in, SizeNew
+    INTEGER,INTENT(OUT) :: MPI_COMM_new
+
+    INTEGER             :: size, rank, ierror, color, rc
+    
+    CALL MPI_COMM_SIZE(MPI_COMM_in, size, ierror)
+    IF (ierror.NE.0) THEN 
+       msg = "FATAL: error returned from MPI_COMM_SIZE()"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+       
+    CALL MPI_COMM_RANK(MPI_COMM_in, rank, ierror)
+    IF (ierror.NE.0) THEN 
+       msg = "FATAL: error returned from MPI_COMM_RANK()"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    IF (SizeNew.GT.size) THEN
+       msg = "FATAL: SizeNew GT size"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    
+    IF (rank.LT.SizeNew) THEN
+       color = 1
+    ELSE
+       color = MPI_UNDEFINED
+    END IF
+
+    CALL MPI_Comm_split(MPI_COMM_in, color, 1, MPI_COMM_new, ierror)
+    IF (ierror.NE.0) THEN 
+       msg = "FATAL: error returned from MPI_COMM_SPLIT()"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+      
+  END SUBROUTINE FISOC_MPI_NewComm
+
+  
   !------------------------------------------------------------------------------
   ! 
   ! wrapper for the ESMF method allows simple time profiling.
@@ -121,6 +176,48 @@ CONTAINS
     END IF
 
   END SUBROUTINE FISOC_GridCompRun
+
+
+  !------------------------------------------------------------------------------
+  ! check whether a field is 'required' or 'derived'
+  LOGICAL FUNCTION FISOC_IsDerived_Real(FieldName,FISOC_config,rc)
+
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    CHARACTER(len=ESMF_MAXSTR),INTENT(IN) :: FieldName
+    INTEGER,INTENT(OUT)                   :: rc
+    
+    CHARACTER(len=ESMF_MAXSTR)            :: ListNameReq,ListNameDer
+
+    rc = ESMF_failure
+
+    ListNameReq = 'FISOC_ISM_ReqVars:'
+    ListNameDer = 'FISOC_ISM_DerVars:'
+    
+    IF (FISOC_ConfigStringListContains(FISOC_config,FieldName,ListNameReq,rc)) THEN
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+       FISOC_IsDerived_Real = .FALSE.
+       rc = ESMF_success
+       
+    ELSE IF (FISOC_ConfigStringListContains(FISOC_config,FieldName,ListNameDer,rc)) THEN
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+       FISOC_IsDerived_Real = .TRUE.
+       rc = ESMF_success
+
+    ELSE
+       msg= "FATAL: FieldName "//FieldName//" not found in ISM_reqVars or ISM_derVars."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    END IF
+
+    RETURN
+    
+  END FUNCTION FISOC_IsDerived_Real
 
 
   !------------------------------------------------------------------------------
@@ -358,7 +455,7 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    
+
     FISOC_ConfigStringListContains = FISOC_listContains(itemName,stringList,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -1921,7 +2018,6 @@ print*,'catch error and set default if missing att'
 
   !--------------------------------------------------------------------
   SUBROUTINE FISOC_FB2NC(filename,fieldBundle,FISOC_config)
-
 
     CHARACTER(len=ESMF_MAXSTR),INTENT(INOUT):: filename
     TYPE(ESMF_FieldBundle),INTENT(IN)       :: fieldBundle
