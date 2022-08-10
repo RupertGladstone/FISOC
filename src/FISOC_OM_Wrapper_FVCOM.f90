@@ -727,6 +727,18 @@ CONTAINS
     nodeMask = MASK_ICE
     WHERE (ISISFN.EQ.OM_OPEN_OCEAN) nodeMask = MASK_OPEN_OCEAN
 
+    WRITE (msg, "(A,I5)") "ISISFN size:   ", SIZE(ISISFN)
+    CALL ESMF_LogWrite(msg,logmsgFlag=ESMF_LOGMSG_INFO,line=__LINE__, file=__FILE__, rc=rc)       
+    WRITE (msg, "(A,I5,I5)") "ISISFN maxmin: ", MAXVAL(ISISFN), MINVAL(ISISFN)
+    CALL ESMF_LogWrite(msg,logmsgFlag=ESMF_LOGMSG_INFO,line=__LINE__, file=__FILE__, rc=rc)       
+    WRITE (msg, "(A,I5)") "nodeMask size: ", SIZE(nodeMask)
+    CALL ESMF_LogWrite(msg,logmsgFlag=ESMF_LOGMSG_INFO,line=__LINE__, file=__FILE__, rc=rc)       
+    WRITE (msg, "(A,I5)") "NGID_X size:   ", SIZE(NGID_X)
+    CALL ESMF_LogWrite(msg,logmsgFlag=ESMF_LOGMSG_INFO,line=__LINE__, file=__FILE__, rc=rc)       
+    WRITE (msg, "(A,I5)") "Num nodes:     ", FVCOM_NumNodes
+    CALL ESMF_LogWrite(msg,logmsgFlag=ESMF_LOGMSG_INFO,line=__LINE__, file=__FILE__, rc=rc)       
+
+
     ! Construct a global array of node owners in which an arbitrary decision is 
     ! taken about which partition boundary nodes should belong to.
     nodeOwnersGL = -1
@@ -767,6 +779,28 @@ CONTAINS
           nodeCoords(nn+2) = YM(ii)
 
        END SELECT
+
+       IF ( (NGID_X(ii).EQ.3785) .OR. &
+            (NGID_X(ii).EQ.5276) .OR. &
+            (NGID_X(ii).EQ.6063) .OR. &
+            (NGID_X(ii).EQ.7575) .OR. &
+            (NGID_X(ii).EQ.7943) ) THEN
+        
+          WRITE (msg, "(A,I5)") "MASK_ICE:        ",MASK_ICE
+          CALL ESMF_LogWrite(msg,logmsgFlag=ESMF_LOGMSG_INFO,line=__LINE__, file=__FILE__, rc=rc)
+          WRITE (msg, "(A,I5)") "MASK_OPEN_OCEAN: ",MASK_OPEN_OCEAN
+          CALL ESMF_LogWrite(msg,logmsgFlag=ESMF_LOGMSG_INFO,line=__LINE__, file=__FILE__, rc=rc)
+          WRITE (msg, "(A,I5)") "OM_OPEN_OCEAN:   ",OM_OPEN_OCEAN
+          CALL ESMF_LogWrite(msg,logmsgFlag=ESMF_LOGMSG_INFO,line=__LINE__, file=__FILE__, rc=rc)
+          
+          WRITE (msg, "(A,I5)") "NGID_X:   ", NGID_X(ii)
+          CALL ESMF_LogWrite(msg,logmsgFlag=ESMF_LOGMSG_INFO,line=__LINE__, file=__FILE__, rc=rc)
+          WRITE (msg, "(A,I5)") "ISISFN:   ", ISISFN(ii)
+          CALL ESMF_LogWrite(msg,logmsgFlag=ESMF_LOGMSG_INFO,line=__LINE__, file=__FILE__, rc=rc)
+          WRITE (msg, "(A,I5)") "nodeMask: ", nodeMask(ii)
+          CALL ESMF_LogWrite(msg,logmsgFlag=ESMF_LOGMSG_INFO,line=__LINE__, file=__FILE__, rc=rc)
+
+       END IF
 
     END DO
 
