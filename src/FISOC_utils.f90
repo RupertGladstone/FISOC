@@ -1086,6 +1086,19 @@ CONTAINS
     rc = ESMF_FAILURE
 
     SELECT CASE(label)
+       
+    CASE('OM_OPEN_OCEAN') ! used in masking
+      CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_OPEN_OCEAN:', rc=rc)
+      IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+        derivedAttribute = 0
+        msg = "WARNING: OM_OPEN_OCEAN not found, setting to 0"
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__)
+      ELSE
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      END IF
 
     CASE('ISM_dt_sec')
       CALL ESMF_ConfigGetAttribute(FISOC_config, dt_ratio, label='dt_ratio:', rc=rc)
@@ -1566,6 +1579,19 @@ CONTAINS
     rc = ESMF_FAILURE
 
     SELECT CASE(label)
+
+    CASE("OM_coords")
+       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_coords:', rc=rc)
+       IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+          derivedAttribute = "Cartesian"
+          msg = "OM_coords not found, setting to Cartesian"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
 
     CASE("FileStyle")
        CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='FileStyle:', rc=rc)

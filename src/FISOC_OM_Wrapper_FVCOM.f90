@@ -685,12 +685,22 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_coords, label='OM_coords:', rc=rc)
+! Replaced with derived attributes so we can set defaults:
+!    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_coords, label='OM_coords:', rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_OPEN_OCEAN, label='OM_OPEN_OCEAN:', rc=rc)
+!    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!         line=__LINE__, file=__FILE__)) &
+!         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_coords, label='OM_coords', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_OPEN_OCEAN, label='OM_OPEN_OCEAN:', rc=rc)
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_OPEN_OCEAN, label='OM_OPEN_OCEAN', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -725,7 +735,10 @@ CONTAINS
 
     ! Setup mask to avoid regridding ice variables in the open ocean.
     nodeMask = MASK_ICE
-    WHERE (ISISFN.EQ.OM_OPEN_OCEAN) nodeMask = MASK_OPEN_OCEAN
+    DO ii = 1, FVCOM_numNodes
+      IF (ISISFN(ii).EQ.OM_OPEN_OCEAN) nodeMask(ii) = MASK_OPEN_OCEAN
+    END DO
+    !WHERE (ISISFN.EQ.OM_OPEN_OCEAN) nodeMask = MASK_OPEN_OCEAN
 
     WRITE (msg, "(A,I5)") "ISISFN size:   ", SIZE(ISISFN)
     CALL ESMF_LogWrite(msg,logmsgFlag=ESMF_LOGMSG_INFO,line=__LINE__, file=__FILE__, rc=rc)       
