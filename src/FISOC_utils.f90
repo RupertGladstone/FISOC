@@ -23,8 +23,7 @@ MODULE FISOC_utils_MOD
        FISOC_ConfigStringListContains, FISOC_locallyOwnedNodes,&
        FISOC_CreateOneToManyRouteHandle,                       & 
        FISOC_ArrayRedistFromField, FISOC_MAPLL,                &
-       FISOC_IsDerived, FISOC_MPI_NewComm
-!         FISOC_getGridOrMeshFromFB, 
+       FISOC_IsDerived, FISOC_makePetList
 
   INTERFACE FISOC_IsDerived
      MODULE PROCEDURE FISOC_IsDerived_Real
@@ -66,22 +65,134 @@ MODULE FISOC_utils_MOD
      MODULE PROCEDURE FISOC_ConfigDerivedAttributeExtrapMethod
   END INTERFACE
 
-  CHARACTER(len=ESMF_MAXSTR) :: msg
-  
 CONTAINS
   
 
 
+  !--------------------------------------------------------------------------------------
+  LOGICAL FUNCTION FISOC_ActivePartitionCheck(rc_getAtt,XXXM_partitions,localpet, &
+       petcount,ComponentType)
+    
+    INTEGER,INTENT(IN)          :: rc_getAtt,localpet,petcount
+    INTEGER,INTENT(INOUT)       :: XXXM_partitions
+    CHARACTER(len=*),INTENT(IN) :: ComponentType
+
+    IF (rc_getAtt.EQ.ESMF_RC_NOT_FOUND) THEN
+       msg = TRIM(ComponentType)//"_partitions not found; using all procs."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+            line=__LINE__, file=__FILE__)
+    ELSE
+       
+       IF (ESMF_LogFoundError(rcToCheck=rc_getAtt, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
+       
+       IF (XXXM_partitions.GT.petcount) THEN
+          msg = TRIM(ComponentType)//"_partitions is higher than petcount, resetting to petcount"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+          XXXM_partitions = petcount
+       END IF
+       
+       IF (XXXM_partitions.LT.1) THEN
+          msg = TRIM(ComponentType)//"_partitions is less than 1, resetting to 1"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+          XXXM_partitions = 1
+       END IF
+       
+       SELECT CASE (ComponentType)
+       CASE ("OM")
+          IF (localpet.GE.(petcount - XXXM_partitions)) THEN
+             FISOC_ActivePartitionCheck = .TRUE.
+          ELSE
+             FISOC_ActivePartitionCheck = .FALSE.
+          END IF
+          
+       CASE ("ISM")
+          IF (localpet.LT.XXXM_partitions) THEN
+             FISOC_ActivePartitionCheck = .TRUE.
+          ELSE
+             FISOC_ActivePartitionCheck = .FALSE.
+          END IF
+          
+       CASE DEFAULT
+          msg = "ComponentType needs to be OM or ISM"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          
+       END SELECT
+
+    END IF
+    
+  END FUNCTION FISOC_ActivePartitionCheck
+
+
   !------------------------------------------------------------------------------
-  SUBROUTINE FISOC_MPI_NewComm(MPI_COMM_in, SizeNew, MPI_COMM_new)
+  ! Createpet lists for components to be run on a subset of all pets
+  !
+  SUBROUTINE FISOC_MakePetList(VM, NumPartitions, PetList, ContextFlag, FirstPet)
+
+    TYPE(ESMF_VM),INTENT(IN)            :: VM
+    INTEGER,INTENT(IN)                  :: NumPartitions
+    INTEGER,ALLOCATABLE,INTENT(OUT)     :: PetList(:)
+    TYPE(ESMF_Context_Flag),INTENT(OUT) :: ContextFlag
+
+    INTEGER,INTENT(IN),OPTIONAL         :: FirstPet
+
+    INTEGER                             :: PetCount, NumPartitions_local
+    INTEGER                             :: FirstPet_local, nn, rc
+
+    IF (PRESENT(FirstPet)) THEN
+       FirstPet_local = FirstPet
+    ELSE
+       FirstPet_local = 0
+    END IF
+
+    CALL ESMF_VMGet(vm, petCount=PetCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    NumPartitions_local = NumPartitions
+    IF (NumPartitions_local.EQ.0) NumPartitions_local = PetCount
+    
+    IF ( (NumPartitions_local - FirstPet_local) .GT. PetCount ) THEN
+       msg = "Too many partitions requested for component"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+    
+    ALLOCATE(PetList(NumPartitions_local))
+    DO nn = 1,NumPartitions_local
+       PetList(nn) = FirstPet_local + nn - 1
+    END DO
+
+    IF (NumPartitions_local.EQ.PetCount) THEN
+       ContextFlag = ESMF_CONTEXT_PARENT_VM
+    ELSE
+       ContextFlag = ESMF_CONTEXT_OWN_VM
+    END IF
+       
+  END SUBROUTINE FISOC_MakePetList
+
+  
+  !------------------------------------------------------------------------------
+  ! Create a new communicator on a subset of the available processes
+  !
+  SUBROUTINE FISOC_MPI_NewComm(MPI_COMM_in, SizeNew, MPI_COMM_new,ISM_process)
 
     USE mpi
 
     INTEGER,INTENT(IN)  :: MPI_COMM_in, SizeNew
     INTEGER,INTENT(OUT) :: MPI_COMM_new
+    LOGICAL,INTENT(OUT) :: ISM_process
 
     INTEGER             :: size, rank, ierror, color, rc
-    
+
+    ! get size of existing MPI communicator
     CALL MPI_COMM_SIZE(MPI_COMM_in, size, ierror)
     IF (ierror.NE.0) THEN 
        msg = "FATAL: error returned from MPI_COMM_SIZE()"
@@ -89,7 +200,8 @@ CONTAINS
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
-       
+
+    ! get rank (local process number) from existing MPI communicator
     CALL MPI_COMM_RANK(MPI_COMM_in, rank, ierror)
     IF (ierror.NE.0) THEN 
        msg = "FATAL: error returned from MPI_COMM_RANK()"
@@ -105,10 +217,13 @@ CONTAINS
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
     
+    ! set color 
     IF (rank.LT.SizeNew) THEN
-       color = 1
+       ISM_process = .TRUE.
+       color = ISM_COLOR
     ELSE
-       color = MPI_UNDEFINED
+       ISM_process = .FALSE.
+       color = OM_COLOR
     END IF
 
     CALL MPI_Comm_split(MPI_COMM_in, color, 1, MPI_COMM_new, ierror)
@@ -118,7 +233,7 @@ CONTAINS
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
-      
+
   END SUBROUTINE FISOC_MPI_NewComm
 
   
@@ -177,6 +292,29 @@ CONTAINS
 
   END SUBROUTINE FISOC_GridCompRun
 
+
+
+  !------------------------------------------------------------------------------
+  ! check whether the current process is contained in the specified MPI
+  ! communicator
+  LOGICAL FUNCTION FISOC_CommContainsLocal(MPI_COMM_IN,rc)
+
+    INTEGER,INTENT(IN)                    :: MPI_COMM_IN
+    INTEGER,INTENT(OUT)                   :: rc
+
+    INTEGER                               :: RANK, IERROR
+    
+    rc = ESMF_FAILURE
+
+    FISOC_CommContainsLocal = .FALSE.
+
+    CALL MPI_COMM_RANK(MPI_COMM_IN, RANK, IERROR)
+
+    FISOC_CommContainsLocal = .TRUE.
+
+    rc = ESMF_SUCCESS
+    
+  END FUNCTION FISOC_CommContainsLocal
 
   !------------------------------------------------------------------------------
   ! check whether a field is 'required' or 'derived'
@@ -1840,7 +1978,7 @@ print*,'catch error and set default if missing att'
     TYPE(ESMF_fieldbundle),INTENT(INOUT)  :: fieldBundle
     INTEGER,INTENT(OUT),OPTIONAL          :: rc
 
-    INTEGER                               :: ii
+    INTEGER                               :: ii, localDeCount
     REAL(ESMF_KIND_R8)                    :: initial_value
     TYPE(ESMF_field)                      :: field
     REAL(ESMF_KIND_R8),POINTER            :: field_ptr(:) 
@@ -1860,11 +1998,22 @@ print*,'catch error and set default if missing att'
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       CALL ESMF_FieldGet(field=field, localDe=0, farrayPtr=field_ptr, rc=rc)
+
+       ! If the mesh (and hence field) don't exist on the current PET, the
+       ! localDeCount will be zero.
+       CALL ESMF_FieldGet(field=field, localDeCount=localDeCount, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       field_ptr = initial_value       
+
+       IF (localDeCount.NE.0) THEN
+          CALL ESMF_FieldGet(field=field, localDe=0, farrayPtr=field_ptr, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          field_ptr = initial_value
+       END IF
+
        CALL ESMF_FieldBundleAdd(fieldBundle, (/field/), rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
@@ -1876,8 +2025,8 @@ print*,'catch error and set default if missing att'
     rc = ESMF_SUCCESS
     
   END SUBROUTINE FISOC_populateFieldBundleOnMesh
-  
 
+  
   !--------------------------------------------------------------------------------------
   SUBROUTINE FISOC_getStringListFromConfig(config,label,stringList,rc,returnCount)
 
@@ -2112,64 +2261,76 @@ print*,'catch error and set default if missing att'
     REAL(ESMF_KIND_R8),ALLOCATABLE   :: InFieldData2D_cp(:,:), OutFieldData2D_cp(:,:)
     REAL(ESMF_KIND_R8),POINTER       :: InFieldData1D(:), OutFieldData1D(:)
     REAL(ESMF_KIND_R8),POINTER       :: InFieldData2D(:,:), OutFieldData2D(:,:)
-    INTEGER                          :: InDims, OutDims
-
+    INTEGER                          :: InDims, OutDims, localDeCountIn, localDeCountOut
+    TYPE(ESMF_FieldStatus_Flag)      :: InFieldStatus, OutFieldStatus
+    LOGICAL                          :: MakeCopyIn = .TRUE., MakeCopyOut = .TRUE.
+    
     rc = ESMF_FAILURE
 
     ! check dimensionality of fields
-    CALL ESMF_FieldGet(field=InField, dimCount=InDims, rc=rc)
+    CALL ESMF_FieldGet(field=InField, status=InFieldStatus, dimCount=InDims, &
+         localDeCount=localDeCountIn, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    CALL ESMF_FieldGet(field=OutField, dimCount=OutDims, rc=rc)
+    CALL ESMF_FieldGet(field=OutField, status=OutFieldStatus, dimCount=OutDims, &
+         localDeCount=localDeCountOut, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! take copy of fields
-    SELECT CASE(InDims)
-    CASE(1)
-       CALL ESMF_FieldGet(field=InField, farrayPtr=InFieldData1D, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       ALLOCATE(InFieldData1D_cp(SIZE(InFieldData1D)))
-       InFieldData1D_cp = InFieldData1D
-    CASE(2)
-       CALL ESMF_FieldGet(field=InField, farrayPtr=InFieldData2D, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       ALLOCATE(InFieldData2D_cp(SIZE(InFieldData2D,1),SIZE(InFieldData2D,2)))
-       InFieldData2D_cp = InFieldData2D
-    CASE DEFAULT
-       msg = 'ERROR: field neither 1D nor 2D in regrid wrapper'
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END SELECT
-    SELECT CASE(OutDims)
-    CASE(1)
-       CALL ESMF_FieldGet(field=OutField, farrayPtr=OutFieldData1D, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       ALLOCATE(OutFieldData1D_cp(SIZE(OutFieldData1D)))
-       OutFieldData1D_cp = OutFieldData1D
-    CASE(2)
-       CALL ESMF_FieldGet(field=OutField, farrayPtr=OutFieldData2D, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-       ALLOCATE(OutFieldData2D_cp(SIZE(OutFieldData2D,1),SIZE(OutFieldData2D,2)))
-       OutFieldData2D_cp = OutFieldData2D       
-    CASE DEFAULT
-       msg = 'ERROR: field neither 1D nor 2D in regrid wrapper'
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-            line=__LINE__, file=__FILE__, rc=rc)
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    END SELECT
+    IF (localDeCountIn.EQ.0)  MakeCopyIn  = .FALSE.
+    IF (localDeCountOut.EQ.0) MakeCopyOut = .FALSE.
     
+    ! take copy of fields
+    CopyIn: IF (MakeCopyIn) THEN
+       SELECT CASE(InDims)
+       CASE(1)
+          CALL ESMF_FieldGet(field=InField, farrayPtr=InFieldData1D, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          ALLOCATE(InFieldData1D_cp(SIZE(InFieldData1D)))
+          InFieldData1D_cp = InFieldData1D
+       CASE(2)
+          CALL ESMF_FieldGet(field=InField, farrayPtr=InFieldData2D, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          ALLOCATE(InFieldData2D_cp(SIZE(InFieldData2D,1),SIZE(InFieldData2D,2)))
+          InFieldData2D_cp = InFieldData2D
+       CASE DEFAULT
+          msg = 'ERROR: field neither 1D nor 2D in regrid wrapper'
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END SELECT
+    END IF CopyIn
+
+    CopyOut: IF (MakeCopyOut) THEN
+       SELECT CASE(OutDims)
+       CASE(1)
+          CALL ESMF_FieldGet(field=OutField, farrayPtr=OutFieldData1D, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          ALLOCATE(OutFieldData1D_cp(SIZE(OutFieldData1D)))
+          OutFieldData1D_cp = OutFieldData1D
+       CASE(2)
+          CALL ESMF_FieldGet(field=OutField, farrayPtr=OutFieldData2D, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+          ALLOCATE(OutFieldData2D_cp(SIZE(OutFieldData2D,1),SIZE(OutFieldData2D,2)))
+          OutFieldData2D_cp = OutFieldData2D       
+       CASE DEFAULT
+          msg = 'ERROR: field neither 1D nor 2D in regrid wrapper'
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END SELECT
+    END IF CopyOut
+       
     CALL ESMF_VMBarrier(vm, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
@@ -2186,27 +2347,31 @@ print*,'catch error and set default if missing att'
 
     
     ! copy the field data back in, cleaning up as we go
-    SELECT CASE(InDims)
-    CASE(1)
-       InFieldData1D=InFieldData1D_cp
-       DEALLOCATE(InFieldData1D_cp)
-       NULLIFY(InFieldData1D)
-    CASE(2)
-       InFieldData2D=InFieldData2D_cp
-       DEALLOCATE(InFieldData2D_cp)
-       NULLIFY(InFieldData2D)
-    END SELECT
+    WriteCopyIn: IF (MakeCopyIn) THEN
+       SELECT CASE(InDims)
+       CASE(1)
+          InFieldData1D=InFieldData1D_cp
+          DEALLOCATE(InFieldData1D_cp)
+          NULLIFY(InFieldData1D)
+       CASE(2)
+          InFieldData2D=InFieldData2D_cp
+          DEALLOCATE(InFieldData2D_cp)
+          NULLIFY(InFieldData2D)
+       END SELECT
+    END IF WriteCopyIn
 
-    SELECT CASE(OutDims)
-    CASE(1)
-       OutFieldData1D=OutFieldData1D_cp
-       DEALLOCATE(OutFieldData1D_cp)
-       NULLIFY(OutFieldData1D)
-    CASE(2)
-       OutFieldData2D=OutFieldData2D_cp
-       DEALLOCATE(OutFieldData2D_cp)
-       NULLIFY(OutFieldData2D)
-    END SELECT
+    WriteCopyOut: IF (MakeCopyOut) THEN
+       SELECT CASE(OutDims)
+       CASE(1)
+          OutFieldData1D=OutFieldData1D_cp
+          DEALLOCATE(OutFieldData1D_cp)
+          NULLIFY(OutFieldData1D)
+       CASE(2)
+          OutFieldData2D=OutFieldData2D_cp
+          DEALLOCATE(OutFieldData2D_cp)
+          NULLIFY(OutFieldData2D)
+       END SELECT
+    END IF WriteCopyOut
     
     rc = ESMF_SUCCESS
     

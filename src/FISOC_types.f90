@@ -17,10 +17,14 @@ MODULE FISOC_types_MOD
   INTEGER,PARAMETER            :: MASK_FLOATING_ICE=12
   INTEGER,PARAMETER            :: MASK_OPEN_OCEAN=0 ! ESMF regridding leaves this at zero by default
   INTEGER,PARAMETER            :: MASK_GL=14 ! grounding line
+
+  INTEGER,PARAMETER            :: ISM_COLOR = 1, OM_COLOR = 2
   
   ! This time information is set at run time.
   TYPE(ESMF_Time)              :: FISOC_time, FISOC_startTime, FISOC_endTime
 !  TYPE(ESMF_TimeInterval)      :: FISOC_OM_TI, FISOC_ISM_TI
   ! TODO: intialise these to zero?
 
+  CHARACTER(len=ESMF_MAXSTR)   :: msg
+  
 END MODULE FISOC_types_MOD

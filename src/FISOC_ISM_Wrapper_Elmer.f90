@@ -211,6 +211,11 @@ CONTAINS
        END IF
        CALL Elmer2ESMF_mesh(FISOC_config,ISM_BodyID,ISM_mesh,vm,rc=rc)
     END IF
+    
+    CALL ESMF_VMBarrier(vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
 
     ! now Elmer is initialised we can check for timestep consistency
     IF (localpet.EQ.0) THEN
@@ -543,33 +548,47 @@ CONTAINS
     
     rc = ESMF_FAILURE
 
+    ! The returned MPI communicator spans the same MPI processes that the VM
+    ! is defined on.
     CALL ESMF_VMGet(vm, mpiCommunicator=mpic, localPet=localPet, &
          peCount=peCount,petCount=petCount,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-    ! The returned MPI communicator spans the same MPI processes that the VM
-    ! is defined on.
 
-    CALL MPI_Comm_dup(mpic, mpic_dup, ierr)
     ! Duplicate the MPI communicator not to interfere with ESMF communications.
     ! The duplicate MPI communicator can be used in any MPI call in the user
     ! code. 
+    CALL MPI_Comm_dup(mpic, mpic_dup, ierr)
 
-    CALL ESMF_ConfigGetAttribute(FISOC_config, sizeNew, label='ISM_partitions:', rc=rc)
-    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
-       msg = "INFO: ISM_partitions not found; using all procs."
-       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
-            line=__LINE__, file=__FILE__)
-       ELMER_COMM_WORLD = mpic_dup
-    ELSE
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
-       CALL FISOC_MPI_NewComm(mpic_dup, SizeNew, MPI_COMM_new)
-       ELMER_COMM_WORLD = MPI_COMM_new 
-    END IF
-       
+    ! below is all replaced by top level code using petlist when creating components
+    ! and statereconcile before regridding
+
+    !    ! Run Elmer on a subset of the total partitions if requested.  In this case,
+!    ! we use mpi functionality wrapped in FISOC_MPI_NewComm to create the new
+!    ! communicator.
+!    CALL ESMF_ConfigGetAttribute(FISOC_config, sizeNew, label='ISM_partitions:', rc=rc)
+!    IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+!       msg = "INFO: ISM_partitions not found; using all procs."
+!       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+!            line=__LINE__, file=__FILE__)
+!       ELMER_COMM_WORLD = mpic_dup
+!       ParEnv % PEs  = petCount
+!    ELSE
+!       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!            line=__LINE__, file=__FILE__)) &
+!            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)       
+!       CALL FISOC_MPI_NewComm(mpic_dup, SizeNew, MPI_COMM_new,ISM_process)
+!       ELMER_COMM_WORLD = MPI_COMM_new 
+!       ParEnv % PEs  = sizeNew
+!    END IF
+    
+
+       CALL ESMF_VMBarrier(vm, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
     IF (peCount.NE.petCount) THEN
        msg = "FATAL: expected peCount = petCount"
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
@@ -577,9 +596,10 @@ CONTAINS
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
 
+    ELMER_COMM_WORLD = mpic_dup
+    ParEnv % PEs  = petCount
     ParEnv % MyPE = localPet
     OutputPE = ParEnv % MyPe
-    ParEnv % PEs  = petCount
     ParEnv % ActiveComm = ELMER_COMM_WORLD
     Parenv % NumOfNeighbours = 0
     ParEnv % Initialized = .TRUE.
