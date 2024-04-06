@@ -11,7 +11,11 @@ MODULE FISOC_OM_Wrapper
   USE FISOC_utils_MOD
   USE FISOC_types_MOD
 
+#ifdef ROMS4
+  USE roms_kernel_mod
+#else
   USE ocean_control_mod
+#endif
   USE mod_scalars
 
   IMPLICIT NONE
@@ -53,6 +57,8 @@ CONTAINS
   ! The first phase of initialisation is mainly to initialise the ocean model, and access 
   ! grid and variable initial information.
   SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(FISOC_config,vm,OM_ExpFB,OM_grid,rc)
+
+    USE mod_param, ONLY       : BOUNDS, Ngrids
 
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_VM),INTENT(IN)              :: vm ! ESMF virtual machine (parallel context)
