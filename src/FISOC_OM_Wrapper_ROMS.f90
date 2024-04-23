@@ -1168,7 +1168,7 @@ CONTAINS
            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 # endif
              
-         CASE('ISM_temperature_l0', 'ISM_temperature_l1', 'ISM_z_l1', 'ISM_velocity_l0', 'ISM_z_l0_previous', 'ISM_dTdz_l0')
+         CASE('ISM_temperature_l0', 'ISM_temperature_l1', 'ISM_z_l1', 'ISM_velocity_l0', 'ISM_z_l0_previous', 'ISM_dTdz_l0','ISM_GL_flux')
            msg = "WARNING: ignored variable: "//TRIM(ADJUSTL(fieldName))
            CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
                 line=__LINE__, file=__FILE__, rc=rc)          

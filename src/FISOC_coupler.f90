@@ -640,13 +640,47 @@ CONTAINS
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-       CALL ESMF_FieldRegrid(ISM_ExpFieldList(ii),OM_ImpFieldList(ii), &
-            routehandle=ISM2OM_regridRouteHandle, zeroregion= ESMF_REGION_TOTAL, &
-            checkflag=.TRUE.,rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
+!       SELECT CASE (fieldName)
+!       CASE ("ISM_GL_flux","ISM_gl_flux")
+!
+!          ESMF_REGRIDMETHOD_NEAREST_STOD
+!          
+!          ! need OM (destination) mask (from OM FB?).  Create routehandle using mask. put it in utils?
+!          ISM_ExpFieldList(ii),OM_ImpFieldList(ii)
+!ISM2OM_alt_regrid:  ESMF_REGRIDMETHOD_NEAREST_DTOS
+!ISM2OM_alt_vars:    ISM_GL_flux
+!check names in ISM2OM_alt_vars list
+!maintain second routehandle (create second routehandle earlier on using ISM2OM_alt_regrid and ISM2OM_alt_vars
+!
+!examples pasted from elsewhere...
+!          CALL ESMF_FieldRegridStore(srcField=src_field, srcMaskValues=(/0/), &
+!               dstField=dest_field,                                           &
+!               regridmethod=ESMF_REGRIDMETHOD_NEAREST_STOD,                   &
+!               routehandle=WET2DRY_RouteHandle, rc=rc)
+!
+!          CALL ESMF_FieldRegridStore(InField, OutField, regridmethod=regridmethod, &
+!               unmappedaction=unmappedaction, routehandle=routeHandle,             &
+!               dstMaskValues=(/MASK_OPEN_OCEAN/),                                   &
+!         extrapMethod=extrapMethod, rc=rc)
+!          
+!          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,      &
+!               line=__LINE__, file=__FILE__))                                 &
+!               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!          
+!          msg = "FATAL: GL_flux NYI"
+!          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+!               line=__LINE__, file=__FILE__, rc=rc)
+!          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)!
+!
+!       CASE DEFAULT
+          CALL ESMF_FieldRegrid(ISM_ExpFieldList(ii),OM_ImpFieldList(ii), &
+               routehandle=ISM2OM_regridRouteHandle, zeroregion= ESMF_REGION_TOTAL, &
+               checkflag=.TRUE.,rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+!       END SELECT
+          
        IF (verbose_coupling) THEN
           msg = "Regridded field "//fieldName
           CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
