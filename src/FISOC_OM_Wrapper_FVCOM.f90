@@ -708,7 +708,8 @@ CONTAINS
           DO ii = 1,SIZE(ptr)
             ISF_DDDT(ii) = ptr(ii)
          END DO
-!         WRITE(msg,*) "ISF_DDDT max ", MAXVAL(ISF_DDDT) ," min ", MINVAL(ISF_DDDT)
+
+         !         WRITE(msg,*) "ISF_DDDT max ", MAXVAL(ISF_DDDT) ," min ", MINVAL(ISF_DDDT)
 !         CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
 !              line=__LINE__, file=__FILE__, rc=rc)
 !         WRITE(msg,*) "ISF ptr max ", MAXVAL(ptr) ," min ", MINVAL(ptr)
@@ -718,6 +719,11 @@ CONTAINS
         CASE ('ISM_dsdt')
           DO ii = 1,SIZE(ptr)
             ISF_DSDT(ii) = ptr(ii)
+          END DO
+          
+        CASE ('ISM_SG_outflow')
+          DO ii = 1,SIZE(ptr)
+            subrunoff(ii) = ptr(ii)
           END DO
           
         CASE ('ISM_thick','ISM_z_l0','ISM_z_l0_previous','ISM_z_lts','ISM_z_lts_previous')
