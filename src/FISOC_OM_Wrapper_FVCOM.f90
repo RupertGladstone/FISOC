@@ -230,7 +230,7 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL                   :: rc_local
 
     INTEGER                    :: localPet, rc
-    LOGICAL                    :: verbose_coupling
+    LOGICAL                    :: verbose_coupling, OM_CONTROL_WD
     TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_bmb
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_bmb_ptr(:,:)
     INTEGER                    :: OM_dt_sec
@@ -247,6 +247,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_CONTROL_WD, label='OM_CONTROL_WD:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -299,6 +304,13 @@ CONTAINS
     CALL ESMF_VMBarrier(vm, rc=rc)
     IF (localPet.EQ.0) THEN
       WRITE (OM_outputUnit,*) 'FISOC has just called FVCOM run method.'
+    END IF
+
+    IF (OM_CONTROL_WD) THEN
+      CALL WET_JUDGE
+      IF (localPet.EQ.0) THEN
+        WRITE (OM_outputUnit,*) 'FISOC has just called FVCOM WET_JUDGE.'
+      END IF
     END IF
     
 ! TODO: is there an accessible exit flag or similar for FVCOM?

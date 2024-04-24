@@ -1600,6 +1600,19 @@ CONTAINS
         derivedAttribute = .TRUE.
       END IF
       
+    CASE('OM_CONTROL_WD','OM_CONTROL_WD:')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_CONTROL_WD:', rc=rc_local)
+       IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN
+          derivedAttribute = .FALSE.
+          msg = "WARNING: OM_CONTROL_WD not found, setting to .FALSE."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+               line=__LINE__, file=__FILE__)
+       ELSE
+          IF (ESMF_LogFoundError(rcToCheck=rc_local, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) &
+               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       END IF
+
     CASE('profiling','profiling:')
        CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='profiling:', rc=rc_local)
        IF (rc_local.EQ.ESMF_RC_NOT_FOUND) THEN

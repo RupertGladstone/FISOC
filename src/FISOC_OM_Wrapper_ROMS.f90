@@ -305,7 +305,7 @@ CONTAINS
     INTEGER,INTENT(OUT),OPTIONAL                   :: rc_local
 
     INTEGER                    :: localPet, rc
-    LOGICAL                    :: verbose_coupling
+    LOGICAL                    :: verbose_coupling, OM_CONTROL_WD
     TYPE(ESMF_field)           :: ISM_dTdz_l0,ISM_z_l0, OM_bmb
     REAL(ESMF_KIND_R8),POINTER :: ISM_dTdz_l0_ptr(:,:), ISM_z_l0_ptr(:,:), OM_bmb_ptr(:,:)
     INTEGER                    :: OM_dt_sec
@@ -320,6 +320,11 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_ConfigGetAttribute(FISOC_config, verbose_coupling, label='verbose_coupling:', rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_CONTROL_WD, label='OM_CONTROL_WD:', rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -351,7 +356,14 @@ CONTAINS
     IF (localPet.EQ.0) THEN
        WRITE (OM_outputUnit,*) 'FISOC has just called ROMS run method.'
     END IF
-
+    
+    IF (OM_CONTROL_WD) THEN
+       CALL FISOC_OM_WETDRY(vm,rc)
+       IF (localPet.EQ.0) THEN
+          WRITE (OM_outputUnit,*) 'FISOC has just called ROMS run method.'
+       END IF
+    END IF
+    
     IF (exit_flag.NE.NoError) THEN
       WRITE (msg, "(A,I0,A)") "ERROR: ROMS has returned non-safe exit_flag=", &
            exit_flag,", see ROMS mod_scalars.f90 for exit flag meanings."
@@ -650,6 +662,60 @@ CONTAINS
   END SUBROUTINE FISOC_ROMS_WET2DRY
 #endif
   
+
+  !--------------------------------------------------------------------------------------
+  ! Update the OM wet dry mask from FISOC, typically on coupling timesteps. 
+  !--------------------------------------------------------------------------------------
+  SUBROUTINE FISOC_OM_WETDRY(vm,rc)
+
+    USE wetdry_mod,   ONLY : wetdry_tile
+    USE mod_stepping, ONLY : kstp
+    USE mod_grid,     ONLY : GRID
+    USE mod_ocean,    ONLY : OCEAN
+    USE mod_coupling, ONLY : COUPLING
+    USE mod_param, only : NtileI, NtileJ, BOUNDS, Lm, Mm, Ngrids
+
+    TYPE(ESMF_VM),INTENT(IN)                 :: vm
+    INTEGER,INTENT(OUT),OPTIONAL             :: rc
+
+    INTEGER                                  :: ng, localpet, zeta_shape(3)
+    
+    rc = ESMF_FAILURE
+
+    ng = 1
+
+    zeta_shape = SHAPE(OCEAN(ng) % zeta(:,:,kstp))
+        
+    CALL ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+!         &                  OCEAN(ng) % zeta(:,:,kstp),                     &
+
+    CALL wetdry_tile (ng, localPet,                                         &
+         & BOUNDS(ng)%LBi(localPet), BOUNDS(ng)%UBi(localPet),              &
+         & BOUNDS(ng)%LBj(localPet), BOUNDS(ng)%UBj(localPet),              &
+         & BOUNDS(ng)%Istr(localPet)-3, BOUNDS(ng)%Iend(localPet)+3,        &
+         & BOUNDS(ng)%Jstr(localPet)-3, BOUNDS(ng)%Jend(localPet)+3,        &
+         &                  GRID(ng) % pmask,       GRID(ng) % rmask,       &
+         &                  GRID(ng) % umask,       GRID(ng) % vmask,       &
+         &                  GRID(ng) % h,                                   &
+         &           RESHAPE(OCEAN(ng) % zeta(:,:,kstp), zeta_shape(1:2)),  &
+         &                  GRID(ng) % zice,                                &
+         &                  GRID(ng) % sice,                                &
+         &                  COUPLING(ng) % DU_avg1,                         &
+         &                  COUPLING(ng) % DV_avg1,                         &
+         &                  GRID(ng) % rmask_wet_avg,                       &
+         &                  GRID(ng) % pmask_wet,   GRID(ng) % pmask_full,  &
+         &                  GRID(ng) % rmask_wet,   GRID(ng) % rmask_full,  &
+         &                  GRID(ng) % umask_wet,   GRID(ng) % umask_full,  &
+         &                  GRID(ng) % vmask_wet,   GRID(ng) % vmask_full)
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_OM_WETDRY
+    
   
   !--------------------------------------------------------------------------------------
   ! Use the cavity from the ISM first stage initialisation to set the OM cavity
