@@ -238,6 +238,7 @@ CONTAINS
     TYPE(ESMF_TimeInterval)    :: OM_dt
     TYPE(ESMF_time)            :: interval_startTime, interval_endTime
     CHARACTER(len=ESMF_MAXSTR) :: interval_startTime_char, interval_endTime_char
+    CHARACTER(len=ESMF_MAXSTR) :: label, listLabel
 
     rc_local = ESMF_FAILURE
     
@@ -311,6 +312,19 @@ CONTAINS
       IF (localPet.EQ.0) THEN
         WRITE (OM_outputUnit,*) 'FISOC has just called FVCOM WET_JUDGE.'
       END IF
+    END IF
+
+    ! if the subglacial outflow is passed to the ocean, we need to set the mask here before
+    ! regridding.
+    label = "ISM_SG_outflow"
+    listLabel = "ISM2OM_vars"
+    IF(FISOC_ConfigStringListContains(FISOC_config,label,listLabel,rc=rc)) THEN
+       IF (PRESENT(OM_ImpFB)) THEN       
+          CALL SetOutflowMask(OM_ImpFB,vm,rc)
+          IF (localPet.EQ.0) THEN
+             WRITE (OM_outputUnit,*) 'FISOC has just updated outflow mask.'
+          END IF
+       END IF
     END IF
     
 ! TODO: is there an accessible exit flag or similar for FVCOM?
@@ -421,6 +435,69 @@ CONTAINS
   
 
   !--------------------------------------------------------------------------------------
+  SUBROUTINE SetOutflowMask(OM_ImpFB,vm,rc)
+    
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB
+    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+    TYPE(ESMF_VM),INTENT(IN)              :: vm
+
+    INTEGER                               :: nn, ii, fieldCount, localPet, petCount
+    TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
+    CHARACTER(len=ESMF_MAXSTR)            :: fieldName
+    REAL(ESMF_KIND_R8),POINTER            :: ptr(:)
+    
+    rc = ESMF_FAILURE
+
+    CALL ESMF_VMGet(vm, localPet=localPet, petCount=petCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,    &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        
+    ! get a list of fields and their names from the OM export field bundle
+    fieldCount = 0
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldCount=fieldCount, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    ALLOCATE(fieldList(fieldCount))
+    CALL ESMF_FieldBundleGet(OM_ImpFB, fieldList=fieldList, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    fieldLoop: DO nn = 1,fieldCount
+      CALL ESMF_FieldGet(fieldList(nn), name=fieldName, rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+      SELECT CASE (TRIM(ADJUSTL(fieldName)))
+
+      CASE ('ISM_SG_outflow')
+        CALL ESMF_FieldGet(fieldList(nn), farrayPtr=ptr, rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)        
+        ptr(ii) = 0.0
+        DO ii = 1,SIZE(ptr)
+          ptr(ii) = ISWETN(ownedNodeIds(ii)) - 1
+          ! ISWETN has 0 for dry; 1 for wet
+          ! By subtracting 1 we have -1 for dry and zero for wet
+        END DO
+       
+      END SELECT
+    END DO fieldLoop
+
+    IF (ASSOCIATED(ptr)) THEN
+       NULLIFY(ptr)
+    END IF
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE SetOutflowMask
+
+
+  !--------------------------------------------------------------------------------------
   ! update the fields in the ocean export field bundle from the OM
   !--------------------------------------------------------------------------------------
   SUBROUTINE getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc)
@@ -501,6 +578,7 @@ CONTAINS
   END SUBROUTINE GetFieldDataFromOM
   
 
+  !--------------------------------------------------------------------------------------
   SUBROUTINE CavityReset(OM_ImpFB,FISOC_config,rc)
 
     TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB
@@ -598,7 +676,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
         
-    ! get a list of fields and their names from the OM export field bundle
+    ! get a list of fields and their names from the OM import field bundle
     fieldCount = 0
     CALL ESMF_FieldBundleGet(OM_ImpFB, fieldCount=fieldCount, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &

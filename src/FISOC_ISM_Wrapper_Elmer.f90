@@ -59,7 +59,7 @@ MODULE FISOC_ISM_Wrapper
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_z_l1           = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_z_lts          = 'Coordinate 3'
   CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_H_l0           = 'depth'
-  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_GL_flux        = 'GL_flux'
+  CHARACTER(len=ESMF_MAXSTR),SAVE :: EIname_SG_outflow     = 'GL_flux'
 
   ! The following mesh related properties are calculated during mesh conversion 
   ! during initialisation, and are needed during variable transfer while 
@@ -520,8 +520,8 @@ CONTAINS
              EIname_thick           = ISM_varNames(ii)
           CASE ('ISM_dddt')
              EIname_dddt            = ISM_varNames(ii)
-          CASE ('ISM_GL_flux')
-             EIname_GL_flux         = ISM_varNames(ii)
+          CASE ('ISM_SG_outflow')
+             EIname_SG_outflow         = ISM_varNames(ii)
           CASE DEFAULT
              msg = "unknown varName "//ISM_ReqVarList(ii)
              CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
@@ -828,9 +828,9 @@ CONTAINS
              END IF
           END DO
           
-       CASE ('ISM_GL_flux')
+       CASE ('ISM_SG_outflow')
           EI_field => VariableGet( CurrentModel % Mesh % Variables, &
-               EIname_GL_flux, UnFoundFatal=.TRUE.)
+               EIname_SG_outflow, UnFoundFatal=.TRUE.)
           EI_fieldVals => EI_field % Values
           EI_fieldPerm => EI_field % Perm ! don't need perm for coords
           DO ii = 1,SIZE(ownedNodeIDs)

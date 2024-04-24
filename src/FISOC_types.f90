@@ -14,7 +14,7 @@ MODULE FISOC_types_MOD
   INTEGER,PARAMETER            :: CLOCKWISE=1, ANTI_CLOCKWISE=2
   
   INTEGER,PARAMETER            :: MASK_ICE=10, MASK_GROUNDED_ICE=11
-  INTEGER,PARAMETER            :: MASK_FLOATING_ICE=12
+  INTEGER,PARAMETER            :: MASK_FLOATING_ICE=12, MASK_DRY = -1
   INTEGER,PARAMETER            :: MASK_OPEN_OCEAN=0 ! ESMF regridding leaves this at zero by default
   INTEGER,PARAMETER            :: MASK_GL=14 ! grounding line
 
