@@ -840,6 +840,7 @@ CONTAINS
                 ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
              END IF
           END DO
+          ptr = ptr / FISOC_secPerYear
           
        CASE ('ISM_dddt')
           IF (FISOC_IsDerived(fieldName,FISOC_config,rc)) THEN
