@@ -41,6 +41,10 @@ export FISOC_OM="dummy"
 export FISOC_OM_LIBS=""
 export FISOC_OM_INCLUDE="$HOME"
 export FISOC_OM_LIBPATH="$HOME"
+export CPPFLAGS="$CPPFLAGS -D ROMS4"
+export CPPFLAGS="$CPPFLAGS -D ROMS_DDDT"
+export CPPFLAGS="$CPPFLAGS -D ROMS_DSDT"
+
 
 #export MY_ROMS_DIR="/home/elmeruser/Source/ROMSIceShelf_devel_MISOMIP"
 #export FISOC_OM="ROMS"
