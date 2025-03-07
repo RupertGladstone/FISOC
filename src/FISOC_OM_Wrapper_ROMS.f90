@@ -134,10 +134,8 @@ CONTAINS
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_VMBarrier(vm, rc=rc)
-       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-            line=__LINE__, file=__FILE__)) &
-            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
        CALL ROMS_initialize(first,mpic,OM_configFile)
+       CALL ESMF_VMBarrier(vm, rc=rc)
        msg = "Completed ROMS initialisation"
        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
             line=__LINE__, file=__FILE__, rc=rc)
@@ -146,6 +144,15 @@ CONTAINS
        WRITE (OM_outputUnit,*) 'FISOC has just called ROMS init method.'
     END IF
 
+    IF (exit_flag.NE.NoError) THEN
+      WRITE (msg, "(A,I0,A)") "ERROR: ROMS_initialize has returned non-safe exit_flag=", &
+           exit_flag,", see ROMS mod_scalars.f90 for exit flag meanings."
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      !RETURN
+   END IF
+    
     ! extract a list of required ocean variables from the configuration object
     label = 'FISOC_OM_ReqVars:' ! the FISOC names for the vars
     CALL FISOC_getListFromConfig(FISOC_config, label, OM_ReqVarList,rc=rc)
@@ -360,12 +367,12 @@ CONTAINS
     IF (OM_CONTROL_WD) THEN
        CALL FISOC_OM_WETDRY(vm,rc)
        IF (localPet.EQ.0) THEN
-          WRITE (OM_outputUnit,*) 'FISOC has just called ROMS run method.'
+          WRITE (OM_outputUnit,*) 'FISOC has just called FISOC_OM_WETDRY.'
        END IF
     END IF
     
     IF (exit_flag.NE.NoError) THEN
-      WRITE (msg, "(A,I0,A)") "ERROR: ROMS has returned non-safe exit_flag=", &
+      WRITE (msg, "(A,I0,A)") "ERROR: ROMS_run has returned non-safe exit_flag=", &
            exit_flag,", see ROMS mod_scalars.f90 for exit flag meanings."
       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
            line=__LINE__, file=__FILE__, rc=rc)
