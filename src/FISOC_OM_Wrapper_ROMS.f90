@@ -59,7 +59,8 @@ CONTAINS
   SUBROUTINE FISOC_OM_Wrapper_Init_Phase1(FISOC_config,vm,OM_ExpFB,OM_grid,rc)
 
     USE mod_param, ONLY       : BOUNDS, Ngrids
-
+    USE mod_iounits, ONLY     : stdout
+    
     TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
     TYPE(ESMF_VM),INTENT(IN)              :: vm ! ESMF virtual machine (parallel context)
     TYPE(ESMF_grid),INTENT(OUT)           :: OM_grid
@@ -120,6 +121,8 @@ CONTAINS
 
 ! TODO: add check that ROMS .in file exists?  Else ROMS can seg fault
 
+    stdout = OM_outputUnit
+
     IF (localPet.EQ.0) THEN
        WRITE (OM_outputUnit,*) 'FISOC is about to call ROMS init method.'
     END IF
@@ -145,13 +148,13 @@ CONTAINS
     END IF
 
     IF (exit_flag.NE.NoError) THEN
-      WRITE (msg, "(A,I0,A)") "ERROR: ROMS_initialize has returned non-safe exit_flag=", &
-           exit_flag,", see ROMS mod_scalars.f90 for exit flag meanings."
-      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
-           line=__LINE__, file=__FILE__, rc=rc)
-      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-      !RETURN
-   END IF
+       WRITE (msg, "(A,I0,A)") "ERROR: ROMS_initialize has returned non-safe exit_flag=", &
+            exit_flag,", see ROMS mod_scalars.f90 for exit flag meanings."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       !RETURN
+    END IF
     
     ! extract a list of required ocean variables from the configuration object
     label = 'FISOC_OM_ReqVars:' ! the FISOC names for the vars
