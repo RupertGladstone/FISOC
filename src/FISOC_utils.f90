@@ -57,6 +57,7 @@ MODULE FISOC_utils_MOD
   
   INTERFACE FISOC_ConfigDerivedAttribute
      MODULE PROCEDURE FISOC_ConfigDerivedAttributeInteger
+     MODULE PROCEDURE FISOC_ConfigDerivedAttributeInteger8
      MODULE PROCEDURE FISOC_ConfigDerivedAttributeStaggerLocArray
      MODULE PROCEDURE FISOC_ConfigDerivedAttributeLogical
      MODULE PROCEDURE FISOC_ConfigDerivedAttributeReal
@@ -716,9 +717,10 @@ CONTAINS
     TYPE(ESMF_Clock),INTENT(INOUT)     :: FISOC_clock
     INTEGER,OPTIONAL,INTENT(OUT)       :: rc
 
-    INTEGER                 :: ISM_dt_sec, OM_dt_sec, dt_ratio
+    INTEGER(ESMF_KIND_I8)   :: ISM_dt_sec, OM_dt_sec
     INTEGER                 :: start_year, end_year, start_month, end_month
-    INTEGER                 :: OM_outputInterval, runLength_ISM_steps, runLength_secs
+    INTEGER                 :: OM_outputInterval, dt_ratio
+    INTEGER(ESMF_KIND_I8)   :: runLength_ISM_steps, runLength_secs
     TYPE(ESMF_TimeInterval) :: ISM_dt, OM_dt, runLength_timeInterval
     TYPE(ESMF_Time)         :: startTime, endTime
     TYPE(ESMF_Alarm)        :: alarm_OM, alarm_OM_output, alarm_ISM, alarm_ISM_exportAvailable
@@ -782,12 +784,12 @@ CONTAINS
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
     
-    CALL ESMF_TimeIntervalSet(OM_dt, s=OM_dt_sec, rc=rc)
+    CALL ESMF_TimeIntervalSet(OM_dt, s_i8=OM_dt_sec, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
-    CALL ESMF_TimeIntervalSet(ISM_dt, s=ISM_dt_sec, rc=rc)
+    CALL ESMF_TimeIntervalSet(ISM_dt, s_i8=ISM_dt_sec, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -799,7 +801,7 @@ CONTAINS
     
     IF (gotRunLength) THEN
        runLength_secs = runLength_ISM_steps * ISM_dt_sec
-       CALL ESMF_TimeIntervalSet(runLength_timeInterval, s=runLength_secs, rc=rc)
+       CALL ESMF_TimeIntervalSet(runLength_timeInterval, s_i8=runLength_secs, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -1208,6 +1210,120 @@ CONTAINS
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_initCumulatorFB
+
+
+  !--------------------------------------------------------------------------------------
+  RECURSIVE SUBROUTINE FISOC_ConfigDerivedAttributeInteger8(FISOC_config, derivedAttribute, label,rc)
+    
+    CHARACTER(len=*),INTENT(IN)           :: label
+    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
+    INTEGER(ESMF_KIND_I8),INTENT(OUT)     :: derivedAttribute
+    INTEGER,OPTIONAL,INTENT(OUT)          :: rc
+    
+    INTEGER                               :: OM_dt_sec, dt_ratio, OM_outputInterval, OM_AFF
+    LOGICAL                               :: APPLY_OM_AFF    
+
+    rc = ESMF_FAILURE
+
+    SELECT CASE(label)
+       
+    CASE('OM_OPEN_OCEAN') ! used in masking
+      CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_OPEN_OCEAN:', rc=rc)
+      IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+        derivedAttribute = 0
+        msg = "WARNING: OM_OPEN_OCEAN not found, setting to 0"
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__)
+      ELSE
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      END IF
+
+    CASE('ISM_dt_sec')
+      CALL ESMF_ConfigGetAttribute(FISOC_config, dt_ratio, label='dt_ratio:', rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      CALL ESMF_ConfigGetAttribute(FISOC_config, OM_dt_sec, label='OM_dt_sec:', rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      derivedAttribute = OM_dt_sec * dt_ratio
+
+    CASE('OM_outputInterval')
+      CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_outputInterval:', rc=rc)
+      IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+        derivedAttribute = 1
+        msg = "WARNING: OM_outputInterval not found, setting to 1."
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__)
+      ELSE
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      END IF
+
+    CASE('EntriesPerFile')
+      CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='EntriesPerFile:', rc=rc)
+      IF (rc.EQ.ESMF_RC_NOT_FOUND) THEN
+        derivedAttribute = 1
+        msg = "WARNING: EntriesPerFile not found, setting to 1."
+        CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, &
+             line=__LINE__, file=__FILE__)
+      ELSE
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      END IF
+
+    CASE('OM_cum_steps')
+       CALL ESMF_ConfigGetAttribute(FISOC_config, dt_ratio, label='dt_ratio:', rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       CALL FISOC_ConfigDerivedAttribute(FISOC_config, OM_outputInterval, label='OM_outputInterval', rc=rc)
+       IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__, rcToReturn=rc)) &
+            CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       derivedAttribute = dt_ratio / OM_outputInterval
+       
+    CASE('OM_dt_sec','OM_dt_sec:') ! OM run interval (this is "derived" when using accelerated forcing).
+      CALL ESMF_ConfigGetAttribute(FISOC_config, derivedAttribute, label='OM_dt_sec:', rc=rc)
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      CALL FISOC_ConfigDerivedAttribute(FISOC_config, APPLY_OM_AFF, 'APPLY_OM_AFF:',rc=rc) 
+      IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__, file=__FILE__)) &
+           CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+      
+      IF (APPLY_OM_AFF) THEN
+        CALL ESMF_ConfigGetAttribute(FISOC_config, OM_AFF, label='OM_AFF:', rc=rc)
+        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+             line=__LINE__, file=__FILE__)) &
+             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        IF ( MOD(derivedAttribute,OM_AFF) .EQ. 0) THEN
+          derivedAttribute = derivedAttribute / OM_AFF
+        ELSE
+          msg = "OM_dt_sec must be divisible by OM_AFF"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+        END IF
+      END IF
+      
+    CASE DEFAULT
+      msg = 'ERROR: unrecognised derived config attribute label '//label
+      CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+           line=__LINE__, file=__FILE__, rc=rc)
+      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END SELECT
+    
+    rc = ESMF_SUCCESS
+    
+  END SUBROUTINE FISOC_ConfigDerivedAttributeInteger8
 
 
   !--------------------------------------------------------------------------------------
