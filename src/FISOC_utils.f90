@@ -10,20 +10,21 @@ MODULE FISOC_utils_MOD
 
   PUBLIC   FISOC_getListFromConfig, FISOC_populateFieldBundle, &
        FISOC_ConfigDerivedAttribute, FISOC_initCumulatorFB,    &
-       FISOC_zeroBundle, FISOC_cumulateFB,                     & 
+       FISOC_zeroBundle, FISOC_cumulateFB,                     &
        FISOC_processCumulator, msg, FISOC_VM_MPI_Comm_dup,     &
-       FISOC_FieldRegridStore, FISOC_FB2NC, FISOC_setClocks,   & 
+       FISOC_FieldRegridStore, FISOC_FB2NC, FISOC_setClocks,   &
        FISOC_destroyClocks, FISOC_ISM2OM, FISOC_OM2ISM,        &
        FISOC_shrink, FISOC_VMAllGather, Unique1DArray,         &
-       FISOC_OneGrid, FISOC_cavityCheckOptions,                & 
+       FISOC_OneGrid, FISOC_cavityCheckOptions,                &
        FISOC_getFirstFieldRank, FISOC_makeRHfromFB,            &
        FISOC_State2StateCopyFB, FISOC_regridFB,                &
        FISOC_GridCompRun, FISOC_FieldListGetField,             &
-       FISOC_getGridFromFB, FISOC_getMeshFromFB,               &                
+       FISOC_getGridFromFB, FISOC_getMeshFromFB,               &
        FISOC_ConfigStringListContains, FISOC_locallyOwnedNodes,&
-       FISOC_CreateOneToManyRouteHandle,                       & 
+       FISOC_CreateOneToManyRouteHandle,                       &
        FISOC_ArrayRedistFromField, FISOC_MAPLL,                &
-       FISOC_IsDerived, FISOC_makePetList
+       FISOC_IsDerived, FISOC_makePetList,                     &
+       FISOC_secPerYearFromCalendar
 
   INTERFACE FISOC_IsDerived
      MODULE PROCEDURE FISOC_IsDerived_Real
@@ -3315,5 +3316,75 @@ print*,'catch error and set default if missing att'
     END IF
 
   END SUBROUTINE FISOC_MAPLL
-  
+
+
+  !--------------------------------------------------------------------------------------
+  ! Return the number of seconds in one model year, according to ESMF's current default
+  ! Calendar (set from FISOC_config.rc's defaultCalKind: label, see FISOC_caller.f90).
+  !
+  ! This exists for wrappers that need a single fixed rate-conversion factor between
+  ! per-year and per-second units (e.g. the Elmer wrapper's m/yr <-> m/s conversion, a
+  ! convention of that wrapper's coupled fields, not a fixed property of FISOC or ESMF)
+  ! rather than calendar-aware date arithmetic.
+  ! Only calendars with a fixed year length have an exact answer (360-day, no-leap/365-day).
+  ! Julian and Gregorian years vary (365 or 366 days), so their long-run MEAN year length is
+  ! returned instead, with a warning logged: callers that need this constant are doing a
+  ! fixed-rate unit conversion, not real calendar arithmetic, so an approximation is used
+  ! rather than refusing outright -- but it is logged so it is not a silent approximation.
+  FUNCTION FISOC_secPerYearFromCalendar(rc) RESULT(secPerYear)
+
+    REAL(ESMF_KIND_R8)                :: secPerYear
+    INTEGER,OPTIONAL,INTENT(OUT)      :: rc
+
+    TYPE(ESMF_Time)                   :: dummyTime
+    TYPE(ESMF_Calendar)               :: defaultCalendar
+    TYPE(ESMF_CalKind_Flag)           :: calkindflag
+    INTEGER                           :: localrc
+    REAL(ESMF_KIND_R8),PARAMETER      :: secPerDay = 86400.0_ESMF_KIND_R8
+
+    IF (PRESENT(rc)) rc = ESMF_FAILURE
+
+    ! An arbitrary ESMF_Time created with no explicit calendar picks up ESMF's current
+    ! default calendar; we then inspect that calendar rather than assuming one.
+    CALL ESMF_TimeSet(dummyTime, yy=2000, mm=1, dd=1, rc=localrc)
+    IF (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_TimeGet(dummyTime, calendar=defaultCalendar, rc=localrc)
+    IF (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    CALL ESMF_CalendarGet(defaultCalendar, calkindflag=calkindflag, rc=localrc)
+    IF (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    IF (calkindflag==ESMF_CALKIND_360DAY) THEN
+       secPerYear = 360.0_ESMF_KIND_R8 * secPerDay
+
+    ELSE IF (calkindflag==ESMF_CALKIND_NOLEAP) THEN
+       secPerYear = 365.0_ESMF_KIND_R8 * secPerDay
+
+    ELSE IF (calkindflag==ESMF_CALKIND_JULIAN) THEN
+       secPerYear = 365.25_ESMF_KIND_R8 * secPerDay
+       msg = "WARNING: FISOC_secPerYearFromCalendar: Julian calendar has no fixed year "// &
+            "length (individual years are 365 or 366 days); using the long-run mean "// &
+            "(365.25 days) for rate conversions."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, line=__LINE__, file=__FILE__)
+
+    ELSE IF (calkindflag==ESMF_CALKIND_GREGORIAN) THEN
+       secPerYear = 365.2425_ESMF_KIND_R8 * secPerDay
+       msg = "WARNING: FISOC_secPerYearFromCalendar: Gregorian calendar has no fixed year "// &
+            "length (individual years are 365 or 366 days); using the long-run mean "// &
+            "(365.2425 days) for rate conversions."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_WARNING, line=__LINE__, file=__FILE__)
+
+    ELSE
+       msg = "ERROR: FISOC_secPerYearFromCalendar: unsupported defaultCalKind for rate "// &
+            "conversions (only 360day, noleap, julian and gregorian are handled)."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__)
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+    END IF
+
+    IF (PRESENT(rc)) rc = ESMF_SUCCESS
+
+  END FUNCTION FISOC_secPerYearFromCalendar
+
 END MODULE FISOC_utils_MOD

@@ -87,9 +87,16 @@ MODULE FISOC_ISM_Wrapper
   ! along partition boundaries) and corresponding ESMF arrays (which don't)
   TYPE(ESMF_RouteHandle),SAVE :: RH_ESMF2Elmer
 
-  ! nodal distgrid, an ESMF object holding information about the distribution of 
+  ! nodal distgrid, an ESMF object holding information about the distribution of
   ! Elmer nodes across partitions, needed for the redist related operations.
   TYPE(ESMF_distgrid),SAVE :: distgridElmer
+
+  ! Elmer/Ice imposes no fixed unit system, but this wrapper's coupled rate fields
+  ! (e.g. meltRate, GL_flux) are conventionally set up in m/yr in the .sif, so a fixed
+  ! conversion to/from FISOC/ESMF's m/s convention is applied where they cross the
+  ! boundary. Derived once (Init_Phase1) from ESMF's default Calendar (FISOC_config.rc's
+  ! defaultCalKind:), via FISOC_secPerYearFromCalendar, rather than a hardcoded constant.
+  REAL(ESMF_KIND_R8),SAVE :: Elmer_secPerYear
 
 CONTAINS
 
@@ -217,6 +224,16 @@ CONTAINS
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+
+    ! This wrapper's coupled rate fields are conventionally in m/yr on the Elmer/.sif side
+    ! and m/s on the FISOC/ESMF side. Derive the fixed conversion factor once, from ESMF's
+    ! default Calendar (FISOC_config.rc's defaultCalKind:), rather than a hardcoded
+    ! constant -- used below (TimeStepConsistent) and in getFieldDataFromISM /
+    ! sendFieldDataToISM.
+    Elmer_secPerYear = FISOC_secPerYearFromCalendar(rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! now Elmer is initialised we can check for timestep consistency
     IF (localpet.EQ.0) THEN
@@ -445,7 +462,7 @@ CONTAINS
     TimeStepConsistent = .TRUE.
 
     Elmer_dt = ListGetConstReal( CurrentModel % Simulation, 'Timestep Sizes' )
-    Elmer_dt_sec = INT(FISOC_secPerYear * Elmer_dt)
+    Elmer_dt_sec = INT(Elmer_secPerYear * Elmer_dt)
 
     CALL FISOC_ConfigDerivedAttribute(FISOC_config, ISM_dt_sec, 'ISM_dt_sec',rc=rc) 
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -709,7 +726,7 @@ CONTAINS
              ! copy the data from the Elmer array (ESMF object) to the Elmer 
              ! variable (native Elmer object), converting from m/sec to m/a.
              DO ii = 1,SIZE(ptr)
-                EI_fieldVals(EI_fieldPerm(EI_NodeIDs(ii))) = ptr(ii) * FISOC_secPerYear
+                EI_fieldVals(EI_fieldPerm(EI_NodeIDs(ii))) = ptr(ii) * Elmer_secPerYear
              END DO
           
           CASE ('OM_temperature_l0')
@@ -840,7 +857,7 @@ CONTAINS
                 ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
              END IF
           END DO
-          ptr = ptr / FISOC_secPerYear
+          ptr = ptr / Elmer_secPerYear
           
        CASE ('ISM_dddt')
           IF (FISOC_IsDerived(fieldName,FISOC_config,rc)) THEN
@@ -859,7 +876,7 @@ CONTAINS
                    ptr(ii) = EI_fieldVals(ownedNodeIds(ii))
                 END IF
              END DO
-             ptr = ptr / FISOC_secPerYear
+             ptr = ptr / Elmer_secPerYear
 !          WRITE(msg,*) "ISM_DDDT max ", MAXVAL(ptr) ," min ", MINVAL(ptr)
 !          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
 !               line=__LINE__, file=__FILE__, rc=rc)

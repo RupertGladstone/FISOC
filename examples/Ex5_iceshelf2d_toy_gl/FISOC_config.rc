@@ -2,6 +2,8 @@
 #  Regrid_method:      ESMF_REGRIDMETHOD_BILINEAR
 #  Regrid_method:      ESMF_REGRIDMETHOD_NEAREST_STOD
 
+  defaultCalKind:     ESMF_CALKIND_360DAY
+
   ISM_configFile:     FISOC_Ex5.sif
   FISOC_ISM_ReqVars:  ISM_z_l0 ISM_thick ISM_gmask 
 #  ISM_varNames: 'Coordinate 3' Depth groundedmask 

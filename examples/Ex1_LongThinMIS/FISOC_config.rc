@@ -1,4 +1,6 @@
 
+  defaultCalKind:     ESMF_CALKIND_360DAY
+
 # ISM params...
 !  ISM_configFile:     /homeappl/home/gladston/Source/FISOC/examples/Ex1_LongThinMIS/FISOC_Ex1.sif
   ISM_configFile:     FISOC_Ex1.sif

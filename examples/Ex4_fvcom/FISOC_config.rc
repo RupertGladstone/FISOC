@@ -8,8 +8,10 @@
  #
  # Syntax:
  # It contains a list of <label,value> pairs.
- # The colon after the label is required. 
- # 
+ # The colon after the label is required.
+ #
+
+  defaultCalKind:     ESMF_CALKIND_360DAY
 
   ISM_configFile:     FISOC_Ex4b.sif
   FISOC_ISM_ReqVars:  ISM_z_l0  ISM_z_lts  ISM_thick 

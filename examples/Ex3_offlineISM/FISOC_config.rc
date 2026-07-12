@@ -4,8 +4,10 @@
  #
  # Syntax:
  # It contains a list of <label,value> pairs.
- # The colon after the label is required. 
- # 
+ # The colon after the label is required.
+ #
+
+  defaultCalKind:     ESMF_CALKIND_360DAY
  # Further notes:
  # Although FISOC uses <label, value> pairs, the values after the label can also be a list.
  # Multiple types are allowed.

@@ -1,5 +1,6 @@
 
 
+  defaultCalKind:     ESMF_CALKIND_360DAY
 
   ISM_configFile:     FISOC_Ex4.sif
   FISOC_ISM_ReqVars:  ISM_z_l0

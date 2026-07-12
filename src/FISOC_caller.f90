@@ -29,13 +29,18 @@ PROGRAM FISOC_main
   TYPE(ESMF_state)        :: importstate, exportstate
 
 
-  ! initialize ESMF framework
-
-!  CALL ESMF_Initialize(defaultCalKind=ESMF_CALKIND_GREGORIAN, &
-!       defaultlogfilename="FISOC.log", &
-!       logkindflag=ESMF_LOGKIND_SINGLE, rc=rc)
-!       defaultlogfilename="ESMF_logs/FISOC.log", &
-  CALL ESMF_Initialize(defaultCalKind=ESMF_CALKIND_360DAY, &
+  ! Initialize ESMF framework and load the FISOC configuration file in the same call.
+  !
+  ! defaultCalKind: is a REQUIRED label in FISOC_config.rc. It is one of the "predefined
+  ! labels" ESMF_Initialize looks for when given configFilename (ESMF ref. manual sec.
+  ! 16.4.1), and it sets ESMF's default Calendar -- used implicitly by every
+  ! ESMF_TimeSet/ESMF_ClockCreate call in FISOC_setClocks (start_year/month, end_year/month,
+  ! run length, etc). Valid values (ESMF ref. manual sec. 43.2.1) include
+  ! ESMF_CALKIND_360DAY, ESMF_CALKIND_NOLEAP, ESMF_CALKIND_JULIAN, ESMF_CALKIND_GREGORIAN.
+  ! If the label is omitted, ESMF silently falls back to ESMF_CALKIND_NOCALENDAR, which
+  ! then makes every yy=/mm=/dd= ESMF_TimeSet call in FISOC_setClocks fail with a caught,
+  ! non-zero rc -- so an omitted label is a loud failure at startup, not a silent one.
+  CALL ESMF_Initialize(configFilename="./FISOC_config.rc", config=FISOC_config, &
        logkindflag=ESMF_LOGKIND_MULTI, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) THEN
@@ -47,7 +52,7 @@ PROGRAM FISOC_main
        line=__LINE__, file=__FILE__)) &
        CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-  msg = "Initialised ESMF framework"  
+  msg = "Initialised ESMF framework and loaded FISOC configuration file"
   CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
        line=__LINE__, file=__FILE__, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -56,20 +61,6 @@ PROGRAM FISOC_main
   ! Note: we are only checking log writing for success on first call to ESMF_LogWrite
   ! possibly this is naively optimistic...
 
-  ! Load configuration file
-  FISOC_config = ESMF_ConfigCreate(rc=rc)
-  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-       line=__LINE__, file=__FILE__)) &
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-  CALL ESMF_ConfigLoadFile(FISOC_config, "./FISOC_config.rc", rc=rc)
-  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-       line=__LINE__, file=__FILE__)) &
-       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-  msg = "Loaded FISOC configuration file"  
-  CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
-       line=__LINE__, file=__FILE__, rc=rc)
-  
 
   ! Create the parent Gridded Component (though we don't use its grid, we just 
   ! use it for coordinating child components...)
@@ -92,9 +83,8 @@ PROGRAM FISOC_main
   
 
 !put all this into thingsToDo/manual once it settles a bit
-!*** what calendar? 360 day?
   !------------------------------------------------------------------------------
-  ! FISOC time model 
+  ! FISOC time model
   ! 
   ! FISOC runs one clock which increments with the ocean timestep. The ice 
   ! timestep must be a multiple of the ocean timestep.  An ocean alarm is used 
