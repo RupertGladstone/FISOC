@@ -425,9 +425,7 @@ CONTAINS
             line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
-! TODO: fix Elmer finalise call, not working for some reason...
-!    CALL ElmerSolver_finalize()
-!    CALL ElmerSolver_finalize(PreserveParEnvOpt=.TRUE.)
+    CALL ElmerSolver_finalize()
 
     CLOSE(unit=ISM_outputUnit, ERR=102)
 
