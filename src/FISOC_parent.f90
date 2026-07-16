@@ -84,21 +84,21 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"************************************************************************************"
-       PRINT*,"This is a verbose run, set by the verbose_coupling flag in the FISOC_config.rc file."
-       PRINT*,"(this mainly affects printing to screen, but also increases verbosity of the log    "
-       PRINT*,"file(s), and dumping of vtk grid files.                                             "
-       PRINT*,"************************************************************************************"
-       PRINT*,""
+       msg = "This is a verbose run, set by the verbose_coupling flag in the FISOC_config.rc file."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "(this mainly affects printing to screen, but also increases verbosity of the log"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "file(s), and dumping of vtk grid files."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"************    FISOC parent.  Initialise method.       **********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
+       msg = "FISOC parent.  Initialise method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     msg = "Starting FISOC parent initialisation"
@@ -112,9 +112,12 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,"The VM object contains information about the execution environment of "
-       PRINT*,"the Component.  Printing info about parent VM..."
-       PRINT*,""
+       msg = "The VM object contains information about the execution environment of"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "the Component.  Printing info about parent VM..."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
        CALL ESMF_VMPrint(vm, rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
@@ -445,11 +448,9 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"************    FISOC parent.  Run method.              **********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
+       msg = "FISOC parent.  Run method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     IF ( (.NOT.ISM_UseOMGrid).AND.(.NOT.OM_UseISMGrid) ) THEN
@@ -496,7 +497,6 @@ CONTAINS
     mainTimeStepping: DO WHILE (.NOT. ESMF_ClockIsStopTime(FISOC_clock, rc=rc))
 
        IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-          PRINT*,""
           CALL ESMF_ClockPrint(FISOC_clock, options="advanceCount string isofrac", rc=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
@@ -509,11 +509,12 @@ CONTAINS
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) &
                CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-          PRINT*,"Alarm status: ",ESMF_AlarmIsRinging(alarm_OM),&
+          WRITE(msg,*) "Alarm status: ",ESMF_AlarmIsRinging(alarm_OM),&
                ESMF_AlarmIsRinging(alarm_OM_output),&
                ESMF_AlarmIsRinging(alarm_ISM),&
                ESMF_AlarmIsRinging(alarm_ISM_exportAvailable)
-          PRINT*,""
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
        END IF
        
        IF (ESMF_AlarmIsRinging(alarm_OM, rc=rc)) THEN
@@ -674,11 +675,9 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"************    FISOC parent.  Finalise method.         **********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
+       msg = "FISOC parent.  Finalise method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     msg = "FISOC parent finalise: getting child states"

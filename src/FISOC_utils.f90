@@ -2182,11 +2182,16 @@ print*,'catch error and set default if missing att'
     ! how many items in list?
     listCount = 0
     DO WHILE (rc.EQ.0)
-       CALL ESMF_ConfigGetAttribute(config, dummyString,rc=rc) 
+       CALL ESMF_ConfigGetAttribute(config, dummyString,rc=rc)
        IF  (rc.EQ.ESMF_RC_NOT_FOUND) EXIT
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       ! A label whose remaining value is entirely a comment (e.g. "label:  #foo bar")
+       ! is not reported as ESMF_RC_NOT_FOUND -- ESMF returns success with an empty
+       ! string instead. Treat that as end-of-list, otherwise every blank/commented-out
+       ! list config ends up with one spurious empty-string item.
+       IF (LEN_TRIM(ADJUSTL(dummyString)).EQ.0) EXIT
        listCount = listCount + 1
     END DO
     CALL ESMF_ConfigFindLabel(config, TRIM(label),rc=rc)
@@ -2237,11 +2242,12 @@ print*,'catch error and set default if missing att'
     ! how many items in list?
     listCount = 0
     DO WHILE (rc.EQ.0)
-       CALL ESMF_ConfigGetAttribute(config, dummyInteger,rc=rc) 
+       CALL ESMF_ConfigGetAttribute(config, dummyInteger,rc=rc)
        IF  (rc.EQ.ESMF_RC_NOT_FOUND) EXIT
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       IF (LEN_TRIM(ADJUSTL(dummyInteger)).EQ.0) EXIT
        listCount = listCount + 1
     END DO
 
@@ -2290,11 +2296,12 @@ print*,'catch error and set default if missing att'
     ! how many items in list?
     listCount = 0
     DO WHILE (rc.EQ.0)
-       CALL ESMF_ConfigGetAttribute(config, dummyReal,rc=rc) 
+       CALL ESMF_ConfigGetAttribute(config, dummyReal,rc=rc)
        IF  (rc.EQ.ESMF_RC_NOT_FOUND) EXIT
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) &
             CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       IF (LEN_TRIM(ADJUSTL(dummyReal)).EQ.0) EXIT
        listCount = listCount + 1
     END DO
 

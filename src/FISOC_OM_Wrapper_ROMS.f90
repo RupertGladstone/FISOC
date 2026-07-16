@@ -112,11 +112,9 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"**********      OM wrapper.  Init phase 1 method.        *********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
+       msg = "OM wrapper.  Init phase 1 method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
 ! TODO: add check that ROMS .in file exists?  Else ROMS can seg fault
@@ -241,14 +239,15 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"**********      OM wrapper.  Init phase 2 method.        *********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
-       PRINT*,"Here we have access to the initialised ISM fields, just in case the OM needs "
-       PRINT*,"to know about these in order to complete its initialisation."
-       PRINT*,""
+       msg = "OM wrapper.  Init phase 2 method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "Here we have access to the initialised ISM fields, just in case the OM needs"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "to know about these in order to complete its initialisation."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
 !    CALL ESMF_ConfigGetAttribute(FISOC_config, OM_initCavityFromISM, label='OM_initCavityFromISM:', rc=rc)
@@ -399,32 +398,50 @@ CONTAINS
     END IF
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"************         OM wrapper.  Run method.           **********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
+       msg = "OM wrapper.  Run method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
 
        IF ((PRESENT(OM_ExpFB)).AND.(.NOT.(PRESENT(OM_ImpFB)))) THEN
-          PRINT*,"We have no new inputs for the OM from the ISM.  We need to call the OM "
-          PRINT*,"and record its output in the OM export field bundle."
+          msg = "We have no new inputs for the OM from the ISM.  We need to call the OM"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          msg = "and record its output in the OM export field bundle."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
        END IF
 
        IF ((PRESENT(OM_ExpFB)).AND.(PRESENT(OM_ImpFB))) THEN
-          PRINT*,"We have new inputs for the OM from the ISM in the OM import field bundle. "
-          PRINT*,"We need to send these inputs to the OM, run one timestep, and record the OM "
-          PRINT*,"outputs. "
+          msg = "We have new inputs for the OM from the ISM in the OM import field bundle."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          msg = "We need to send these inputs to the OM, run one timestep, and record the OM"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          msg = "outputs."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
        END IF
        
        IF ((.NOT.(PRESENT(OM_ExpFB))).AND.(PRESENT(OM_ImpFB))) THEN
-          PRINT*,"We have new inputs for the OM from the ISM in the OM import field bundle. "
-          PRINT*,"We need to send these inputs to the OM and run one timestep. We do not "
-          PRINT*,"need to collect OM outputs.  Just run the OM one timestep."
+          msg = "We have new inputs for the OM from the ISM in the OM import field bundle."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          msg = "We need to send these inputs to the OM and run one timestep. We do not"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          msg = "need to collect OM outputs.  Just run the OM one timestep."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
        END IF
 
        IF ((.NOT.(PRESENT(OM_ExpFB))).AND.(.NOT.(PRESENT(OM_ImpFB)))) THEN
-          PRINT*,"We have no new inputs for the OM from the ISM, and we do not need to "
-          PRINT*,"collect OM outputs.  Just run the OM one timestep."
+          msg = "We have no new inputs for the OM from the ISM, and we do not need to"
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          msg = "collect OM outputs.  Just run the OM one timestep."
+          CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
        END IF
 
     END IF
@@ -458,13 +475,15 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"************       OM wrapper.  Finalise method.        **********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
-       PRINT*,"FISOC has taken care of clearing up ESMF types.  Here we just need to call the "
-       PRINT*,"OM finalise method."
+       msg = "OM wrapper.  Finalise method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "FISOC has taken care of clearing up ESMF types.  Here we just need to call the"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "OM finalise method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     IF (localPet.EQ.0) THEN

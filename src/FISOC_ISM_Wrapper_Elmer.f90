@@ -170,11 +170,9 @@ CONTAINS
 
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"**********      ISM wrapper.  Init phase 1 method.        *********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
+       msg = "ISM wrapper.  Init phase 1 method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     ! FISOC sets the unit for Elmer's standard messaging routines to use instead of stdout
@@ -310,14 +308,15 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"**********      ISM wrapper.  Init phase 2 method.        *********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
-       PRINT*,"Here we have access to the re-initialised OM fields, just in case the ISM needs "
-       PRINT*,"to know about these in order to complete its initialisation."
-       PRINT*,""
+       msg = "ISM wrapper.  Init phase 2 method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "Here we have access to the re-initialised OM fields, just in case the ISM needs"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "to know about these in order to complete its initialisation."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     CALL getFieldDataFromISM(ISM_ExpFB,FISOC_config,vm,rc=rc)
@@ -362,11 +361,9 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"************        ISM wrapper.  Run method.           **********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
+       msg = "ISM wrapper.  Run method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     ! get hold of the elmer variables for receiving inputs, and convert them here from esmf to elmer type.
@@ -417,13 +414,15 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"************      ISM wrapper.  Finalise method.        **********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
-       PRINT*,"FISOC has taken care of clearing up ESMF types.  Here we just need to call the "
-       PRINT*,"ISM finalise method."
+       msg = "ISM wrapper.  Finalise method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "FISOC has taken care of clearing up ESMF types.  Here we just need to call the"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "ISM finalise method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
 ! TODO: fix Elmer finalise call, not working for some reason...

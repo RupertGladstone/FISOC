@@ -165,15 +165,18 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"*****************************************************************************"
-       PRINT*,"****   ISM offline forcing wrapper.  Init phase 1 method.    ****************"
-       PRINT*,"*****************************************************************************"
-       PRINT*,""
-       PRINT*,"Here we need to get the ISM grid information into the ESMF_grid type. "
-       PRINT*,"We also need to create and initialise the required variables using the "
-       PRINT*,"ESMF_field type and put them into an ESMF_fieldBundle type."
-       PRINT*,""
+       msg = "ISM offline forcing wrapper.  Init phase 1 method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "Here we need to get the ISM grid information into the ESMF_grid type."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "We also need to create and initialise the required variables using the"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "ESMF_field type and put them into an ESMF_fieldBundle type."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     CALL FISOC_populateFieldBundle(ISM_ReqVarList,ISM_ExpFB,ISM_Grid,rc=rc)
@@ -223,14 +226,15 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"**********    ISM FOOL wrapper.  Init phase 2 method.    ********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
-       PRINT*,"Here we have access to the initialised OM fields, just in case the ISM needs "
-       PRINT*,"to know about these in order to complete its initialisation."
-       PRINT*,""
+       msg = "ISM FOOL wrapper.  Init phase 2 method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "Here we have access to the initialised OM fields, just in case the ISM needs"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "to know about these in order to complete its initialisation."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
     
     rc = ESMF_SUCCESS
@@ -292,14 +296,15 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"*************       ISM FOOL wrapper.  Run method.       ********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
-       PRINT*,"OM export fields are available but for offline forcing we dont need them. "
-       PRINT*,"Just read new forcing data to pass to OM."
-       PRINT*,""
+       msg = "ISM FOOL wrapper.  Run method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "OM export fields are available but for offline forcing we dont need them."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "Just read new forcing data to pass to OM."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     ! Get the fields needed from our ISM, in this case just the netcdf file
@@ -654,13 +659,15 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"************    ISM FOOL wrapper.  Finalise method.     *********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
-       PRINT*,"FISOC has taken care of clearing up ESMF types.  Here we just need to call the "
-       PRINT*,"ISM finalise method."
+       msg = "ISM FOOL wrapper.  Finalise method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "FISOC has taken care of clearing up ESMF types.  Here we just need to call the"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "ISM finalise method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     rc = ESMF_SUCCESS

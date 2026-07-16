@@ -71,15 +71,18 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"**********    ISM dummy wrapper.  Init phase 1 method.    ********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
-       PRINT*,"Here we need to get the ISM mesh information into the ESMF_grid type. "
-       PRINT*,"We also need to create and initialise the required variables using the "
-       PRINT*,"ESMF_field type and put them into an ESMF_fieldBundle type."
-       PRINT*,""
+       msg = "ISM dummy wrapper.  Init phase 1 method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "Here we need to get the ISM mesh information into the ESMF_grid type."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "We also need to create and initialise the required variables using the"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "ESMF_field type and put them into an ESMF_fieldBundle type."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     CALL dummyCreateMesh(ISM_dummyMesh)
@@ -123,14 +126,15 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"**********    ISM dummy wrapper.  Init phase 2 method.    ********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
-       PRINT*,"Here we have access to the initialised OM fields, just in case the ISM needs "
-       PRINT*,"to know about these in order to complete its initialisation."
-       PRINT*,""
+       msg = "ISM dummy wrapper.  Init phase 2 method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "Here we have access to the initialised OM fields, just in case the ISM needs"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "to know about these in order to complete its initialisation."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
     
     rc = ESMF_SUCCESS
@@ -165,13 +169,12 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"*************       ISM dummy wrapper.  Run method.       ********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
-       PRINT*,"OM export fields are available.  Run the ISM and return ISM export fields "
-       PRINT*,""
+       msg = "ISM dummy wrapper.  Run method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "OM export fields are available.  Run the ISM and return ISM export fields"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     ! get import and export fields and do something with them.
@@ -186,7 +189,9 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,"See the Elmer wrapper for examples of accessing ESMF vars and field bundles."
+       msg = "See the Elmer wrapper for examples of accessing ESMF vars and field bundles."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     rc = ESMF_SUCCESS
@@ -217,13 +222,15 @@ CONTAINS
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF ((verbose_coupling).AND.(localPet.EQ.0)) THEN
-       PRINT*,""
-       PRINT*,"******************************************************************************"
-       PRINT*,"************    ISM dummy wrapper.  Finalise method.     *********************"
-       PRINT*,"******************************************************************************"
-       PRINT*,""
-       PRINT*,"FISOC has taken care of clearing up ESMF types.  Here we just need to call the "
-       PRINT*,"ISM finalise method."
+       msg = "ISM dummy wrapper.  Finalise method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "FISOC has taken care of clearing up ESMF types.  Here we just need to call the"
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
+       msg = "ISM finalise method."
+       CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_INFO, &
+            line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
     rc = ESMF_SUCCESS
