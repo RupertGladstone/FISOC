@@ -78,12 +78,13 @@ CONTAINS
   !--------------------------------------------------------------------------------------
   ! This dummy wrapper aims to create the dummy grid and required variables 
   ! in the ESMF formats.  
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(FISOC_config,vm,OM_ImpFB,OM_ExpFB,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(FISOC_config,vm,OM_ImpFB,OM_ExpFB,ISM_ExpFB,rc)
 
-    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB, OM_ExpFB
-    INTEGER,INTENT(OUT),OPTIONAL          :: rc
-    TYPE(ESMF_VM),INTENT(IN)              :: vm
+    TYPE(ESMF_config),INTENT(INOUT)             :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)        :: OM_ImpFB, OM_ExpFB
+    TYPE(ESMF_fieldBundle),INTENT(IN),OPTIONAL  :: ISM_ExpFB
+    INTEGER,INTENT(OUT),OPTIONAL                :: rc
+    TYPE(ESMF_VM),INTENT(IN)                    :: vm
 
     LOGICAL                      :: verbose_coupling
     INTEGER                      :: localPet
@@ -130,10 +131,11 @@ CONTAINS
   
   
   !--------------------------------------------------------------------------------------
-  SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB,OM_ImpFB,rc_local)
-    
+  SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB,OM_ImpFB,ISM_ExpFB,rc_local)
+
     TYPE(ESMF_config),INTENT(INOUT)                :: FISOC_config
-    TYPE(ESMF_fieldBundle),INTENT(INOUT),OPTIONAL  :: OM_ExpFB, OM_ImpFB 
+    TYPE(ESMF_fieldBundle),INTENT(INOUT),OPTIONAL  :: OM_ExpFB, OM_ImpFB
+    TYPE(ESMF_fieldBundle),INTENT(IN),OPTIONAL     :: ISM_ExpFB
     TYPE(ESMF_VM),INTENT(IN)                       :: vm
     INTEGER,INTENT(OUT),OPTIONAL                   :: rc_local
 

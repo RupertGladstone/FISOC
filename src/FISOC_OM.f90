@@ -174,10 +174,10 @@ CONTAINS
 
     TYPE(ESMF_VM)          :: vm
     TYPE(ESMF_config)      :: FISOC_config
-    TYPE(ESMF_fieldbundle) :: OM_ImpFB, OM_ExpFB
+    TYPE(ESMF_fieldbundle) :: OM_ImpFB, OM_ExpFB, ISM_ExpFB
 
     LOGICAL                :: APPLY_OM_AFF
-    
+
     rc = ESMF_FAILURE
 
     CALL ESMF_GridCompGet(FISOC_OM, config=FISOC_config, vm=vm, rc=rc)
@@ -188,23 +188,32 @@ CONTAINS
     CALL ESMF_StateGet(OM_ImpSt, OM_impFBname, OM_ImpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     CALL ESMF_StateGet(OM_ExpSt, OM_expFBname, OM_ExpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Raw (un-regridded) ISM export fields, stashed into OM_ImpSt by
+    ! FISOC_coupler_init_phase1 - lets the OM wrapper handle its own
+    ! dynamically-masked regridding (e.g. subglacial discharge) during this
+    ! spin-up phase too, not just during the main Run loop.
+    CALL ESMF_StateGet(OM_ImpSt, "ISM export fields", ISM_ExpFB, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! If accelerated forcing is active, scale selected OM import fields
-    CALL FISOC_ConfigDerivedAttribute(FISOC_config, APPLY_OM_AFF, 'APPLY_OM_AFF:',rc=rc) 
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, APPLY_OM_AFF, 'APPLY_OM_AFF:',rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     IF (APPLY_OM_AFF) THEN
       CALL OM_AcceleratedForcing(FISOC_config, OM_ImpFB, rc)
     END IF
-      
-    CALL FISOC_OM_Wrapper_Init_Phase2(FISOC_config,vm,OM_ImpFB,OM_ExpFB,rc=rc)
+
+    CALL FISOC_OM_Wrapper_Init_Phase2(FISOC_config,vm,OM_ImpFB,OM_ExpFB,ISM_ExpFB=ISM_ExpFB,rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -231,7 +240,7 @@ CONTAINS
     TYPE(ESMF_VM)              :: vm
     INTEGER(ESMF_KIND_I8)      :: advanceCount
     INTEGER                    :: localPet,advanceCountInt4
-    TYPE(ESMF_fieldbundle)     :: OM_ImpFB, OM_ExpFB, OM_ExpFBcum
+    TYPE(ESMF_fieldbundle)     :: OM_ImpFB, OM_ExpFB, OM_ExpFBcum, ISM_ExpFB
     TYPE(ESMF_config)          :: FISOC_config
     TYPE(ESMF_Alarm)           :: alarm_OM_output, alarm_ISM, alarm_ISM_exportAvailable
     LOGICAL                    :: verbose_coupling, OM_writeNetcdf, APPLY_OM_AFF
@@ -311,17 +320,25 @@ CONTAINS
     CALL ESMF_StateGet(OM_ImpSt, OM_impFBname, OM_ImpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
-         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)    
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Raw (un-regridded) ISM export fields, stashed into OM_ImpSt by
+    ! FISOC_coupler_init_phase1 - only passed on to the OM wrapper below when
+    ! new ISM output is actually available this step (see alarm_ISM_exportAvailable).
+    CALL ESMF_StateGet(OM_ImpSt, "ISM export fields", ISM_ExpFB, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! If accelerated forcing is active, scale selected OM import fields
-    CALL FISOC_ConfigDerivedAttribute(FISOC_config, APPLY_OM_AFF, 'APPLY_OM_AFF:',rc=rc) 
+    CALL FISOC_ConfigDerivedAttribute(FISOC_config, APPLY_OM_AFF, 'APPLY_OM_AFF:',rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     IF (APPLY_OM_AFF) THEN
       CALL OM_AcceleratedForcing(FISOC_config, OM_ImpFB, rc)
     END IF
-    
+
     ! The ocean cavity might need temporal linear interpolation at this point.
     CALL OM_HandleCavity(FISOC_config, FISOC_clock, OM_ImpFB, OM_ExpFB, localPet, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -332,8 +349,8 @@ CONTAINS
     OM_output: IF (ESMF_AlarmIsRinging(alarm_OM_output, rc=rc)) THEN
        
        ! we have new ISM output available and we need OM output
-       ISM_input1: IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN          
-          CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB=OM_ExpFB,OM_ImpFB=OM_ImpFB,rc_local=rc)
+       ISM_input1: IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN
+          CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB=OM_ExpFB,OM_ImpFB=OM_ImpFB,ISM_ExpFB=ISM_ExpFB,rc_local=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) THEN
              CALL FISOC_OM_finalise(FISOC_OM, OM_ImpSt, OM_ExpSt, FISOC_clock, rc)
@@ -356,7 +373,7 @@ CONTAINS
     ELSE       
        ! we have new ISM output available but we do not need OM output
        ISM_input2: IF (ESMF_AlarmIsRinging(alarm_ISM_exportAvailable, rc=rc)) THEN
-          CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ImpFB=OM_ImpFB,rc_local=rc)
+          CALL FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ImpFB=OM_ImpFB,ISM_ExpFB=ISM_ExpFB,rc_local=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) THEN
              CALL FISOC_OM_finalise(FISOC_OM, OM_ImpSt, OM_ExpSt, FISOC_clock, rc)

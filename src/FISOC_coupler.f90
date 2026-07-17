@@ -8,7 +8,7 @@ MODULE FISOC_coupler_MOD
   
   PRIVATE
   
-  PUBLIC FISOC_coupler_register
+  PUBLIC FISOC_coupler_register, FISOC_coupler_regridMaskedField
     
 CONTAINS
   
@@ -219,6 +219,20 @@ CONTAINS
 
 
     CALL ESMF_StateAdd(OM_ImpSt, (/OM_ImpFB/), rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Also stash the raw (un-regridded) ISM export bundle itself into the OM
+    ! import state. This costs nothing (ESMF_FieldBundle is a handle, so this
+    ! just registers an extra reference under a name, not a data copy), and it
+    ! is only ever added once here at init: Elmer's own wrapper overwrites
+    ! ISM_ExpFB's fields' data in place every ISM run step (it doesn't
+    ! recreate them), so this reference always reflects the current values.
+    ! This gives the OM wrapper access to ISM fields whose regridding can't
+    ! use one long-lived routehandle (e.g. a dynamically-masked exchange like
+    ! subglacial discharge) - see FISOC_coupler_regridMaskedField.
+    CALL ESMF_StateAdd(OM_ImpSt, (/ISM_ExpFB/), rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) &
          CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -557,7 +571,7 @@ CONTAINS
     TYPE(ESMF_StateItem_Flag)     :: ISM_ExpSt_TypeList(ListLen)
     INTEGER                       :: OM_ImpFieldCount, ISM_ExpFieldCount, ii, NumRouteHandleItems, RouteHandleIndex
     TYPE(ESMF_Field),ALLOCATABLE  :: OM_ImpFieldList(:), ISM_ExpFieldList(:)
-    TYPE(ESMF_RouteHandle)        :: ISM2OM_regridRouteHandle, Outflow_RouteHandle
+    TYPE(ESMF_RouteHandle)        :: ISM2OM_regridRouteHandle
     TYPE(ESMF_TypeKind_Flag)      :: fieldTypeKind
 
     REAL(ESMF_KIND_R8),POINTER    :: optr(:,:),iptr(:)
@@ -645,30 +659,16 @@ CONTAINS
 
        SELECT CASE (fieldName)
 
-       CASE ("ISM_SG_outflow")
-          ! The mask dynamically evolves for this outflow regrid operation.
-          ! So ... create the routehandle using masking...
-          CALL ESMF_FieldRegridStore(srcField=ISM_ExpFieldList(ii),     &
-               srcMaskValues=(/0/),                                     &
-               dstField=OM_ImpFieldList(ii),                            &
-               regridmethod=ESMF_REGRIDMETHOD_NEAREST_DTOS,             &
-               dstMaskValues=(/MASK_DRY/),                              &
-               routehandle=Outflow_RouteHandle, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-          ! ...then regrid...
-          CALL ESMF_FieldRegrid(ISM_ExpFieldList(ii),OM_ImpFieldList(ii), &
-               routehandle=Outflow_RouteHandle, zeroregion= ESMF_REGION_TOTAL, &
-               checkflag=.TRUE.,rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
-          ! ...then destroy routehandle (need a new one next time anyway).
-          CALL ESMF_FieldBundleRegridRelease(Outflow_Routehandle, rc=rc)
-          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-               line=__LINE__, file=__FILE__)) &
-               CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+       CASE ("ISM_SGD_flux")
+          ! Deliberately not regridded here. This field's destination mask depends on
+          ! the ice-sheet model's own grounded/floating classification, which is only
+          ! current *inside* the OM's own run call - i.e. after this coupler phase has
+          ! already run. So the shared, long-lived ISM2OM_regridRouteHandle (built once
+          ! at Init, no masking) cannot be used for it, and regridding it here would use
+          ! a stale (one-step-lagged) mask. Instead the OM wrapper calls
+          ! FISOC_coupler_regridMaskedField directly, at the correct point in its own
+          ! logic, using the raw field from the "ISM export fields" bundle that
+          ! FISOC_coupler_init_phase1 stashes into the OM import state for this purpose.
 
        CASE DEFAULT
           CALL ESMF_FieldRegrid(ISM_ExpFieldList(ii),OM_ImpFieldList(ii), &
@@ -696,6 +696,55 @@ CONTAINS
     rc = ESMF_SUCCESS
 
   END SUBROUTINE FISOC_coupler_run_phase2
+
+
+
+  !------------------------------------------------------------------------------
+  ! Regrid a single field with a routehandle built fresh for this one call, using
+  ! destination masking. Intended for exchanges whose destination mask evolves during
+  ! a coupling step (e.g. subglacial discharge placement, which depends on the
+  ! ice-sheet model's own grounded/floating classification and so can only be built
+  ! correctly *after* that classification is updated). Unlike the bulk ISM<->OM
+  ! exchange (FISOC_coupler_run_phase1/2), which uses one long-lived routehandle built
+  ! once at Init, this cannot be precomputed - so it is not wired up as a coupler
+  ! Init/Run entry point at all. Instead the caller (an OM or ISM wrapper) invokes this
+  ! directly, as an ordinary subroutine call, at whatever point in its own logic the
+  ! destination mask is current.
+  SUBROUTINE FISOC_coupler_regridMaskedField(srcField, dstField, dstMaskValue, rc)
+
+    TYPE(ESMF_Field), INTENT(IN)      :: srcField
+    TYPE(ESMF_Field), INTENT(INOUT)   :: dstField
+    INTEGER, INTENT(IN)               :: dstMaskValue
+    INTEGER, INTENT(OUT), OPTIONAL    :: rc
+
+    TYPE(ESMF_RouteHandle) :: maskedRouteHandle
+
+    CALL ESMF_FieldRegridStore(srcField=srcField,                      &
+         dstField=dstField,                                            &
+         regridmethod=ESMF_REGRIDMETHOD_NEAREST_DTOS,                  &
+         dstMaskValues=(/dstMaskValue/),                               &
+         routehandle=maskedRouteHandle, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    CALL ESMF_FieldRegrid(srcField, dstField,                          &
+         routehandle=maskedRouteHandle, zeroregion=ESMF_REGION_TOTAL,  &
+         checkflag=.TRUE., rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! destroy routehandle (need a new one next time anyway, since the mask may
+    ! have changed)
+    CALL ESMF_FieldRegridRelease(maskedRouteHandle, rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) &
+         CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    rc = ESMF_SUCCESS
+
+  END SUBROUTINE FISOC_coupler_regridMaskedField
 
 
 

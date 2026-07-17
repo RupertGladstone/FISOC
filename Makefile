@@ -141,7 +141,7 @@ $(SRCDIR)/FISOC_coupler.o:                  $(SRCDIR)/FISOC_coupler.f90
 $(SRCDIR)/FISOC_ISM.o:                      $(SRCDIR)/FISOC_ISM.f90 $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o $(SRCDIR)/FISOC_utils.o
 $(SRCDIR)/FISOC_OM.o:                       $(SRCDIR)/FISOC_OM.f90 $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o  $(SRCDIR)/FISOC_utils.o
 $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).o: $(SRCDIR)/FISOC_ISM_Wrapper_$(FISOC_ISM).f90 $(SRCDIR)/FISOC_types.o $(SRCDIR)/FISOC_utils.o 
-$(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o:   $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).f90 $(SRCDIR)/FISOC_types.o $(SRCDIR)/FISOC_utils.o
+$(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).o:   $(SRCDIR)/FISOC_OM_Wrapper_$(FISOC_OM).f90 $(SRCDIR)/FISOC_types.o $(SRCDIR)/FISOC_utils.o $(SRCDIR)/FISOC_coupler.o
 $(SRCDIR)/FISOC_utils.o:                    $(SRCDIR)/FISOC_utils.f90 $(SRCDIR)/FISOC_types.o
 $(SRCDIR)/FISOC_types.o:                    $(SRCDIR)/FISOC_types.f90
 

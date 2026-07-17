@@ -17,6 +17,7 @@ MODULE FISOC_OM_Wrapper
 
   USE FISOC_utils_MOD
   USE FISOC_types_MOD
+  USE FISOC_coupler_MOD,                 ONLY: FISOC_coupler_regridMaskedField
 
   ! LADDIE / UPSY library modules (mirrors the USE list of LADDIE_program.f90)
   USE petscksp
@@ -166,12 +167,13 @@ CONTAINS
   ! Init phase 2: ISM fields are now available. Stage 1 does no exchange, so here we just
   ! finish LADDIE's initialisation (subglacial-discharge transects + allocate model state),
   ! mirroring the rest of the LADDIE_program init sequence.
-  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(FISOC_config,vm,OM_ImpFB,OM_ExpFB,rc)
+  SUBROUTINE FISOC_OM_Wrapper_Init_Phase2(FISOC_config,vm,OM_ImpFB,OM_ExpFB,ISM_ExpFB,rc)
 
-    TYPE(ESMF_config),INTENT(INOUT)       :: FISOC_config
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)  :: OM_ImpFB, OM_ExpFB
-    TYPE(ESMF_VM),INTENT(IN)              :: vm
-    INTEGER,INTENT(OUT),OPTIONAL          :: rc
+    TYPE(ESMF_config),INTENT(INOUT)                :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)           :: OM_ImpFB, OM_ExpFB
+    TYPE(ESMF_fieldBundle),INTENT(IN),OPTIONAL     :: ISM_ExpFB
+    TYPE(ESMF_VM),INTENT(IN)                       :: vm
+    INTEGER,INTENT(OUT),OPTIONAL                   :: rc
 
     INTEGER   :: localPet
     LOGICAL   :: verbose_coupling
@@ -193,7 +195,7 @@ CONTAINS
             line=__LINE__, file=__FILE__, rc=rc)
     END IF
 
-    CALL sendFieldDataToOM(OM_ImpFB, FISOC_config, vm, rc=rc)
+    CALL sendFieldDataToOM(OM_ImpFB, FISOC_config, vm, ISM_ExpFB=ISM_ExpFB, rc=rc)
     IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
@@ -228,10 +230,11 @@ CONTAINS
   END SUBROUTINE FISOC_OM_Wrapper_Init_Phase2
 
 
-  SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB,OM_ImpFB,rc_local)
+  SUBROUTINE FISOC_OM_Wrapper_Run(FISOC_config,vm,OM_ExpFB,OM_ImpFB,ISM_ExpFB,rc_local)
 
     TYPE(ESMF_config),INTENT(INOUT)                :: FISOC_config
     TYPE(ESMF_fieldBundle),INTENT(INOUT),OPTIONAL  :: OM_ExpFB, OM_ImpFB
+    TYPE(ESMF_fieldBundle),INTENT(IN),OPTIONAL     :: ISM_ExpFB
     TYPE(ESMF_VM),INTENT(IN)                       :: vm
     INTEGER,INTENT(OUT),OPTIONAL                   :: rc_local
 
@@ -250,7 +253,7 @@ CONTAINS
          line=__LINE__, file=__FILE__)) CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     IF (PRESENT(OM_ImpFB)) THEN
-       CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc=rc)
+       CALL sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,ISM_ExpFB=ISM_ExpFB,rc=rc)
        IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
     END IF
@@ -476,6 +479,94 @@ CONTAINS
   END SUBROUTINE LADDIE2ESMF_mesh
 
 
+  ! Rebuilds an ESMF Mesh identical in nodes/elements/ownership to LADDIE2ESMF_mesh's
+  ! OM_mesh, but with a nodeMask attached (MASK_DRY at vertices that are grounded ice
+  ! or icefree land, 0 elsewhere -- i.e. not a valid subglacial-discharge destination).
+  ! Node masking can only be set at ESMF_MeshCreate time (ESMF_MeshSet only supports
+  ! updating elementMask in place, not nodeMask -- confirmed against ESMF_refdoc-1.pdf
+  ! 34.4.20/34.3.11), and forcing%mask_grounded_ice/mask_icefree_land evolve every
+  ! coupling step, so unlike the long-lived OM_mesh, this one is rebuilt fresh every
+  ! time it's needed (see FISOC_coupler_regridMaskedField, which likewise rebuilds its
+  ! routehandle fresh every call for the same reason). The node construction here is
+  ! deterministic and identical to LADDIE2ESMF_mesh's, so the existing module-level
+  ! OM_localNode2globalVi mapping still applies to Fields built on this mesh -- no
+  ! separate mapping is computed or returned.
+  SUBROUTINE LADDIE2ESMF_mesh_masked(mesh,forcing,OM_mesh_masked,rc)
+
+    TYPE(type_mesh),INTENT(IN)               :: mesh
+    TYPE(type_laddie_forcing),INTENT(IN)     :: forcing
+    TYPE(ESMF_mesh),INTENT(OUT)              :: OM_mesh_masked
+    INTEGER,INTENT(OUT),OPTIONAL             :: rc
+
+    INTEGER                          :: ti, vi, kk, lid, owner
+    INTEGER                          :: nLocalElems, nLocalNodes
+    INTEGER,ALLOCATABLE              :: gi2local(:)
+    INTEGER,ALLOCATABLE              :: nodeIds(:), nodeOwners(:), nodeMask(:)
+    INTEGER,ALLOCATABLE              :: elemIds(:), elemTypes(:), elemConn(:)
+    REAL(ESMF_KIND_R8),ALLOCATABLE   :: nodeCoords(:)
+
+    nLocalElems = mesh%ti2 - mesh%ti1 + 1
+
+    ALLOCATE(gi2local(mesh%nV))
+    gi2local = 0
+    nLocalNodes = 0
+    DO ti = mesh%ti1, mesh%ti2
+       DO kk = 1,3
+          vi = mesh%Tri(ti,kk)
+          IF (gi2local(vi) == 0) THEN
+             nLocalNodes = nLocalNodes + 1
+             gi2local(vi) = nLocalNodes
+          END IF
+       END DO
+    END DO
+
+    ALLOCATE(nodeIds(nLocalNodes), nodeOwners(nLocalNodes), nodeCoords(2*nLocalNodes), &
+         nodeMask(nLocalNodes))
+    DO vi = 1, mesh%nV
+       lid = gi2local(vi)
+       IF (lid > 0) THEN
+          owner = mesh%Tri_owning_process(mesh%iTri(vi,1))
+          DO kk = 2, mesh%niTri(vi)
+             owner = MIN(owner, mesh%Tri_owning_process(mesh%iTri(vi,kk)))
+          END DO
+          nodeIds(lid)        = vi
+          nodeOwners(lid)     = owner
+          nodeCoords(2*lid-1) = mesh%V(vi,1)
+          nodeCoords(2*lid  ) = mesh%V(vi,2)
+          IF (forcing%mask_grounded_ice(vi) .OR. forcing%mask_icefree_land(vi)) THEN
+             nodeMask(lid) = MASK_DRY
+          ELSE
+             nodeMask(lid) = 0
+          END IF
+       END IF
+    END DO
+
+    ALLOCATE(elemIds(nLocalElems), elemTypes(nLocalElems), elemConn(3*nLocalElems))
+    elemTypes = ESMF_MESHELEMTYPE_TRI
+    kk = 0
+    DO ti = mesh%ti1, mesh%ti2
+       kk = kk + 1
+       elemIds(kk)       = ti
+       elemConn(3*kk-2)  = gi2local(mesh%Tri(ti,1))
+       elemConn(3*kk-1)  = gi2local(mesh%Tri(ti,2))
+       elemConn(3*kk  )  = gi2local(mesh%Tri(ti,3))
+    END DO
+
+    OM_mesh_masked = ESMF_MeshCreate(parametricDim=2, spatialDim=2, &
+         coordSys=ESMF_COORDSYS_CART,                        &
+         nodeIds=nodeIds, nodeCoords=nodeCoords,             &
+         nodeOwners=nodeOwners, nodeMask=nodeMask,           &
+         elementIds=elemIds, elementTypes=elemTypes,         &
+         elementConn=elemConn,                               &
+         rc=rc)
+    IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    DEALLOCATE(gi2local, nodeIds, nodeOwners, nodeCoords, nodeMask, elemIds, elemTypes, elemConn)
+
+  END SUBROUTINE LADDIE2ESMF_mesh_masked
+
+
   SUBROUTINE getFieldDataFromOM(OM_ExpFB,FISOC_config,vm,rc)
 
     TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: OM_ExpFB
@@ -547,20 +638,24 @@ CONTAINS
   ! and sea level are NOT updated from the ISM -- LADDIE's own reference-geometry starting
   ! values (forcing%Hb; sea level assumed 0, matching typical modern-day setups) are
   ! trusted for the whole run.
-  SUBROUTINE sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,rc)
+  SUBROUTINE sendFieldDataToOM(OM_ImpFB,FISOC_config,vm,ISM_ExpFB,rc)
 
-    TYPE(ESMF_fieldBundle),INTENT(INOUT)     :: OM_ImpFB
-    TYPE(ESMF_config),INTENT(INOUT)          :: FISOC_config
-    TYPE(ESMF_VM),INTENT(IN)                 :: vm
-    INTEGER,INTENT(OUT),OPTIONAL             :: rc
+    TYPE(ESMF_fieldBundle),INTENT(INOUT)          :: OM_ImpFB
+    TYPE(ESMF_config),INTENT(INOUT)               :: FISOC_config
+    TYPE(ESMF_fieldBundle),INTENT(IN),OPTIONAL    :: ISM_ExpFB
+    TYPE(ESMF_VM),INTENT(IN)                      :: vm
+    INTEGER,INTENT(OUT),OPTIONAL                  :: rc
 
     INTEGER                               :: fieldCount, ii, nn, vi
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
-    CHARACTER(len=ESMF_MAXSTR)            :: fieldName
+    CHARACTER(len=ESMF_MAXSTR)            :: fieldName, label, listLabel
     REAL(ESMF_KIND_R8),POINTER            :: ptr(:)
     REAL(dp),ALLOCATABLE                  :: SL(:)
     LOGICAL,ALLOCATABLE                   :: mask_margin(:), mask_gl_gr(:), mask_cf_gr(:), &
                                               mask_cf_fl(:), mask_coastline(:)
+    TYPE(ESMF_Field)                      :: SGD_srcField, SGD_dstField
+    TYPE(ESMF_mesh)                       :: SGD_dstMesh
+    REAL(ESMF_KIND_R8),POINTER            :: SGD_ptr(:)
     LOGICAL                               :: gotIceThicknessUpdate
 
     rc = ESMF_FAILURE
@@ -640,6 +735,55 @@ CONTAINS
 
        DEALLOCATE(SL, mask_margin, mask_gl_gr, mask_cf_gr, mask_cf_fl, mask_coastline)
 
+    END IF
+
+    ! Subglacial discharge from the ISM (e.g. Elmer/GlaDS), if configured. Uses
+    ! forcing%mask_grounded_ice/mask_icefree_land as currently held -- freshly
+    ! updated above if ice thickness came in this step, otherwise whatever they
+    ! were last set to (trust the config, same philosophy as ISM_thick above).
+    IF (PRESENT(ISM_ExpFB)) THEN
+       label = "ISM_SGD_flux"
+       listLabel = "ISM2OM_vars"
+       IF (FISOC_ConfigStringListContains(FISOC_config,label,listLabel,rc=rc)) THEN
+
+          CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_SGD_flux", field=SGD_srcField, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+          ! Rebuilt fresh every call: forcing%mask_grounded_ice/mask_icefree_land evolve
+          ! every step, and node masking can't be updated on an existing Mesh (see
+          ! LADDIE2ESMF_mesh_masked).
+          CALL LADDIE2ESMF_mesh_masked(mesh, forcing, SGD_dstMesh, rc=rc)
+
+          SGD_dstField = ESMF_FieldCreate(SGD_dstMesh, typekind=ESMF_TYPEKIND_R8, &
+               meshloc=ESMF_MESHLOC_NODE, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+          ! zeroregion=TOTAL: nodes excluded by the mask (grounded/icefree land) are reset
+          ! to zero, matching the physical expectation of no subglacial discharge there,
+          ! rather than retaining a stale value from a previous step.
+          CALL FISOC_coupler_regridMaskedField(SGD_srcField, SGD_dstField, MASK_DRY, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+          CALL ESMF_FieldGet(SGD_dstField, farrayPtr=SGD_ptr, rc=rc)
+          IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+               line=__LINE__, file=__FILE__)) CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+          ! ptr holds this PET's *owned* nodes only, in the same order as
+          ! OM_localNode2globalVi (see LADDIE2ESMF_mesh_masked - construction is
+          ! identical to the long-lived OM_mesh, so the same mapping applies).
+          ! Volume flux [m^3 s^-1] -> rate [m s^-1], matching how LADDIE's own
+          ! compute_subglacial_discharge normalises by area (laddie_physics.f90).
+          DO ii = 1,SIZE(SGD_ptr)
+             laddie%SGD( OM_localNode2globalVi(ii)) = SGD_ptr(ii) / mesh%A( OM_localNode2globalVi(ii))
+          END DO
+
+          CALL ESMF_FieldDestroy(SGD_dstField, rc=rc)
+          CALL ESMF_MeshDestroy(SGD_dstMesh, rc=rc)
+
+       END IF
     END IF
 
     rc = ESMF_SUCCESS
