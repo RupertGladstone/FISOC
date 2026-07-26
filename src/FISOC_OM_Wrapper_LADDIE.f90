@@ -713,10 +713,22 @@ CONTAINS
        ! UFEMISM. geom is a scratch, subroutine-local instance: allocate/fill/consume/let
        ! it finalise (type_ice_geometry_model has a FINAL procedure) each call, rather than
        ! keeping one around persistently, since it's only needed transiently here.
+       !
+       ! IMPORTANT: geom's fields are allocated at [mesh%vi1:mesh%vi2]/[mesh%ti1:mesh%ti2]
+       ! (this process's own local range only -- see allocate_ice_geometry_model), while
+       ! forcing's fields are dist_shared at [pai_V%i1_nih:i2_nih]/[pai_Tri%i1_nih:i2_nih]
+       ! (this whole shared-memory node's range, including halo -- see
+       ! laddie_utilities.f90's allocate_laddie_forcing). These are genuinely different
+       ! sizes. A bare whole-array "geom%Hi = forcing%Hi" would silently trigger Fortran's
+       ! reallocate-on-assignment for the (allocatable) LHS, resizing just that one field
+       ! and leaving geom internally inconsistent; a bare "forcing%Hs = geom%Hs" would hit
+       ! a hard runtime bounds-check failure since forcing%Hs is a pointer (no
+       ! reallocation). Always copy through the explicit vi1:vi2/ti1:ti2 section instead,
+       ! which is valid and matching on both sides.
        CALL geom%allocate( 'ANT', mesh)
-       geom%Hi = forcing%Hi
-       geom%Hb = forcing%Hb
-       geom%SL = 0.0_dp   ! LADDIE's own sea level is not available, but LADDIE assumes it to be zero, so we do too.
+       geom%Hi(mesh%vi1:mesh%vi2) = forcing%Hi(mesh%vi1:mesh%vi2)
+       geom%Hb(mesh%vi1:mesh%vi2) = forcing%Hb(mesh%vi1:mesh%vi2)
+       geom%SL(mesh%vi1:mesh%vi2) = 0.0_dp   ! LADDIE's own sea level is not available, but LADDIE assumes it to be zero, so we do too.
 
        CALL geom%calc_surface_elevation()
        CALL geom%calc_ice_base_elevation()
@@ -724,17 +736,17 @@ CONTAINS
        CALL geom%determine_masks()
        CALL geom%calc_ice_base_slopes()
 
-       forcing%Hs                 = geom%Hs
-       forcing%Hib                = geom%Hib
-       forcing%TAF                = geom%TAF
-       forcing%mask                = geom%mask
-       forcing%mask_icefree_land  = geom%mask_icefree_land
-       forcing%mask_icefree_ocean = geom%mask_icefree_ocean
-       forcing%mask_grounded_ice  = geom%mask_grounded_ice
-       forcing%mask_floating_ice  = geom%mask_floating_ice
-       forcing%mask_gl_fl         = geom%mask_gl_fl
-       forcing%dHib_dx_b          = geom%dHib_dx_b
-       forcing%dHib_dy_b          = geom%dHib_dy_b
+       forcing%Hs(mesh%vi1:mesh%vi2)                 = geom%Hs(mesh%vi1:mesh%vi2)
+       forcing%Hib(mesh%vi1:mesh%vi2)                = geom%Hib(mesh%vi1:mesh%vi2)
+       forcing%TAF(mesh%vi1:mesh%vi2)                = geom%TAF(mesh%vi1:mesh%vi2)
+       forcing%mask(mesh%vi1:mesh%vi2)               = geom%mask(mesh%vi1:mesh%vi2)
+       forcing%mask_icefree_land(mesh%vi1:mesh%vi2)  = geom%mask_icefree_land(mesh%vi1:mesh%vi2)
+       forcing%mask_icefree_ocean(mesh%vi1:mesh%vi2) = geom%mask_icefree_ocean(mesh%vi1:mesh%vi2)
+       forcing%mask_grounded_ice(mesh%vi1:mesh%vi2)  = geom%mask_grounded_ice(mesh%vi1:mesh%vi2)
+       forcing%mask_floating_ice(mesh%vi1:mesh%vi2)  = geom%mask_floating_ice(mesh%vi1:mesh%vi2)
+       forcing%mask_gl_fl(mesh%vi1:mesh%vi2)         = geom%mask_gl_fl(mesh%vi1:mesh%vi2)
+       forcing%dHib_dx_b(mesh%ti1:mesh%ti2)          = geom%dHib_dx_b(mesh%ti1:mesh%ti2)
+       forcing%dHib_dy_b(mesh%ti1:mesh%ti2)          = geom%dHib_dy_b(mesh%ti1:mesh%ti2)
 
        CALL geom%deallocate()
 
