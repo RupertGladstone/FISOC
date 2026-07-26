@@ -36,9 +36,7 @@ MODULE FISOC_OM_Wrapper
   USE LADDIE_main_model,                 ONLY: initialise_laddie_model, run_laddie_model
   USE netcdf_resource_tracking,          ONLY: create_resource_tracking_file, &
                                                write_to_resource_tracking_file
-  USE masks_mod,                         ONLY: determine_masks
-  USE ice_geometry_basics,               ONLY: ice_surface_elevation, thickness_above_floatation
-  USE mesh_disc_apply_operators,         ONLY: ddx_a_b_2D, ddy_a_b_2D
+  USE ice_geometry_model_basic,          ONLY: type_ice_geometry_model
 
   IMPLICIT NONE
 
@@ -50,7 +48,7 @@ MODULE FISOC_OM_Wrapper
   ! Persistent LADDIE state, held across the FISOC phases (as the FVCOM/ROMS wrappers hold
   ! their model state in module variables). LADDIE's mesh is built in Init_Phase1 by
   ! initialise_forcing; the model state is allocated in Init_Phase2.
-  TYPE(type_mesh),           SAVE :: mesh
+  TYPE(type_mesh),           SAVE, TARGET :: mesh
   TYPE(type_laddie_model),   SAVE :: laddie
   TYPE(type_laddie_forcing), SAVE :: forcing
 
@@ -135,8 +133,10 @@ CONTAINS
     CALL create_resource_tracking_file( C%output_dir)
 
     ! initialise_forcing builds LADDIE's (UPSY) mesh from the reference-geometry file and
-    ! sets up the ambient ocean forcing. After this, `mesh` is populated.
-    CALL initialise_forcing( mesh, forcing)
+    ! sets up the ambient ocean forcing. After this, `mesh` is populated. 'ANT' matches the
+    ! region_name convention used everywhere else in this single-region (Antarctica) LADDIE
+    ! build (e.g. C%lambda_M_ANT, laddie_forcing_main.f90's own 'ANT' calls).
+    CALL initialise_forcing( mesh, forcing, 'ANT')
 
     ! Translate the LADDIE mesh into an ESMF_Mesh to return to FISOC.
     CALL LADDIE2ESMF_mesh(FISOC_config, mesh, OM_mesh, vm, rc=rc)
@@ -646,13 +646,11 @@ CONTAINS
     TYPE(ESMF_VM),INTENT(IN)                      :: vm
     INTEGER,INTENT(OUT),OPTIONAL                  :: rc
 
-    INTEGER                               :: fieldCount, ii, nn, vi
+    INTEGER                               :: fieldCount, ii, nn
     TYPE(ESMF_Field),ALLOCATABLE          :: fieldList(:)
     CHARACTER(len=ESMF_MAXSTR)            :: fieldName, label, listLabel
     REAL(ESMF_KIND_R8),POINTER            :: ptr(:)
-    REAL(dp),ALLOCATABLE                  :: SL(:)
-    LOGICAL,ALLOCATABLE                   :: mask_margin(:), mask_gl_gr(:), mask_cf_gr(:), &
-                                              mask_cf_fl(:), mask_coastline(:)
+    TYPE(type_ice_geometry_model)         :: geom
     TYPE(ESMF_Field)                      :: SGD_srcField, SGD_dstField
     TYPE(ESMF_mesh)                       :: SGD_dstMesh
     REAL(ESMF_KIND_R8),POINTER            :: SGD_ptr(:)
@@ -708,32 +706,37 @@ CONTAINS
     IF (gotIceThicknessUpdate) THEN
 
        ! Recompute LADDIE's derived geometry (surface elevation, draft, thickness-above-
-       ! floatation, masks, b-grid draft slopes) from the freshly-updated ice thickness --
-       ! same fields, same utilities, as native UFEMISM+LADDIE forcing updates (compare
-       ! laddie_forcing_main.f90's initialise_forcing and BMB_main.f90's
-       ! update_laddie_forcing), just computed here rather than copied from UFEMISM.
-       ALLOCATE(SL(mesh%vi1:mesh%vi2))
-       SL = 0.0_dp   ! LADDIE's own sea level is not available, but LADDIE assumes it to be zero, so we do too.
+       ! floatation, masks, b-grid draft slopes) from the freshly-updated ice thickness,
+       ! using the same type-bound ice_geometry_model machinery as native UFEMISM+LADDIE
+       ! forcing updates (compare laddie_forcing_main.f90's initialise_forcing and
+       ! BMB_main.f90's update_laddie_forcing), just computed here rather than copied from
+       ! UFEMISM. geom is a scratch, subroutine-local instance: allocate/fill/consume/let
+       ! it finalise (type_ice_geometry_model has a FINAL procedure) each call, rather than
+       ! keeping one around persistently, since it's only needed transiently here.
+       CALL geom%allocate( 'ANT', mesh)
+       geom%Hi = forcing%Hi
+       geom%Hb = forcing%Hb
+       geom%SL = 0.0_dp   ! LADDIE's own sea level is not available, but LADDIE assumes it to be zero, so we do too.
 
-       ALLOCATE(mask_margin(mesh%vi1:mesh%vi2), mask_gl_gr(mesh%vi1:mesh%vi2), &
-            mask_cf_gr(mesh%vi1:mesh%vi2), mask_cf_fl(mesh%vi1:mesh%vi2), &
-            mask_coastline(mesh%vi1:mesh%vi2))
+       CALL geom%calc_surface_elevation()
+       CALL geom%calc_ice_base_elevation()
+       CALL geom%calc_thickness_above_floatation()
+       CALL geom%determine_masks()
+       CALL geom%calc_ice_base_slopes()
 
-       DO vi = mesh%vi1, mesh%vi2
-          forcing%Hs ( vi) = ice_surface_elevation( forcing%Hi( vi), forcing%Hb( vi), SL( vi))
-          forcing%Hib( vi) = forcing%Hs( vi) - forcing%Hi( vi)
-          forcing%TAF( vi) = thickness_above_floatation( forcing%Hi( vi), forcing%Hb( vi), SL( vi))
-       END DO
+       forcing%Hs                 = geom%Hs
+       forcing%Hib                = geom%Hib
+       forcing%TAF                = geom%TAF
+       forcing%mask                = geom%mask
+       forcing%mask_icefree_land  = geom%mask_icefree_land
+       forcing%mask_icefree_ocean = geom%mask_icefree_ocean
+       forcing%mask_grounded_ice  = geom%mask_grounded_ice
+       forcing%mask_floating_ice  = geom%mask_floating_ice
+       forcing%mask_gl_fl         = geom%mask_gl_fl
+       forcing%dHib_dx_b          = geom%dHib_dx_b
+       forcing%dHib_dy_b          = geom%dHib_dy_b
 
-       CALL determine_masks( mesh, forcing%Hi, forcing%Hb, SL, forcing%mask,          &
-            forcing%mask_icefree_land, forcing%mask_icefree_ocean,                    &
-            forcing%mask_grounded_ice, forcing%mask_floating_ice,                     &
-            mask_margin, forcing%mask_gl_fl, mask_gl_gr, mask_cf_gr, mask_cf_fl, mask_coastline)
-
-       CALL ddx_a_b_2D( mesh, forcing%Hib, forcing%dHib_dx_b)
-       CALL ddy_a_b_2D( mesh, forcing%Hib, forcing%dHib_dy_b)
-
-       DEALLOCATE(SL, mask_margin, mask_gl_gr, mask_cf_gr, mask_cf_fl, mask_coastline)
+       CALL geom%deallocate()
 
     END IF
 
