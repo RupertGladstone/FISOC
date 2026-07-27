@@ -761,6 +761,23 @@ CONTAINS
        listLabel = "ISM2OM_vars"
        IF (FISOC_ConfigStringListContains(FISOC_config,label,listLabel,rc=rc)) THEN
 
+          ! laddie%SGD is only allocated once initialise_laddie_model has run (see
+          ! FISOC_OM_Wrapper_Init_Phase2, which calls sendFieldDataToOM -- this routine
+          ! -- *before* initialise_laddie_model, since the latter needs this routine's
+          ! own ice-thickness/mask refresh above to have already happened). So on that
+          ! one very first call, laddie itself doesn't exist yet; skip the SGD update
+          ! this one time rather than indexing an unallocated array -- real SGD values
+          ! get applied starting from the next call (the first regular Run cycle),
+          ! well after initialise_laddie_model has completed.
+          IF (.NOT. ASSOCIATED(laddie%SGD)) THEN
+             CALL ESMF_LogWrite("sendFieldDataToOM: laddie%SGD not yet allocated "// &
+                  "(expected on the first Init Phase 2 call only) -- skipping SGD "// &
+                  "update this call.", logmsgFlag=ESMF_LOGMSG_INFO, &
+                  line=__LINE__, file=__FILE__, rc=rc)
+             rc = ESMF_SUCCESS
+             RETURN
+          END IF
+
           CALL ESMF_FieldBundleGet(ISM_ExpFB, fieldName="ISM_SGD_flux", field=SGD_srcField, rc=rc)
           IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                line=__LINE__, file=__FILE__)) CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
