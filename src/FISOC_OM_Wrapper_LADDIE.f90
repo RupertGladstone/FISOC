@@ -686,6 +686,12 @@ CONTAINS
           END DO
           gotIceThicknessUpdate = .TRUE.
 
+       CASE('ISM_SGD_flux')
+          CALL ESMF_LogWrite("sendFieldDataToOM: ISM_SGD_flux handled separately", &
+               logmsgFlag=ESMF_LOGMSG_INFO, &
+               line=__LINE__, file=__FILE__, rc=rc)
+          rc = ESMF_SUCCESS
+
        CASE DEFAULT
           ! Trust the config: a field FISOC hands us that we don't act on is allowed --
           ! e.g. ISM2OM_vars: naming something LADDIE has no use for. Only ISM_thick
