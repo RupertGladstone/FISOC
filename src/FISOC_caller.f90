@@ -17,6 +17,7 @@ PROGRAM FISOC_main
   ! Timekeeping
   TYPE(ESMF_Clock)        :: FISOC_clock
   LOGICAL                 :: tight_coupling
+  LOGICAL                 :: defaultCalKindPresent
 
   TYPE(ESMF_VM)           :: vm
   INTEGER                 :: localPet
@@ -32,18 +33,27 @@ PROGRAM FISOC_main
   ! Initialize ESMF framework and load the FISOC configuration file in the same call.
   !
   ! defaultCalKind: is a REQUIRED label in FISOC_config.rc. It is one of the "predefined
-  ! labels" ESMF_Initialize looks for when given configFilename (ESMF ref. manual sec.
-  ! 16.4.1), and it sets ESMF's default Calendar -- used implicitly by every
-  ! ESMF_TimeSet/ESMF_ClockCreate call in FISOC_setClocks (start_year/month, end_year/month,
-  ! run length, etc). Valid values (ESMF ref. manual sec. 43.2.1) include
-  ! ESMF_CALKIND_360DAY, ESMF_CALKIND_NOLEAP, ESMF_CALKIND_JULIAN, ESMF_CALKIND_GREGORIAN.
-  ! If the label is omitted, ESMF silently falls back to ESMF_CALKIND_NOCALENDAR, which
-  ! then makes every yy=/mm=/dd= ESMF_TimeSet call in FISOC_setClocks fail with a caught,
-  ! non-zero rc -- so an omitted label is a loud failure at startup, not a silent one.
+  ! labels" ESMF_Initialize looks for when given configFilename and it sets ESMF's default
+  ! Calendar -- used implicitly by every ESMF_TimeSet/ESMF_ClockCreate call in
+  ! FISOC_setClocks. Valid values (see also ESMF ref. manual) include ESMF_CALKIND_360DAY,
+  ! ESMF_CALKIND_NOLEAP, ESMF_CALKIND_JULIAN, ESMF_CALKIND_GREGORIAN.
   CALL ESMF_Initialize(configFilename="./FISOC_config.rc", config=FISOC_config, &
        logkindflag=ESMF_LOGKIND_MULTI, rc=rc)
   IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) THEN
+     CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+  END IF
+
+  CALL ESMF_ConfigFindLabel(FISOC_config, "defaultCalKind:", &
+       isPresent=defaultCalKindPresent, rc=rc)
+  IF (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__)) &
+       CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
+  IF (.NOT. defaultCalKindPresent) THEN
+     msg = "ERROR: required label 'defaultCalKind:' not found in FISOC_config.rc. "// &
+          "See the comment above this check in FISOC_caller.f90 for why it is required."
+     CALL ESMF_LogWrite(msg, logmsgFlag=ESMF_LOGMSG_ERROR, &
+          line=__LINE__, file=__FILE__, rc=rc)
      CALL ESMF_Finalize(endflag=ESMF_END_ABORT)
   END IF
 

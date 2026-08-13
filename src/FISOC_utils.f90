@@ -132,7 +132,7 @@ CONTAINS
 
 
   !------------------------------------------------------------------------------
-  ! Createpet lists for components to be run on a subset of all pets
+  ! Create pet lists for components to be run on a subset of all pets
   !
   SUBROUTINE FISOC_MakePetList(VM, NumPartitions, PetList, ContextFlag, FirstPet)
 
